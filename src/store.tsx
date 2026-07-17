@@ -31,8 +31,12 @@ import {
 
 export type Tab = 'train' | 'history' | 'progress' | 'menu';
 
+/** Тема оформления: как в системе / всегда светлая / всегда тёмная */
+export type Theme = 'system' | 'light' | 'dark';
+
 export interface Settings {
   keepAwake: boolean;
+  theme: Theme;
 }
 
 export interface Occurrence {
@@ -54,10 +58,11 @@ const RELOAD_IF_STALE_MS = 60_000;
 interface UiPersist {
   editMode: boolean;
   keepAwake: boolean;
+  theme: Theme;
 }
 
 function readUi(): UiPersist {
-  const fallback: UiPersist = { editMode: false, keepAwake: false };
+  const fallback: UiPersist = { editMode: false, keepAwake: false, theme: 'system' };
   try {
     const raw = localStorage.getItem(UI_KEY);
     return raw ? { ...fallback, ...(JSON.parse(raw) as Partial<UiPersist>) } : fallback;
@@ -526,7 +531,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDirtyGuard,
     openExerciseId,
     showExerciseProgress,
-    settings: { keepAwake: ui.keepAwake },
+    settings: { keepAwake: ui.keepAwake, theme: ui.theme },
     setSettings,
     exerciseById,
     workoutById,

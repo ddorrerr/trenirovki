@@ -387,6 +387,18 @@ function InsertSlot({ onClick }: { onClick: () => void }) {
 /* --- Карточка одного упражнения ----------------------------------------- */
 /* Название нарочно не «ItemCard» — так зовут карточку чтения в train/. */
 
+/** «3х12-10» → поля {sets: '3', reps: '12-10'}; свободный текст целиком в reps */
+function splitSetsReps(raw: string): { sets: string; reps: string } {
+  const m = /^\s*(\d+)\s*[xхXХ]\s*([\s\S]*)$/.exec(raw);
+  return m ? { sets: m[1], reps: m[2].trim() } : { sets: '', reps: raw.trim() };
+}
+
+function joinSetsReps(sets: string, reps: string): string {
+  const s = sets.trim();
+  const r = reps.trim();
+  return s && r ? `${s}х${r}` : s || r;
+}
+
 interface ItemEditorCardProps {
   item: WorkoutItem;
   index: number;
@@ -409,6 +421,7 @@ function ItemEditorCard({
   createExercise,
 }: ItemEditorCardProps) {
   const subNotes = item.subNotes ?? [];
+  const sr = splitSetsReps(item.setsReps?.raw ?? '');
   return (
     <article className="rounded-2xl border border-border bg-card p-4">
       <div className="flex items-start gap-2">
@@ -451,12 +464,19 @@ function ItemEditorCard({
         />
       </div>
 
+      {/* Подходы и повторы — отдельными полями (в чтении так и останется «3х12») */}
       <div className="mt-3 grid grid-cols-2 gap-3">
         <TextField
-          label="Подходы×повторы"
-          value={item.setsReps?.raw ?? ''}
-          placeholder="3х12"
-          onCommit={(v) => patchItem(item.id, { setsReps: parseSetsReps(v) })}
+          label="Подходы"
+          value={sr.sets}
+          placeholder="3"
+          onCommit={(v) => patchItem(item.id, { setsReps: parseSetsReps(joinSetsReps(v, sr.reps)) })}
+        />
+        <TextField
+          label="Повторы"
+          value={sr.reps}
+          placeholder="12 или 12-10"
+          onCommit={(v) => patchItem(item.id, { setsReps: parseSetsReps(joinSetsReps(sr.sets, v)) })}
         />
         <TextField
           label="Вес, кг"
@@ -476,15 +496,15 @@ function ItemEditorCard({
           placeholder="1.5"
           onCommit={(v) => patchItem(item.id, { rest: v.trim() || null })}
         />
-      </div>
-
-      <div className="mt-3 space-y-3">
         <TextField
           label="Темп"
           value={item.tempo ?? ''}
           placeholder="напр. спуск 2-3 сек"
           onCommit={(v) => patchItem(item.id, { tempo: v.trim() || null })}
         />
+      </div>
+
+      <div className="mt-3 space-y-3">
         <TextAreaField
           label="Техника (пункты с новой строки)"
           value={subNotes.map((s) => s.text).join('\n')}

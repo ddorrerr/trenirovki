@@ -142,10 +142,11 @@ export default function TrainingScreen() {
                 В этой тренировке пока нет упражнений.
               </p>
             )}
-            {sortedItems.map((it) => (
+            {sortedItems.map((it, i) => (
               <ItemCard
                 key={it.id}
                 item={it}
+                num={i + 1}
                 exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
                 last={it.exerciseId ? lastResultBefore(it.exerciseId, w.date, w.id) : null}
                 onChange={(patch) => saveItem(it.id, patch)}

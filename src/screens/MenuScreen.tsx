@@ -1,7 +1,7 @@
 // Экран «Меню»: режим редактирования, настройки, данные, о приложении.
 
 import { useId, useState, type ReactNode } from 'react';
-import { useApp } from '../store';
+import { useApp, type Theme } from '../store';
 import { wakeLockSupported } from '../hooks/useWakeLock';
 import { downloadBackup } from '../lib/backup';
 import { fmtDate } from '../lib/dates';
@@ -63,6 +63,7 @@ export default function MenuScreen() {
           disabled={!supported}
           onChange={(v) => setSettings({ keepAwake: v })}
         />
+        <ThemeRow value={settings.theme} onChange={(theme) => setSettings({ theme })} />
       </Section>
 
       <Section title="Данные">
@@ -123,9 +124,46 @@ export default function MenuScreen() {
         <div className="space-y-1 px-4 py-3.5 text-sm text-muted">
           <p>{workoutsLine}</p>
           <p>{exercisesLine}</p>
-          <p>Версия 0.3.1</p>
+          <p>Версия 0.4.0</p>
         </div>
       </Section>
+    </div>
+  );
+}
+
+/* --- Тема оформления ---------------------------------------------------- */
+
+const THEME_OPTIONS: { value: Theme; label: string }[] = [
+  { value: 'system', label: 'Как в системе' },
+  { value: 'light', label: 'Светлая' },
+  { value: 'dark', label: 'Тёмная' },
+];
+
+function ThemeRow({ value, onChange }: { value: Theme; onChange: (t: Theme) => void }) {
+  return (
+    <div className="px-4 py-3.5">
+      <span className="block font-medium">Тема</span>
+      <div
+        role="radiogroup"
+        aria-label="Тема оформления"
+        className="mt-2.5 grid grid-cols-3 gap-1 rounded-xl bg-bg p-1"
+      >
+        {THEME_OPTIONS.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={value === o.value}
+            onClick={() => onChange(o.value)}
+            className={
+              'min-h-9 rounded-lg px-1 text-sm font-medium transition-colors ' +
+              (value === o.value ? 'bg-card shadow-sm' : 'text-muted')
+            }
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

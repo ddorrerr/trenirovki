@@ -1,7 +1,7 @@
 // Компактная ссылка на видео (Drive / Яндекс.Диск) — всегда обычная ссылка
 // в новой вкладке, никаких встраиваний.
 
-import { PlayIcon } from './icons';
+import { VideoIcon } from './icons';
 
 export default function VideoLink({
   href,
@@ -25,7 +25,7 @@ export default function VideoLink({
       }
     >
       {label}
-      <PlayIcon />
+      <VideoIcon size={16} />
     </a>
   );
 }

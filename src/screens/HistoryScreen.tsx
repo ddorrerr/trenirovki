@@ -19,13 +19,13 @@ import {
   Chip,
   IconCheck,
   IconComment,
-  IconPlay,
   IconPlus,
   IconX,
   TextField,
   inputCls,
   plural,
 } from '../components/edit/ui';
+import { VideoIcon } from '../components/train/icons';
 
 type Segment = 'workouts' | 'exercises';
 
@@ -554,7 +554,7 @@ function ExerciseRow({ e, count, lastDate, expanded, onToggle }: ExerciseRowProp
         </div>
         {e.videoUrl && (
           <span className="shrink-0 text-accent" title="Есть видео">
-            <IconPlay />
+            <VideoIcon size={18} />
           </span>
         )}
       </button>
@@ -598,7 +598,7 @@ function ExerciseDetails({ e }: { e: Exercise }) {
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 font-medium text-accent"
           >
-            <IconPlay size={16} /> Видео техники
+            <VideoIcon size={16} /> Видео техники
           </a>
         )}
         {recent.length > 0 && (

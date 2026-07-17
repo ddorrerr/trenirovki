@@ -7,19 +7,22 @@ import type { Occurrence } from '../../store';
 import { fmtDateShort } from '../../lib/dates';
 import VideoLink from './VideoLink';
 import {
-  BatteryIcon,
   CheckIcon,
   ChevronIcon,
-  ClockIcon,
+  DeadFaceIcon,
   DumbbellIcon,
   FlameIcon,
+  HistoryIcon,
   PinIcon,
+  RechargeIcon,
   RepeatIcon,
   VideoIcon,
 } from './icons';
 
 interface ItemCardProps {
   item: WorkoutItem;
+  /** Порядковый номер в тренировке (1..n) */
+  num: number;
   exercise: Exercise | undefined;
   last: Occurrence | null;
   /** Иммутабельный патч позиции — экран сам подменит её в workout и сохранит */
@@ -70,7 +73,7 @@ function lastSummary(it: WorkoutItem): string {
   return core || 'без записи';
 }
 
-export default function ItemCard({ item, exercise, last, onChange, onRest }: ItemCardProps) {
+export default function ItemCard({ item, num, exercise, last, onChange, onRest }: ItemCardProps) {
   const [open, setOpen] = useState(false);
 
   const name = exercise?.name ?? stripNumbering(item.nameRaw ?? '');
@@ -78,14 +81,25 @@ export default function ItemCard({ item, exercise, last, onChange, onRest }: Ite
   const myComment = (item.myComment ?? '').trim();
 
   /* Чипы параметров: вместо словесных подписей — иконки (слова остаются
-     для скринридера и в title при долгом тапе); «темп» оставлен словом. */
+     для скринридера и в title при долгом тапе); «темп» оставлен словом.
+     Записанный факт вытесняет план: показываем одно число, не оба. */
+  const factSets = item.actual?.sets ?? null;
+  const factReps = item.actual?.reps ?? null;
+  const setsRepsText =
+    factSets != null && factReps != null ? `${factSets}х${factReps}` : (item.setsReps?.raw ?? '');
+  const weightText =
+    item.actual?.weight != null
+      ? weightLabel(String(item.actual.weight))
+      : item.weight?.raw
+        ? weightLabel(item.weight.raw)
+        : '';
+
   const chips: { icon: ReactNode | null; name: string | null; text: string }[] = [];
-  if (item.setsReps?.raw)
-    chips.push({ icon: <RepeatIcon />, name: 'подходы × повторы', text: item.setsReps.raw });
-  if (item.weight?.raw)
-    chips.push({ icon: <DumbbellIcon />, name: 'вес', text: weightLabel(item.weight.raw) });
+  if (setsRepsText)
+    chips.push({ icon: <RepeatIcon />, name: 'подходы × повторы', text: setsRepsText });
+  if (weightText) chips.push({ icon: <DumbbellIcon />, name: 'вес', text: weightText });
   if (item.pvr)
-    chips.push({ icon: <BatteryIcon />, name: 'ПВР — повторы в резерве', text: item.pvr });
+    chips.push({ icon: <DeadFaceIcon />, name: 'ПВР — повторы в резерве', text: item.pvr });
   if (item.tempo) chips.push({ icon: null, name: null, text: `темп ${item.tempo}` });
 
   // Тап по карточке раскрывает её, но не когда попали в ссылку/кнопку/поле
@@ -100,14 +114,24 @@ export default function ItemCard({ item, exercise, last, onChange, onRest }: Ite
       onClick={handleCardClick}
       className="cursor-pointer rounded-2xl border border-border bg-card p-4"
     >
-      {/* Название + видео техники + отметка «выполнено» */}
+      {/* Номер + название + видео техники + отметка «выполнено» */}
       <div className="flex items-start gap-3">
+        <span
+          aria-hidden="true"
+          className={
+            'mt-0.5 flex h-6 min-w-6 shrink-0 items-center justify-center rounded-lg px-1 text-[13px] font-bold tabular-nums ' +
+            (item.done ? 'bg-bg text-muted' : 'bg-accent-soft text-accent')
+          }
+        >
+          {num}
+        </span>
         <h3
           className={
             'min-w-0 flex-1 break-words text-lg font-semibold leading-snug ' +
             (item.done ? 'text-muted' : '')
           }
         >
+          <span className="sr-only">{num}. </span>
           {name || 'Упражнение'}
         </h3>
         {videoUrl && (
@@ -174,7 +198,7 @@ export default function ItemCard({ item, exercise, last, onChange, onRest }: Ite
                 className="relative inline-flex max-w-full items-center gap-1 rounded-lg bg-accent-soft px-2 py-1 text-left text-sm font-medium underline decoration-dotted underline-offset-2 after:absolute after:-inset-1.5 after:content-['']"
               >
                 <span className="shrink-0 text-accent">
-                  <ClockIcon />
+                  <RechargeIcon />
                 </span>
                 <span className="sr-only">отдых: </span>
                 <span className="min-w-0 break-words">{restLabel(item.rest)}</span>
@@ -228,11 +252,20 @@ export default function ItemCard({ item, exercise, last, onChange, onRest }: Ite
           <p className="mt-2 break-words text-sm italic text-muted line-clamp-2">— {myComment}</p>
         )}
 
-        {/* Прошлый раз + шеврон */}
+        {/* Прошлый раз (иконка «Истории») + шеврон */}
         <div className="mt-3 flex items-center gap-2">
           {last ? (
-            <p className="min-w-0 flex-1 truncate text-sm text-muted">
-              Прошлый раз, {fmtDateShort(last.workout.date)}: {lastSummary(last.item)}
+            <p
+              title="прошлый раз"
+              className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-muted"
+            >
+              <span className="shrink-0" aria-hidden="true">
+                <HistoryIcon />
+              </span>
+              <span className="sr-only">прошлый раз, </span>
+              <span className="min-w-0 flex-1 truncate">
+                {fmtDateShort(last.workout.date)}: {lastSummary(last.item)}
+              </span>
             </p>
           ) : (
             <span className="flex-1" />

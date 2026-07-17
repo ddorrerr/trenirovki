@@ -28,6 +28,33 @@
   }
 }
 
+/* Принудительная тема из настроек (data-theme на <html>); селектор с атрибутом
+   специфичнее голого :root, поэтому побеждает и медиазапрос, и дефолт. */
+:root[data-theme="light"] {
+  --bg: #f6f7f8;
+  --card: #ffffff;
+  --fg: #16181c;
+  --muted: #6b7280;
+  --border: #e4e7eb;
+  --accent: #0f766e;
+  --accent-soft: #d5f5f0;
+  --accent-fg: #ffffff;
+  --danger: #b91c1c;
+  --ok: #15803d;
+}
+:root[data-theme="dark"] {
+  --bg: #101214;
+  --card: #1a1d21;
+  --fg: #f2f4f6;
+  --muted: #9aa2ad;
+  --border: #2a2f36;
+  --accent: #2dd4bf;
+  --accent-soft: #11403b;
+  --accent-fg: #04211d;
+  --danger: #f87171;
+  --ok: #4ade80;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-card: var(--card);

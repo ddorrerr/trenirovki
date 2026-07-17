@@ -1,22 +1,5 @@
 // Маленькие инлайновые иконки экрана «Тренировка» (наследуют currentColor).
 
-export function PlayIcon({ size = 13 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M8 5.5v13l11-6.5L8 5.5z" />
-    </svg>
-  );
-}
-
 export function ChevronIcon({ open, size = 20 }: { open: boolean; size?: number }) {
   return (
     <svg
@@ -152,8 +135,30 @@ export function DumbbellIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-/** ПВР — повторы «в резерве», батарейка с запасом */
-export function BatteryIcon({ size = 15 }: { size?: number }) {
+/** ПВР — повторы «в резерве»: смайлик с крестиками-глазами (до отказа) */
+export function DeadFaceIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M7.6 8.1l2.6 2.6M10.2 8.1l-2.6 2.6" />
+      <path d="M13.8 8.1l2.6 2.6M16.4 8.1l-2.6 2.6" />
+      <path d="M8.6 15.6c1 .9 2.1 1.3 3.4 1.3s2.4-.4 3.4-1.3" />
+    </svg>
+  );
+}
+
+/** Отдых — «подзарядка»: батарейка с молнией */
+export function RechargeIcon({ size = 15 }: { size?: number }) {
   return (
     <svg
       width={size}
@@ -168,8 +173,28 @@ export function BatteryIcon({ size = 15 }: { size?: number }) {
     >
       <rect x="2" y="7" width="16" height="10" rx="2" />
       <path d="M22 11v2" />
-      <path d="M6.5 11v2" />
-      <path d="M10.5 11v2" />
+      <path d="M10.5 8.6l-3.2 3.9h2.8l-.6 2.9 3.2-3.9h-2.8l.6-2.9z" fill="currentColor" strokeWidth="0.8" strokeLinejoin="miter" />
+    </svg>
+  );
+}
+
+/** «Прошлый раз» — та же стрелка-часы, что у вкладки «История» */
+export function HistoryIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l4 2" />
     </svg>
   );
 }

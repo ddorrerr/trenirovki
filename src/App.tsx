@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useApp, type SyncInfo, type Tab } from './store';
 import { fmtDateShort, fmtWeekday } from './lib/dates';
 import { useWakeLock } from './hooks/useWakeLock';
@@ -31,6 +32,19 @@ export default function App() {
     currentWorkout,
   } = useApp();
   useWakeLock(settings.keepAwake);
+
+  // Тема из настроек: атрибут на <html> включает CSS-переопределение,
+  // meta theme-color подгоняем, чтобы системная плашка совпадала с фоном.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (settings.theme === 'system') delete root.dataset.theme;
+    else root.dataset.theme = settings.theme;
+    const bg: Record<string, string> = { light: '#f6f7f8', dark: '#101214' };
+    document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((m) => {
+      const own = m.media.includes('dark') ? bg.dark : bg.light;
+      m.content = settings.theme === 'system' ? own : bg[settings.theme];
+    });
+  }, [settings.theme]);
 
   // В шапке — не имя приложения, а где ты находишься: на «Тренировке» дата
   // открытой тренировки, на остальных экранах название раздела.
@@ -144,13 +158,15 @@ function SyncBadge({
 }) {
   if (sync.mode !== 'github') return null;
 
-  const view: Record<string, { text: string; cls: string }> = {
-    saved: { text: 'сохранено', cls: 'text-muted' },
-    saving: { text: 'сохраняю…', cls: 'text-muted' },
-    pending: { text: 'сохраняю…', cls: 'text-muted' },
-    offline: { text: 'офлайн', cls: 'text-danger' },
-    error: { text: 'не сохранено', cls: 'text-danger' },
-    auth: { text: 'нет доступа', cls: 'text-danger' },
+  /* Компактный вариант: в норме — только огонёк (зелёный «всё сохранено»,
+     пульсирующий «сохраняю»); слово появляется лишь когда что-то не так. */
+  const view: Record<string, { text: string; ok: boolean }> = {
+    saved: { text: 'сохранено', ok: true },
+    saving: { text: 'сохраняю…', ok: true },
+    pending: { text: 'сохраняю…', ok: true },
+    offline: { text: 'офлайн', ok: false },
+    error: { text: 'не сохранено', ok: false },
+    auth: { text: 'нет доступа', ok: false },
   };
   const v = view[sync.state] ?? view.saved;
   const retryable = sync.state === 'offline' || sync.state === 'error';
@@ -160,19 +176,23 @@ function SyncBadge({
     <button
       onClick={needsKey ? onAuth : retryable ? onRetry : undefined}
       disabled={!retryable && !needsKey}
+      aria-label={`Синхронизация: ${v.text}`}
       title={
         needsKey
           ? 'Ключ больше не действует — нажми, чтобы ввести новый'
           : retryable
-            ? 'Нажми, чтобы повторить сохранение'
-            : 'Синхронизация с хранилищем'
+            ? `${v.text} — нажми, чтобы повторить сохранение`
+            : v.text
       }
-      className={'flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium ' + v.cls}
+      className={
+        'flex min-h-9 items-center gap-1.5 rounded-lg px-1.5 py-1 text-xs font-medium ' +
+        (v.ok ? 'text-muted' : 'text-danger')
+      }
     >
       <span
         aria-hidden="true"
         className={
-          'inline-block h-2 w-2 rounded-full ' +
+          'inline-block h-2.5 w-2.5 rounded-full ' +
           (sync.state === 'saved'
             ? 'bg-ok'
             : sync.state === 'saving' || sync.state === 'pending'
@@ -180,7 +200,7 @@ function SyncBadge({
               : 'bg-danger')
         }
       />
-      <span>{v.text}</span>
+      {!v.ok && <span>{v.text}</span>}
     </button>
   );
 }
