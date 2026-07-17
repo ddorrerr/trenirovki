@@ -62,3 +62,15 @@ button, input, textarea, select {
 button {
   touch-action: manipulation;
 }
+
+/* iOS Safari: у input[type=date] есть «родная» минимальная ширина,
+   из-за которой поле вылезает из своей колонки сетки и наезжает на соседнее. */
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+}
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}

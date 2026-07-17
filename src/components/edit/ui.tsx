@@ -7,7 +7,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 /** Единый вид текстовых полей редактора */
 export const inputCls = 'w-full rounded-xl border border-border bg-bg px-3 py-2';
 
-export function Labelled({ label, children }: { label: string; children: ReactNode }) {
+export function Labelled({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <label className="block min-w-0">
       <span className="mb-1 block text-sm text-muted">{label}</span>
@@ -17,7 +17,7 @@ export function Labelled({ label, children }: { label: string; children: ReactNo
 }
 
 interface TextFieldProps {
-  label: string;
+  label: ReactNode;
   value: string;
   onCommit: (v: string) => void;
   type?: 'text' | 'url' | 'date';
@@ -71,7 +71,7 @@ export function TextField({ label, value, onCommit, type = 'text', placeholder, 
 }
 
 interface TextAreaFieldProps {
-  label: string;
+  label: ReactNode;
   value: string;
   onCommit: (v: string) => void;
   placeholder?: string;

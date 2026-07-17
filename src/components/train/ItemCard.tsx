@@ -1,12 +1,22 @@
 // Карточка одного упражнения в тренировке: чипы параметров, заметки тренера,
 // «прошлый раз», отметка «выполнено» и лёгкий редактор (комментарий + факт).
 
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import type { Actual, Exercise, WorkoutItem } from '../../types';
 import type { Occurrence } from '../../store';
 import { fmtDateShort } from '../../lib/dates';
 import VideoLink from './VideoLink';
-import { CheckIcon, ChevronIcon, ClockIcon, PinIcon } from './icons';
+import {
+  BatteryIcon,
+  CheckIcon,
+  ChevronIcon,
+  ClockIcon,
+  DumbbellIcon,
+  FlameIcon,
+  PinIcon,
+  RepeatIcon,
+  VideoIcon,
+} from './icons';
 
 interface ItemCardProps {
   item: WorkoutItem;
@@ -27,6 +37,12 @@ function stripNumbering(raw: string): string {
 function restLabel(rest: string): string {
   const t = rest.trim();
   return /^[\d.,\s\-–—+]+$/.test(t) ? `${t} мин` : t;
+}
+
+/** Для чипа: «27.5» → «27.5 кг», а «12+12 кг» / свободный текст — как есть */
+function weightLabel(weight: string): string {
+  const t = weight.trim();
+  return /^[\d.,\s\-–—+]+$/.test(t) ? `${t} кг` : t;
 }
 
 /** Короткая строка «что было в прошлый раз» */
@@ -61,11 +77,16 @@ export default function ItemCard({ item, exercise, last, onChange, onRest }: Ite
   const videoUrl = item.videoUrl ?? exercise?.videoUrl ?? null;
   const myComment = (item.myComment ?? '').trim();
 
-  const chips: string[] = [];
-  if (item.setsReps?.raw) chips.push(item.setsReps.raw);
-  if (item.weight?.raw) chips.push(`вес ${item.weight.raw}`);
-  if (item.pvr) chips.push(`ПВР ${item.pvr}`);
-  if (item.tempo) chips.push(`темп ${item.tempo}`);
+  /* Чипы параметров: вместо словесных подписей — иконки (слова остаются
+     для скринридера и в title при долгом тапе); «темп» оставлен словом. */
+  const chips: { icon: ReactNode | null; name: string | null; text: string }[] = [];
+  if (item.setsReps?.raw)
+    chips.push({ icon: <RepeatIcon />, name: 'подходы × повторы', text: item.setsReps.raw });
+  if (item.weight?.raw)
+    chips.push({ icon: <DumbbellIcon />, name: 'вес', text: weightLabel(item.weight.raw) });
+  if (item.pvr)
+    chips.push({ icon: <BatteryIcon />, name: 'ПВР — повторы в резерве', text: item.pvr });
+  if (item.tempo) chips.push({ icon: null, name: null, text: `темп ${item.tempo}` });
 
   // Тап по карточке раскрывает её, но не когда попали в ссылку/кнопку/поле
   const handleCardClick = (e: MouseEvent<HTMLDivElement>) => {
@@ -79,7 +100,7 @@ export default function ItemCard({ item, exercise, last, onChange, onRest }: Ite
       onClick={handleCardClick}
       className="cursor-pointer rounded-2xl border border-border bg-card p-4"
     >
-      {/* Название + отметка «выполнено» */}
+      {/* Название + видео техники + отметка «выполнено» */}
       <div className="flex items-start gap-3">
         <h3
           className={
@@ -89,6 +110,19 @@ export default function ItemCard({ item, exercise, last, onChange, onRest }: Ite
         >
           {name || 'Упражнение'}
         </h3>
+        {videoUrl && (
+          <a
+            href={videoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Видео техники"
+            title="Видео техники"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"
+          >
+            <VideoIcon />
+          </a>
+        )}
         <button
           onClick={() => onChange({ done: !item.done })}
           aria-pressed={item.done}
@@ -105,79 +139,51 @@ export default function ItemCard({ item, exercise, last, onChange, onRest }: Ite
       </div>
 
       <div className={item.done ? 'opacity-70' : ''}>
+        {/* Разминка упражнения — первой: с неё начинают и её читают первой */}
+        {item.warmupSets && (
+          <p title="разминка" className="mt-2.5 flex items-start gap-1.5 text-sm">
+            <span className="mt-0.5 shrink-0 text-accent">
+              <FlameIcon />
+            </span>
+            <span className="sr-only">разминка: </span>
+            <span className="min-w-0 whitespace-pre-line break-words text-muted">
+              {item.warmupSets}
+            </span>
+          </p>
+        )}
+
         {/* Чипы параметров */}
         {(chips.length > 0 || item.rest) && (
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
             {chips.map((c, i) => (
               <span
                 key={i}
-                className="max-w-full break-words rounded-lg bg-accent-soft px-2 py-1 text-sm font-medium"
+                title={c.name ?? undefined}
+                className="inline-flex max-w-full items-center gap-1 rounded-lg bg-accent-soft px-2 py-1 text-sm font-medium"
               >
-                {c}
+                {c.icon && <span className="shrink-0 text-accent">{c.icon}</span>}
+                {c.name && <span className="sr-only">{c.name}: </span>}
+                <span className="min-w-0 break-words">{c.text}</span>
               </span>
             ))}
             {item.rest && (
               <button
                 onClick={() => onRest(item)}
                 aria-label="Запустить таймер отдыха"
+                title="отдых"
                 className="relative inline-flex max-w-full items-center gap-1 rounded-lg bg-accent-soft px-2 py-1 text-left text-sm font-medium underline decoration-dotted underline-offset-2 after:absolute after:-inset-1.5 after:content-['']"
               >
-                <ClockIcon />
-                <span className="min-w-0 break-words">отдых {restLabel(item.rest)}</span>
+                <span className="shrink-0 text-accent">
+                  <ClockIcon />
+                </span>
+                <span className="sr-only">отдых: </span>
+                <span className="min-w-0 break-words">{restLabel(item.rest)}</span>
               </button>
             )}
           </div>
         )}
 
-        {/* Видео техники */}
-        {videoUrl && (
-          <div className="mt-2.5">
-            <VideoLink href={videoUrl} label="Техника" />
-          </div>
-        )}
-
-        {/* Разминочные подходы упражнения */}
-        {item.warmupSets && (
-          <p className="mt-2 break-words text-sm text-muted">
-            <span className="font-medium">Разминка:</span> {item.warmupSets}
-          </p>
-        )}
-
-        {/* Заметки тренера: строки с 📌 — просьбы на этот день, показываем с булавкой */}
-        {(item.ptNote || item.ptRequest) && (
-          <div className="mt-2 space-y-1 text-sm">
-            {(item.ptNote ?? '')
-              .split('\n')
-              .map((line, i) => {
-                const t = line.trim();
-                if (!t) return null;
-                const pinned = t.startsWith('📌');
-                return pinned ? (
-                  <p key={i} className="flex items-start gap-1.5 break-words font-medium">
-                    <span className="mt-0.5 shrink-0 text-muted">
-                      <PinIcon />
-                    </span>
-                    <span className="min-w-0">{t.replace(/^📌\s*/, '')}</span>
-                  </p>
-                ) : (
-                  <p key={i} className="break-words text-muted">
-                    {t}
-                  </p>
-                );
-              })}
-            {/* совместимость со старыми данными, где запрос лежал отдельным полем */}
-            {item.ptRequest && (
-              <p className="flex items-start gap-1.5 break-words font-medium">
-                <span className="mt-0.5 shrink-0 text-muted">
-                  <PinIcon />
-                </span>
-                <span className="min-w-0 whitespace-pre-line">{item.ptRequest}</span>
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Подпункты */}
+        {/* Техника: подсказки-подпункты */}
         {item.subNotes.length > 0 && (
           <ul className="mt-2 space-y-1">
             {item.subNotes.map((sn, i) => (
@@ -187,6 +193,34 @@ export default function ItemCard({ item, exercise, last, onChange, onRest }: Ite
               </li>
             ))}
           </ul>
+        )}
+
+        {/* Примечание тренера — всегда последним и всегда с булавкой;
+            строки с 📌 — просьбы на этот день, они выделены жирнее */}
+        {(item.ptNote || item.ptRequest) && (
+          <div className="mt-2.5 flex items-start gap-1.5 text-sm">
+            <span className="mt-0.5 shrink-0 text-muted">
+              <PinIcon />
+            </span>
+            <div className="min-w-0 flex-1 space-y-1">
+              {(item.ptNote ?? '')
+                .split('\n')
+                .map((line, i) => {
+                  const t = line.trim();
+                  if (!t) return null;
+                  const pinned = t.startsWith('📌');
+                  return (
+                    <p key={i} className={'break-words ' + (pinned ? 'font-medium' : 'text-muted')}>
+                      {t.replace(/^📌\s*/, '')}
+                    </p>
+                  );
+                })}
+              {/* совместимость со старыми данными, где запрос лежал отдельным полем */}
+              {item.ptRequest && (
+                <p className="whitespace-pre-line break-words font-medium">{item.ptRequest}</p>
+              )}
+            </div>
+          </div>
         )}
 
         {/* Твой комментарий — в свёрнутом виде одной-двумя строками */}
@@ -325,7 +359,7 @@ function ItemEditor({
 
         <div className="mt-1 grid grid-cols-3 gap-2">
           <label className="block">
-            <span className="text-xs text-muted">Вес</span>
+            <span className="text-xs text-muted">Вес, кг</span>
             <input
               type="number"
               step={0.5}

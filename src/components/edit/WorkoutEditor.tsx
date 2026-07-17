@@ -9,6 +9,7 @@ import { fmtDate } from '../../lib/dates';
 import { nextExerciseId, nextItemId } from '../../lib/ids';
 import { linesToSubNotes, parseSetsReps, parseWeight } from './parse';
 import ExerciseCombobox from './ExerciseCombobox';
+import { ChevronIcon, PinIcon } from '../train/icons';
 import {
   IconBtn,
   IconDown,
@@ -100,6 +101,9 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
   }, [draft.type]);
 
   /* --- Разминка --------------------------------------------------------- */
+
+  // Разминку правят редко — по умолчанию блок свёрнут, как в режиме чтения
+  const [warmupOpen, setWarmupOpen] = useState(false);
 
   const patchWarmup = (i: number, p: Partial<WarmupItem>) =>
     patch({ warmup: draft.warmup.map((x, j) => (j === i ? { ...x, ...p } : x)) });
@@ -211,6 +215,8 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
       {/* --- Шапка --------------------------------------------------------- */}
       <section className="rounded-2xl border border-border bg-card p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Тренировка</h2>
+        {/* Поле «Название» убрано из формы (в данных title остаётся) —
+            для себя оно не нужно; вернём, если появятся другие клиенты. */}
         <div className="mt-3 grid grid-cols-2 gap-3">
           <TextField
             label="Дата"
@@ -225,14 +231,6 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
             value={draft.type ?? ''}
             options={typeOptions}
             onCommit={(v) => patch({ type: v || null })}
-          />
-        </div>
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <TextField
-            label="Название"
-            value={draft.title ?? ''}
-            placeholder="необязательно"
-            onCommit={(v) => patch({ title: v.trim() || null })}
           />
           <SelectField
             label="Статус"
@@ -251,56 +249,75 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
         </div>
       </section>
 
-      {/* --- Разминка ------------------------------------------------------ */}
+      {/* --- Разминка (свёрнута, как в режиме чтения — правят её редко) ----- */}
       <section className="rounded-2xl border border-border bg-card p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Разминка</h2>
-        <div className="mt-3">
-          <TextField
-            label="Видео разминки (ссылка)"
-            type="url"
-            value={draft.warmupVideoUrl ?? ''}
-            placeholder="https://…"
-            onCommit={(v) => patch({ warmupVideoUrl: v.trim() || null })}
-          />
-        </div>
-        {draft.warmup.length > 0 && (
-          <ul className="mt-3 space-y-3">
-            {draft.warmup.map((wu, i) => (
-              <li key={i} className="rounded-xl border border-border p-3">
-                <div className="flex items-start gap-2">
-                  <div className="min-w-0 flex-1 space-y-3">
-                    <TextAreaField
-                      label={`Пункт ${i + 1}`}
-                      value={wu.text}
-                      placeholder="- вращение бедра…"
-                      onCommit={(v) => patchWarmup(i, { text: v })}
-                    />
-                    <TextField
-                      label="Видео (ссылка)"
-                      type="url"
-                      value={wu.videoUrl ?? ''}
-                      placeholder="https://…"
-                      onCommit={(v) => patchWarmup(i, { videoUrl: v.trim() || null })}
-                    />
-                  </div>
-                  <IconBtn label="Убрать пункт" danger onClick={() => removeWarmup(i)}>
-                    <IconX />
-                  </IconBtn>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-        {draft.warmup.length === 0 && (
-          <p className="mt-3 text-sm text-muted">Разминки пока нет.</p>
-        )}
         <button
           type="button"
-          onClick={addWarmup}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 font-medium"
+          onClick={() => setWarmupOpen((v) => !v)}
+          aria-expanded={warmupOpen}
+          className="flex min-h-11 w-full items-center gap-2 text-left"
         >
-          <IconPlus size={16} /> Пункт разминки
+          <span className="text-sm font-semibold uppercase tracking-wide text-muted">
+            Разминка
+          </span>
+          {draft.warmup.length > 0 && (
+            <span className="text-sm text-muted">{draft.warmup.length}</span>
+          )}
+          <span className="text-muted">
+            <ChevronIcon open={warmupOpen} size={18} />
+          </span>
         </button>
+        {warmupOpen && (
+          <>
+            <div className="mt-2">
+              <TextField
+                label="Видео разминки (ссылка)"
+                type="url"
+                value={draft.warmupVideoUrl ?? ''}
+                placeholder="https://…"
+                onCommit={(v) => patch({ warmupVideoUrl: v.trim() || null })}
+              />
+            </div>
+            {draft.warmup.length > 0 && (
+              <ul className="mt-3 space-y-3">
+                {draft.warmup.map((wu, i) => (
+                  <li key={i} className="rounded-xl border border-border p-3">
+                    <div className="flex items-start gap-2">
+                      <div className="min-w-0 flex-1 space-y-3">
+                        <TextAreaField
+                          label={`Пункт ${i + 1}`}
+                          value={wu.text}
+                          placeholder="- вращение бедра…"
+                          onCommit={(v) => patchWarmup(i, { text: v })}
+                        />
+                        <TextField
+                          label="Видео (ссылка)"
+                          type="url"
+                          value={wu.videoUrl ?? ''}
+                          placeholder="https://…"
+                          onCommit={(v) => patchWarmup(i, { videoUrl: v.trim() || null })}
+                        />
+                      </div>
+                      <IconBtn label="Убрать пункт" danger onClick={() => removeWarmup(i)}>
+                        <IconX />
+                      </IconBtn>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {draft.warmup.length === 0 && (
+              <p className="mt-3 text-sm text-muted">Разминки пока нет.</p>
+            )}
+            <button
+              type="button"
+              onClick={addWarmup}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 font-medium"
+            >
+              <IconPlus size={16} /> Пункт разминки
+            </button>
+          </>
+        )}
       </section>
 
       {/* --- Упражнения ---------------------------------------------------- */}
@@ -423,7 +440,18 @@ function ItemEditorCard({
         </IconBtn>
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-3">
+      {/* Порядок полей повторяет карточку чтения: разминка первой,
+          примечание тренера — всегда последним. */}
+      <div className="mt-2">
+        <TextAreaField
+          label="Разминка"
+          value={item.warmupSets ?? ''}
+          placeholder="напр. 1х10 без веса"
+          onCommit={(v) => patchItem(item.id, { warmupSets: v.trim() ? v : null })}
+        />
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-3">
         <TextField
           label="Подходы×повторы"
           value={item.setsReps?.raw ?? ''}
@@ -431,9 +459,9 @@ function ItemEditorCard({
           onCommit={(v) => patchItem(item.id, { setsReps: parseSetsReps(v) })}
         />
         <TextField
-          label="Вес"
+          label="Вес, кг"
           value={item.weight?.raw ?? ''}
-          placeholder="27.5 кг"
+          placeholder="27.5 или 12+12"
           onCommit={(v) => patchItem(item.id, { weight: parseWeight(v) })}
         />
         <TextField
@@ -458,16 +486,10 @@ function ItemEditorCard({
           onCommit={(v) => patchItem(item.id, { tempo: v.trim() || null })}
         />
         <TextAreaField
-          label="Разминочные подходы"
-          value={item.warmupSets ?? ''}
-          placeholder="напр. 1х10 без веса"
-          onCommit={(v) => patchItem(item.id, { warmupSets: v.trim() ? v : null })}
-        />
-        <TextAreaField
-          label="Примечание тренера"
-          value={item.ptNote ?? ''}
-          placeholder="заметки к упражнению; строка, начатая с 📌 — просьба на этот день"
-          onCommit={(v) => patchItem(item.id, { ptNote: v.trim() ? v : null })}
+          label="Техника (пункты с новой строки)"
+          value={subNotes.map((s) => s.text).join('\n')}
+          placeholder="- напряжение стоп"
+          onCommit={(v) => patchItem(item.id, { subNotes: linesToSubNotes(v, subNotes) })}
         />
         <TextField
           label="Видео (ссылка)"
@@ -477,10 +499,14 @@ function ItemEditorCard({
           onCommit={(v) => patchItem(item.id, { videoUrl: v.trim() || null })}
         />
         <TextAreaField
-          label="Подпункты (каждый с новой строки)"
-          value={subNotes.map((s) => s.text).join('\n')}
-          placeholder="- напряжение стоп"
-          onCommit={(v) => patchItem(item.id, { subNotes: linesToSubNotes(v, subNotes) })}
+          label={
+            <span className="inline-flex items-center gap-1">
+              <PinIcon size={13} /> Примечание тренера
+            </span>
+          }
+          value={item.ptNote ?? ''}
+          placeholder="другие заметки, например — запиши видео сбоку"
+          onCommit={(v) => patchItem(item.id, { ptNote: v.trim() ? v : null })}
         />
       </div>
     </article>
