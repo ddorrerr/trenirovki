@@ -160,7 +160,7 @@ function SyncBadge({
               : 'bg-danger')
         }
       />
-      <span className="hidden sm:inline">{v.text}</span>
+      <span>{v.text}</span>
     </button>
   );
 }

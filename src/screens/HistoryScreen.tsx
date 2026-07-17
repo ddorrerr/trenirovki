@@ -160,6 +160,17 @@ function WorkoutRow({ w }: { w: Workout }) {
 
 type FillMode = 'empty' | 'last' | 'pick';
 
+/**
+ * Тип тренировки по дню недели: среда — «с тренером», вс/пн — «сама»
+ * (правило Лизы; остальные дни — без типа, можно выбрать вручную).
+ */
+function typeForDate(iso: string): string | null {
+  const wd = new Date(iso + 'T00:00:00Z').getUTCDay(); // 0 = вс
+  if (wd === 3) return 'с тренером';
+  if (wd === 0 || wd === 1) return 'сама';
+  return null;
+}
+
 const FILL_OPTIONS: { id: FillMode; label: string }[] = [
   { id: 'empty', label: 'Пустая' },
   { id: 'last', label: 'Копия последней' },
@@ -210,7 +221,7 @@ function NewWorkoutForm() {
       id,
       date,
       title: source?.title ?? null,
-      type: source?.type ?? null,
+      type: typeForDate(date),
       status: 'planned',
       fatigue: null,
       source: 'app',
@@ -309,7 +320,8 @@ function NewWorkoutForm() {
               >
                 <span className="font-medium">{fmtDateShort(w.date)}</span>{' '}
                 <span className="text-sm text-muted">
-                  · {plural(w.items.length, 'упражнение', 'упражнения', 'упражнений')}
+                  {fmtWeekday(w.date)} ·{' '}
+                  {plural(w.items.length, 'упражнение', 'упражнения', 'упражнений')}
                   {w.type ? ` · ${w.type}` : ''}
                 </span>
               </button>

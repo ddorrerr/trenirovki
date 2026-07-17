@@ -26,7 +26,7 @@ const STATUS_OPTIONS: { value: WorkoutStatus; label: string }[] = [
 ];
 
 export default function WorkoutEditor({ workout }: { workout: Workout }) {
-  const { workouts, exercises, saveWorkout, deleteWorkout, saveExercise } = useApp();
+  const { exercises, saveWorkout, deleteWorkout, saveExercise, setEditMode } = useApp();
 
   const patch = (p: Partial<Workout>) => saveWorkout({ ...workout, ...p });
 
@@ -36,12 +36,19 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
       items: workout.items.map((it) => (it.id === id ? { ...it, ...p } : it)),
     });
 
-  /* Существующие типы тренировок — подсказки для поля «Тип» */
+  /* Тип тренировки — фиксированный список (все тренировки full body).
+     Если у тренировки уже стоит нестандартное значение, показываем и его,
+     чтобы ничего молча не потерять. */
   const typeOptions = useMemo(() => {
-    const s = new Set<string>();
-    for (const w of workouts) if (w.type) s.add(w.type);
-    return [...s].sort((a, b) => a.localeCompare(b, 'ru'));
-  }, [workouts]);
+    const base = [
+      { value: '', label: '—' },
+      { value: 'с тренером', label: 'с тренером' },
+      { value: 'сама', label: 'сама' },
+    ];
+    const cur = workout.type ?? '';
+    if (cur && !base.some((o) => o.value === cur)) base.push({ value: cur, label: cur });
+    return base;
+  }, [workout.type]);
 
   /* --- Разминка --------------------------------------------------------- */
 
@@ -127,6 +134,10 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
 
   return (
     <div className="space-y-4">
+      <p className="px-1 text-sm text-muted">
+        Все изменения сохраняются автоматически — отдельной кнопки «Сохранить» нет.
+      </p>
+
       {/* --- Шапка --------------------------------------------------------- */}
       <section className="rounded-2xl border border-border bg-card p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Тренировка</h2>
@@ -139,19 +150,13 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
               if (v) patch({ date: v });
             }}
           />
-          <TextField
+          <SelectField
             label="Тип"
             value={workout.type ?? ''}
-            placeholder="напр. ноги"
-            list="workout-type-options"
-            onCommit={(v) => patch({ type: v.trim() || null })}
+            options={typeOptions}
+            onCommit={(v) => patch({ type: v || null })}
           />
         </div>
-        <datalist id="workout-type-options">
-          {typeOptions.map((t) => (
-            <option key={t} value={t} />
-          ))}
-        </datalist>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <TextField
             label="Название"
@@ -258,6 +263,15 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
         </button>
       </section>
 
+      {/* --- Готово: выйти из режима редактирования ------------------------- */}
+      <button
+        type="button"
+        onClick={() => setEditMode(false)}
+        className="w-full rounded-xl bg-accent px-4 py-2.5 text-lg font-semibold text-accent-fg"
+      >
+        Готово
+      </button>
+
       {/* --- Опасная зона --------------------------------------------------- */}
       <section className="rounded-2xl border border-border bg-card p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-danger">Опасная зона</h2>
@@ -305,7 +319,14 @@ function ItemEditorCard({
         <ExerciseCombobox
           exercises={exercises}
           value={item.exerciseId}
-          onSelect={(ex) => patchItem(item.id, { exerciseId: ex.id, nameRaw: ex.name })}
+          onSelect={(ex) =>
+            patchItem(item.id, {
+              exerciseId: ex.id,
+              nameRaw: ex.name,
+              // ссылка на технику подтягивается из библиотеки, если своей нет
+              videoUrl: item.videoUrl ?? ex.videoUrl ?? null,
+            })
+          }
           onCreate={(name) => createExercise(item, name)}
         />
       </div>
