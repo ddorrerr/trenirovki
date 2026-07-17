@@ -9,13 +9,14 @@ import VideoLink from './VideoLink';
 import {
   CheckIcon,
   ChevronIcon,
+  DeadFaceIcon,
   FlameIcon,
   HistoryIcon,
   KettlebellIcon,
   PinIcon,
   RechargeIcon,
   RepeatIcon,
-  SkullIcon,
+  TempoIcon,
   VideoIcon,
 } from './icons';
 
@@ -99,8 +100,8 @@ export default function ItemCard({ item, num, exercise, last, onChange, onRest }
     chips.push({ icon: <RepeatIcon />, name: 'подходы × повторы', text: setsRepsText });
   if (weightText) chips.push({ icon: <KettlebellIcon />, name: 'вес', text: weightText });
   if (item.pvr)
-    chips.push({ icon: <SkullIcon />, name: 'ПВР — повторы в резерве', text: item.pvr });
-  if (item.tempo) chips.push({ icon: null, name: null, text: `темп ${item.tempo}` });
+    chips.push({ icon: <DeadFaceIcon />, name: 'ПВР — повторы в резерве', text: item.pvr });
+  if (item.tempo) chips.push({ icon: <TempoIcon />, name: 'темп', text: item.tempo });
 
   // Тап по карточке раскрывает её, но не когда попали в ссылку/кнопку/поле
   const handleCardClick = (e: MouseEvent<HTMLDivElement>) => {

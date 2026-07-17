@@ -6,6 +6,7 @@ import { useApp } from '../store';
 import { fmtDate, fmtWeekday } from '../lib/dates';
 import type { Workout, WorkoutItem } from '../types';
 import WorkoutEditor from '../components/edit/WorkoutEditor';
+import NewWorkoutForm from '../components/edit/NewWorkoutForm';
 import ItemCard from '../components/train/ItemCard';
 import RestTimer, { parseRestSeconds, type RestRequest } from '../components/train/RestTimer';
 import VideoLink from '../components/train/VideoLink';
@@ -54,7 +55,9 @@ export default function TrainingScreen() {
 
   const w = currentWorkout;
   if (!w) {
-    return (
+    return editMode ? (
+      <NewWorkoutForm />
+    ) : (
       <EmptyState
         onEdit={() => setEditMode(true)}
         onMenu={() => navigate('menu')}
@@ -85,7 +88,11 @@ export default function TrainingScreen() {
       <TopBlock w={w} prev={prev} next={next} onOpen={(id) => navigate('train', id)} />
 
       {editMode ? (
-        <WorkoutEditor workout={w} />
+        <>
+          {/* Тренеру не нужно ходить в «Историю», чтобы добавить тренировку */}
+          <NewWorkoutForm />
+          <WorkoutEditor workout={w} />
+        </>
       ) : (
         <>
           {/* Разминка: шапка как у карточки упражнения — видео и «выполнено» */}
@@ -194,27 +201,7 @@ export default function TrainingScreen() {
 
           {/* Конец тренировки: усталость + статус */}
           <section className="rounded-2xl border border-border bg-card p-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
-              Усталость после тренировки
-            </h2>
-            <div className="mt-3 grid grid-cols-5 justify-items-center gap-2 md:grid-cols-10">
-              {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                <button
-                  key={n}
-                  onClick={() => saveWorkout({ ...w, fatigue: w.fatigue === n ? null : n })}
-                  aria-pressed={w.fatigue === n}
-                  aria-label={`Усталость ${n} из 10`}
-                  className={
-                    'flex h-11 w-11 items-center justify-center rounded-full border text-base font-semibold transition-colors ' +
-                    (w.fatigue === n
-                      ? 'border-accent bg-accent text-accent-fg'
-                      : 'border-border bg-bg text-muted')
-                  }
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
+            <FatigueBlock w={w} onSave={(f) => saveWorkout({ ...w, fatigue: f })} />
             <div className="mt-4">
               {w.status === 'planned' ? (
                 <button
@@ -348,6 +335,173 @@ function NavButton({
         {dir === 'prev' ? <path d="M14.5 6l-6 6 6 6" /> : <path d="M9.5 6l6 6-6 6" />}
       </svg>
     </button>
+  );
+}
+
+/* --- Усталость: ползунок со смайликом и замком от случайных сдвигов -------- */
+
+function fatigueColor(level: number): string {
+  if (level >= 8) return 'text-danger';
+  if (level >= 4) return 'text-accent';
+  return 'text-ok';
+}
+
+/** Лицо едет вместе с ползунком: улыбка → гримаса → крестики-глаза */
+function FatigueFace({ level, size = 26 }: { level: number; size?: number }) {
+  const dead = level >= 9;
+  // кривизна рта: +3.8 (улыбка, y вниз) → −3.8 (грусть)
+  const c = 3.8 - ((level - 1) / 9) * 7.6;
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      {dead ? (
+        <>
+          <path d="M7.4 7.9l2.8 2.8M10.2 7.9l-2.8 2.8" />
+          <path d="M13.8 7.9l2.8 2.8M16.6 7.9l-2.8 2.8" />
+        </>
+      ) : (
+        <>
+          <circle cx="9" cy="9.7" r="1.15" fill="currentColor" stroke="none" />
+          <circle cx="15" cy="9.7" r="1.15" fill="currentColor" stroke="none" />
+        </>
+      )}
+      <path d={`M8.3 15.4 Q12 ${(15.4 + c).toFixed(1)} 15.7 15.4`} />
+    </svg>
+  );
+}
+
+function LockIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+      {open ? <path d="M8 10.5V7a4 4 0 0 1 7.7-1.5" /> : <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" />}
+    </svg>
+  );
+}
+
+function FatigueBlock({
+  w,
+  onSave,
+}: {
+  w: Workout;
+  onSave: (fatigue: number | null) => void;
+}) {
+  const saved = w.fatigue;
+  const [draft, setDraft] = useState<number | null>(null);
+  const [unlocked, setUnlocked] = useState(false);
+
+  // другая тренировка — чистое состояние
+  useEffect(() => {
+    setDraft(null);
+    setUnlocked(false);
+  }, [w.id]);
+
+  // после сохранения черновик не нужен, а ползунок снова закрываем от случайных сдвигов
+  useEffect(() => {
+    setDraft(null);
+    setUnlocked(false);
+  }, [saved]);
+
+  const locked = saved != null && !unlocked;
+  const marked = saved != null || draft != null;
+  const value = draft ?? saved ?? 5;
+
+  const commit = () => {
+    if (draft != null && draft !== saved) onSave(draft);
+  };
+
+  return (
+    <>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+          Усталость после тренировки{marked ? ` — ${value}/10` : ''}
+        </h2>
+        {saved != null && (
+          <button
+            type="button"
+            onClick={() => setUnlocked((u) => !u)}
+            aria-pressed={!locked}
+            aria-label={
+              locked ? 'Разблокировать ползунок усталости' : 'Заблокировать ползунок усталости'
+            }
+            title={locked ? 'Разблокировать' : 'Заблокировать'}
+            className={
+              '-my-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ' +
+              (locked ? 'text-muted' : 'text-accent')
+            }
+          >
+            <LockIcon open={!locked} />
+          </button>
+        )}
+      </div>
+
+      <div className="relative mt-10">
+        <span
+          aria-hidden="true"
+          className={
+            'pointer-events-none absolute -top-8 transition-[left] duration-100 ' +
+            (marked ? fatigueColor(value) : 'text-muted')
+          }
+          style={{ left: `calc(${((value - 1) / 9).toFixed(4)} * (100% - 28px) + 1px)` }}
+        >
+          <FatigueFace level={value} />
+        </span>
+        <input
+          type="range"
+          min={1}
+          max={10}
+          step={1}
+          value={value}
+          disabled={locked}
+          aria-label="Усталость после тренировки, от 1 до 10"
+          onChange={(e) => setDraft(Number(e.target.value))}
+          onPointerUp={commit}
+          onKeyUp={commit}
+          onBlur={commit}
+          className="fatigue"
+        />
+        <div className="flex justify-between text-xs text-muted">
+          <span>1 — легко</span>
+          <span>10 — умираю</span>
+        </div>
+      </div>
+
+      {!marked && (
+        <p className="mt-2 text-sm text-muted">Сдвинь ползунок, чтобы отметить усталость.</p>
+      )}
+      {marked && !locked && saved != null && (
+        <button
+          type="button"
+          onClick={() => {
+            setDraft(null);
+            onSave(null);
+          }}
+          className="mt-2 text-sm text-muted underline decoration-dotted underline-offset-2"
+        >
+          убрать отметку
+        </button>
+      )}
+    </>
   );
 }
 

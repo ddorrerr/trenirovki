@@ -76,7 +76,7 @@ export function ClockIcon({ size = 14 }: { size?: number }) {
 }
 
 /** Разминка (и разминочные подходы упражнения) */
-export function FlameIcon({ size = 15 }: { size?: number }) {
+export function FlameIcon({ size = 16 }: { size?: number }) {
   return (
     <svg
       width={size}
@@ -95,7 +95,7 @@ export function FlameIcon({ size = 15 }: { size?: number }) {
 }
 
 /** Подходы×повторы */
-export function RepeatIcon({ size = 14 }: { size?: number }) {
+export function RepeatIcon({ size = 16 }: { size?: number }) {
   return (
     <svg
       width={size}
@@ -116,8 +116,8 @@ export function RepeatIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-/** ПВР — повторы «в резерве»: череп (сколько осталось до отказа) */
-export function SkullIcon({ size = 15 }: { size?: number }) {
+/** ПВР — повторы «в резерве»: смайлик с крестиками-глазами (до отказа) */
+export function DeadFaceIcon({ size = 17 }: { size?: number }) {
   return (
     <svg
       width={size}
@@ -130,16 +130,37 @@ export function SkullIcon({ size = 15 }: { size?: number }) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M15 22a1 1 0 0 0 1-1v-1a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20v1a1 1 0 0 0 1 1z" />
-      <circle cx="9" cy="12.5" r="1.3" fill="currentColor" stroke="none" />
-      <circle cx="15" cy="12.5" r="1.3" fill="currentColor" stroke="none" />
-      <path d="M12 22v-3" />
+      <circle cx="12" cy="12" r="9" />
+      <path d="M7.4 7.9l3 3M10.4 7.9l-3 3" />
+      <path d="M13.6 7.9l3 3M16.6 7.9l-3 3" />
+      <path d="M8.4 15.8c1 .95 2.2 1.4 3.6 1.4s2.6-.45 3.6-1.4" />
+    </svg>
+  );
+}
+
+/** Темп — «звуковые полоски»: ритм движения */
+export function TempoIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <path d="M5 9.5v5" />
+      <path d="M9.7 5.5v13" />
+      <path d="M14.3 8v8" />
+      <path d="M19 10.5v3" />
     </svg>
   );
 }
 
 /** Вес — гиря: силуэт читается лучше гантели на мелком размере */
-export function KettlebellIcon({ size = 15 }: { size?: number }) {
+export function KettlebellIcon({ size = 17 }: { size?: number }) {
   return (
     <svg
       width={size}
@@ -159,7 +180,7 @@ export function KettlebellIcon({ size = 15 }: { size?: number }) {
 }
 
 /** Отдых — «подзарядка»: батарейка с молнией */
-export function RechargeIcon({ size = 15 }: { size?: number }) {
+export function RechargeIcon({ size = 17 }: { size?: number }) {
   return (
     <svg
       width={size}
@@ -180,7 +201,7 @@ export function RechargeIcon({ size = 15 }: { size?: number }) {
 }
 
 /** «Прошлый раз» — та же стрелка-часы, что у вкладки «История» */
-export function HistoryIcon({ size = 14 }: { size?: number }) {
+export function HistoryIcon({ size = 15 }: { size?: number }) {
   return (
     <svg
       width={size}
