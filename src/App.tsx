@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApp, type SyncInfo, type Tab } from './store';
 import { fmtDateShort, fmtWeekday } from './lib/dates';
 import { useWakeLock } from './hooks/useWakeLock';
@@ -59,6 +59,16 @@ export default function App() {
     tab === 'train' && scrolled && currentWorkout
       ? `${fmtDateShort(currentWorkout.date)}, ${fmtWeekday(currentWorkout.date)}`
       : (TABS.find((t) => t.id === tab)?.label ?? 'Тренировка');
+
+  // Экран «въезжает» со стороны, куда шагнула навигация (по порядку вкладок)
+  const prevTabRef = useRef(tab);
+  const slideDirRef = useRef<'left' | 'right'>('right');
+  if (prevTabRef.current !== tab) {
+    const order = TABS.map((t) => t.id);
+    slideDirRef.current =
+      order.indexOf(tab) >= order.indexOf(prevTabRef.current) ? 'right' : 'left';
+    prevTabRef.current = tab;
+  }
 
   if (authRequired) {
     return <KeyScreen />;
@@ -127,11 +137,13 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 pb-28 pt-4 md:pb-10">
-        {tab === 'train' && <TrainingScreen />}
-        {tab === 'history' && <HistoryScreen />}
-        {tab === 'progress' && <ProgressScreen />}
-        {tab === 'menu' && <MenuScreen />}
+      <main className="mx-auto max-w-3xl overflow-x-clip px-4 pb-28 pt-4 md:pb-10">
+        <div key={tab} className={slideDirRef.current === 'right' ? 'anim-screen-right' : 'anim-screen-left'}>
+          {tab === 'train' && <TrainingScreen />}
+          {tab === 'history' && <HistoryScreen />}
+          {tab === 'progress' && <ProgressScreen />}
+          {tab === 'menu' && <MenuScreen />}
+        </div>
       </main>
 
       {/* Нижняя навигация для телефона: только иконки */}

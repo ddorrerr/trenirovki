@@ -9,6 +9,7 @@ import VideoLink from './VideoLink';
 import {
   CheckIcon,
   ChevronIcon,
+  CommentIcon,
   DeadFaceIcon,
   FlameIcon,
   HistoryIcon,
@@ -26,6 +27,8 @@ interface ItemCardProps {
   num: number;
   exercise: Exercise | undefined;
   last: Occurrence | null;
+  /** Тренировка завершена и закрыта: отметки «выполнено» не переключаются */
+  locked: boolean;
   /** Иммутабельный патч позиции — экран сам подменит её в workout и сохранит */
   onChange: (patch: Partial<WorkoutItem>) => void;
   onRest: (item: WorkoutItem) => void;
@@ -74,7 +77,15 @@ function lastSummary(it: WorkoutItem): string {
   return core || 'без записи';
 }
 
-export default function ItemCard({ item, num, exercise, last, onChange, onRest }: ItemCardProps) {
+export default function ItemCard({
+  item,
+  num,
+  exercise,
+  last,
+  locked,
+  onChange,
+  onRest,
+}: ItemCardProps) {
   const [open, setOpen] = useState(false);
 
   const name = exercise?.name ?? stripNumbering(item.nameRaw ?? '');
@@ -150,8 +161,10 @@ export default function ItemCard({ item, num, exercise, last, onChange, onRest }
         )}
         <button
           onClick={() => onChange({ done: !item.done })}
+          disabled={locked}
           aria-pressed={item.done}
           aria-label={item.done ? 'Снять отметку «выполнено»' : 'Отметить выполненным'}
+          title={locked ? 'Тренировка завершена — отметки закрыты (замок внизу)' : undefined}
           className={
             'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors ' +
             (item.done
@@ -250,7 +263,13 @@ export default function ItemCard({ item, num, exercise, last, onChange, onRest }
 
         {/* Твой комментарий — в свёрнутом виде одной-двумя строками */}
         {!open && myComment && (
-          <p className="mt-2 break-words text-sm italic text-muted line-clamp-2">— {myComment}</p>
+          <p title="твой комментарий" className="mt-2 flex items-start gap-1.5 text-sm italic text-muted">
+            <span className="mt-0.5 shrink-0" aria-hidden="true">
+              <CommentIcon />
+            </span>
+            <span className="sr-only">твой комментарий: </span>
+            <span className="min-w-0 break-words line-clamp-2">{myComment}</span>
+          </p>
         )}
 
         {/* Прошлый раз (иконка «Истории») + шеврон */}
@@ -362,7 +381,7 @@ function ItemEditor({
     'mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-base outline-none focus:border-accent';
 
   return (
-    <div className="mt-4 border-t border-border pt-4" onClick={(e) => e.stopPropagation()}>
+    <div className="anim-rise mt-4 border-t border-border pt-4" onClick={(e) => e.stopPropagation()}>
       <label className="block">
         <span className="text-xs font-semibold uppercase tracking-wide text-muted">
           Твой комментарий

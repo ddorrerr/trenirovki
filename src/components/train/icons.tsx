@@ -200,6 +200,25 @@ export function RechargeIcon({ size = 17 }: { size?: number }) {
   );
 }
 
+/** Твой комментарий — простой квадратный пузырь речи */
+export function CommentIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 4V6z" />
+    </svg>
+  );
+}
+
 /** «Прошлый раз» — та же стрелка-часы, что у вкладки «История» */
 export function HistoryIcon({ size = 15 }: { size?: number }) {
   return (

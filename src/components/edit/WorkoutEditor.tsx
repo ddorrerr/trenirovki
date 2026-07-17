@@ -268,7 +268,7 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
           </span>
         </button>
         {warmupOpen && (
-          <>
+          <div className="anim-rise">
             <div className="mt-2">
               <TextField
                 label="Видео разминки (ссылка)"
@@ -316,7 +316,7 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
             >
               <IconPlus size={16} /> Пункт разминки
             </button>
-          </>
+          </div>
         )}
       </section>
 

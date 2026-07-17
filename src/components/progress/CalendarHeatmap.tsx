@@ -176,7 +176,8 @@ export default function CalendarHeatmap() {
       {/* Карточка-превью тренировки */}
       {preview && (
         <div
-          className="absolute z-10 rounded-xl border border-border bg-card p-3 shadow-lg"
+          key={preview.w.id}
+          className="anim-pop absolute z-10 rounded-xl border border-border bg-card p-3 shadow-lg"
           style={{
             width: TIP_W,
             left: Math.min(

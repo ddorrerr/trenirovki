@@ -102,13 +102,16 @@ input[type="date"]::-webkit-date-and-time-value {
   text-align: left;
 }
 
-/* Ползунок усталости: крупный палец, трек в цветах темы */
+/* Ползунок усталости: крупный палец, заполнение и палец красятся оценкой
+   (--fill / --fill-color задаёт компонент: зелёный → жёлтый → красный) */
 input[type="range"].fatigue {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
   height: 28px;
   background: transparent;
+  --fill: 0%;
+  --fill-color: var(--muted);
 }
 input[type="range"].fatigue:disabled {
   opacity: 0.55;
@@ -116,7 +119,7 @@ input[type="range"].fatigue:disabled {
 input[type="range"].fatigue::-webkit-slider-runnable-track {
   height: 8px;
   border-radius: 9999px;
-  background: var(--border);
+  background: linear-gradient(to right, var(--fill-color) var(--fill), var(--border) var(--fill));
 }
 input[type="range"].fatigue::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -124,19 +127,88 @@ input[type="range"].fatigue::-webkit-slider-thumb {
   width: 28px;
   margin-top: -10px;
   border-radius: 9999px;
-  background: var(--accent);
+  background: var(--fill-color);
   border: 3px solid var(--card);
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
+  transition: background-color 0.15s ease;
 }
 input[type="range"].fatigue::-moz-range-track {
   height: 8px;
   border-radius: 9999px;
-  background: var(--border);
+  background: linear-gradient(to right, var(--fill-color) var(--fill), var(--border) var(--fill));
 }
 input[type="range"].fatigue::-moz-range-thumb {
   height: 22px;
   width: 22px;
   border-radius: 9999px;
-  background: var(--accent);
+  background: var(--fill-color);
   border: 3px solid var(--card);
+}
+
+/* --- Базовые анимации: аккуратные появления и «живые» нажатия ------------ */
+@media (prefers-reduced-motion: no-preference) {
+  /* смена экрана: лёгкий сдвиг в сторону навигации */
+  .anim-screen-right {
+    animation: screen-in-right 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  .anim-screen-left {
+    animation: screen-in-left 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  /* всплывающие карточки (превью, подсказки графиков) */
+  .anim-pop {
+    animation: pop-in 0.16s cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  /* раскрывающийся контент (разминка, заметки, быстрый лог) */
+  .anim-rise {
+    animation: rise-in 0.18s ease-out;
+  }
+  /* нижняя шторка таймера и её фон */
+  .anim-sheet {
+    animation: sheet-up 0.26s cubic-bezier(0.2, 0.9, 0.3, 1);
+  }
+  .anim-fade {
+    animation: fade-in 0.2s ease-out;
+  }
+  /* отклик на нажатие: чуть «утапливаем» любую кнопку.
+     :where даёт нулевую специфичность — Tailwind-переходы не ломаются */
+  :where(button:not(:disabled)) {
+    transition: transform 0.12s ease;
+  }
+  button:not(:disabled):active {
+    transform: scale(0.96);
+  }
+}
+@keyframes screen-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+}
+@keyframes screen-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+  }
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
 }

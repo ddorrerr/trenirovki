@@ -208,7 +208,8 @@ export default function WeightChart({ points }: { points: WeightPoint[] }) {
 
       {a && (
         <div
-          className="pointer-events-none absolute z-10 rounded-xl border border-border bg-card p-3 shadow-lg"
+          key={active ?? -1}
+          className="anim-pop pointer-events-none absolute z-10 rounded-xl border border-border bg-card p-3 shadow-lg"
           style={{
             width: TIP_W,
             left: clamp(ax - TIP_W / 2, 4, Math.max(4, w - TIP_W - 4)),

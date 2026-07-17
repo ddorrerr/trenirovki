@@ -50,6 +50,9 @@ export default function TrainingScreen() {
   const [warmupOpenMap, setWarmupOpenMap] = useState<Record<string, boolean>>({});
   const [notesOpenMap, setNotesOpenMap] = useState<Record<string, boolean>>({});
   const [restRequest, setRestRequest] = useState<RestRequest | null>(null);
+  /* Завершённая тренировка «закрыта»: отметки упражнений, разминки и ползунок
+     усталости не реагируют, пока не открыть замок внизу (на время сессии). */
+  const [unlockedMap, setUnlockedMap] = useState<Record<string, boolean>>({});
 
   if (loading) return null;
 
@@ -82,6 +85,7 @@ export default function TrainingScreen() {
 
   const warmupOpen = warmupOpenMap[w.id] ?? (w.status === 'planned' && !w.warmupDone);
   const notesOpen = notesOpenMap[w.id] ?? false;
+  const workoutLocked = w.status === 'done' && !unlockedMap[w.id];
 
   return (
     <div className="space-y-4">
@@ -135,9 +139,13 @@ export default function TrainingScreen() {
                 )}
                 <button
                   onClick={() => saveWorkout({ ...w, warmupDone: !w.warmupDone })}
+                  disabled={workoutLocked}
                   aria-pressed={w.warmupDone ?? false}
                   aria-label={
                     w.warmupDone ? 'Снять отметку «разминка выполнена»' : 'Разминка выполнена'
+                  }
+                  title={
+                    workoutLocked ? 'Тренировка завершена — отметки закрыты (замок внизу)' : undefined
                   }
                   className={
                     'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors ' +
@@ -150,7 +158,7 @@ export default function TrainingScreen() {
                 </button>
               </div>
               {warmupOpen && w.warmup.length > 0 && (
-                <ul className={'mt-2 space-y-2.5 ' + (w.warmupDone ? 'opacity-70' : '')}>
+                <ul className={'anim-rise mt-2 space-y-2.5 ' + (w.warmupDone ? 'opacity-70' : '')}>
                   {w.warmup.map((wu, i) => {
                     const line = parseWarmupLine(wu.text, i + 1);
                     return (
@@ -185,6 +193,7 @@ export default function TrainingScreen() {
                 key={it.id}
                 item={it}
                 num={i + 1}
+                locked={workoutLocked}
                 exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
                 last={it.exerciseId ? lastResultBefore(it.exerciseId, w.date, w.id) : null}
                 onChange={(patch) => saveItem(it.id, patch)}
@@ -199,9 +208,13 @@ export default function TrainingScreen() {
             ))}
           </section>
 
-          {/* Конец тренировки: усталость + статус */}
+          {/* Конец тренировки: усталость + завершение-замок */}
           <section className="rounded-2xl border border-border bg-card p-4">
-            <FatigueBlock w={w} onSave={(f) => saveWorkout({ ...w, fatigue: f })} />
+            <FatigueBlock
+              w={w}
+              workoutLocked={workoutLocked}
+              onSave={(f) => saveWorkout({ ...w, fatigue: f })}
+            />
             <div className="mt-4">
               {w.status === 'planned' ? (
                 <button
@@ -211,15 +224,35 @@ export default function TrainingScreen() {
                   Завершить тренировку
                 </button>
               ) : (
+                /* Общий замок: «Завершить» закрывает отметки всей тренировки */
                 <button
-                  onClick={() => saveWorkout({ ...w, status: 'planned' })}
-                  className="w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted"
+                  onClick={() => setUnlockedMap((m) => ({ ...m, [w.id]: workoutLocked }))}
+                  aria-pressed={!workoutLocked}
+                  className={
+                    'flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium ' +
+                    (workoutLocked
+                      ? 'border-border bg-bg text-muted'
+                      : 'border-accent/50 bg-accent-soft text-accent')
+                  }
                 >
-                  Вернуть в запланированные
+                  <LockIcon open={!workoutLocked} />
+                  {workoutLocked
+                    ? 'Тренировка завершена — отметки закрыты'
+                    : 'Отметки открыты — нажми, чтобы закрыть'}
                 </button>
               )}
             </div>
           </section>
+
+          {/* «Вернуть в запланированные» — отдельно, появляется после разблокировки */}
+          {w.status === 'done' && !workoutLocked && (
+            <button
+              onClick={() => saveWorkout({ ...w, status: 'planned' })}
+              className="anim-rise w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted"
+            >
+              Вернуть в запланированные
+            </button>
+          )}
 
           {/* Заметки тренера */}
           {w.notes.trim() !== '' && (
@@ -237,7 +270,7 @@ export default function TrainingScreen() {
                 </span>
               </button>
               {notesOpen && (
-                <p className="mt-2 whitespace-pre-line break-words text-[15px] leading-relaxed">
+                <p className="anim-rise mt-2 whitespace-pre-line break-words text-[15px] leading-relaxed">
                   {w.notes}
                 </p>
               )}
@@ -340,10 +373,10 @@ function NavButton({
 
 /* --- Усталость: ползунок со смайликом и замком от случайных сдвигов -------- */
 
+/** Каждой оценке — свой цвет: зелёный → жёлтый → оранжевый → красный */
 function fatigueColor(level: number): string {
-  if (level >= 8) return 'text-danger';
-  if (level >= 4) return 'text-accent';
-  return 'text-ok';
+  const hue = Math.round(145 - ((level - 1) / 9) * 145);
+  return `hsl(${hue} 72% 44%)`;
 }
 
 /** Лицо едет вместе с ползунком: улыбка → гримаса → крестики-глаза */
@@ -401,9 +434,12 @@ function LockIcon({ open }: { open: boolean }) {
 
 function FatigueBlock({
   w,
+  workoutLocked,
   onSave,
 }: {
   w: Workout;
+  /** Общий замок завершённой тренировки — закрывает и ползунок */
+  workoutLocked: boolean;
   onSave: (fatigue: number | null) => void;
 }) {
   const saved = w.fatigue;
@@ -422,9 +458,10 @@ function FatigueBlock({
     setUnlocked(false);
   }, [saved]);
 
-  const locked = saved != null && !unlocked;
+  const locked = workoutLocked || (saved != null && !unlocked);
   const marked = saved != null || draft != null;
   const value = draft ?? saved ?? 5;
+  const color = fatigueColor(value);
 
   const commit = () => {
     if (draft != null && draft !== saved) onSave(draft);
@@ -434,9 +471,18 @@ function FatigueBlock({
     <>
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
-          Усталость после тренировки{marked ? ` — ${value}/10` : ''}
+          Усталость после тренировки
+          {marked && (
+            <>
+              {' — '}
+              <span style={{ color }} className="tabular-nums">
+                {value}/10
+              </span>
+            </>
+          )}
         </h2>
-        {saved != null && (
+        {/* свой замочек нужен, только пока тренировку не закрыл общий замок */}
+        {saved != null && !workoutLocked && (
           <button
             type="button"
             onClick={() => setUnlocked((u) => !u)}
@@ -458,11 +504,11 @@ function FatigueBlock({
       <div className="relative mt-10">
         <span
           aria-hidden="true"
-          className={
-            'pointer-events-none absolute -top-8 transition-[left] duration-100 ' +
-            (marked ? fatigueColor(value) : 'text-muted')
-          }
-          style={{ left: `calc(${((value - 1) / 9).toFixed(4)} * (100% - 28px) + 1px)` }}
+          className="pointer-events-none absolute -top-8 transition-[left,color] duration-100"
+          style={{
+            left: `calc(${((value - 1) / 9).toFixed(4)} * (100% - 28px) + 1px)`,
+            color: marked ? color : 'var(--muted)',
+          }}
         >
           <FatigueFace level={value} />
         </span>
@@ -479,6 +525,14 @@ function FatigueBlock({
           onKeyUp={commit}
           onBlur={commit}
           className="fatigue"
+          style={
+            marked
+              ? ({
+                  '--fill': `${(((value - 1) / 9) * 100).toFixed(1)}%`,
+                  '--fill-color': color,
+                } as React.CSSProperties)
+              : undefined
+          }
         />
         <div className="flex justify-between text-xs text-muted">
           <span>1 — легко</span>

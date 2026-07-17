@@ -236,9 +236,9 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
           <button
             aria-label="Закрыть таймер"
             onClick={() => setOpen(false)}
-            className="absolute inset-0 h-full w-full cursor-default bg-bg/70 backdrop-blur-sm"
+            className="anim-fade absolute inset-0 h-full w-full cursor-default bg-bg/70 backdrop-blur-sm"
           />
-          <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-md rounded-t-2xl border border-b-0 border-border bg-card p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl">
+          <div className="anim-sheet absolute inset-x-0 bottom-0 mx-auto w-full max-w-md rounded-t-2xl border border-b-0 border-border bg-card p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl">
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold uppercase tracking-wide text-muted">
                 Отдых
