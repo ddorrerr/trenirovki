@@ -116,27 +116,8 @@ export function RepeatIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-/** Вес */
-export function DumbbellIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M7 8v8M4.5 9.5v5M17 8v8M19.5 9.5v5M7 12h10" />
-    </svg>
-  );
-}
-
-/** ПВР — повторы «в резерве»: смайлик с крестиками-глазами (до отказа) */
-export function DeadFaceIcon({ size = 15 }: { size?: number }) {
+/** ПВР — повторы «в резерве»: череп (сколько осталось до отказа) */
+export function SkullIcon({ size = 15 }: { size?: number }) {
   return (
     <svg
       width={size}
@@ -149,10 +130,30 @@ export function DeadFaceIcon({ size = 15 }: { size?: number }) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M7.6 8.1l2.6 2.6M10.2 8.1l-2.6 2.6" />
-      <path d="M13.8 8.1l2.6 2.6M16.4 8.1l-2.6 2.6" />
-      <path d="M8.6 15.6c1 .9 2.1 1.3 3.4 1.3s2.4-.4 3.4-1.3" />
+      <path d="M15 22a1 1 0 0 0 1-1v-1a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20v1a1 1 0 0 0 1 1z" />
+      <circle cx="9" cy="12.5" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="12.5" r="1.3" fill="currentColor" stroke="none" />
+      <path d="M12 22v-3" />
+    </svg>
+  );
+}
+
+/** Вес — гиря: силуэт читается лучше гантели на мелком размере */
+export function KettlebellIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M8.2 10.2C7 6.2 8.6 3.5 12 3.5s5 2.7 3.8 6.7" />
+      <circle cx="12" cy="15" r="6" />
     </svg>
   );
 }

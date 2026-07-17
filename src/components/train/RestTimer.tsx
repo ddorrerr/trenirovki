@@ -81,6 +81,7 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
   const [flash, setFlash] = useState(false);
 
   const endAtRef = useRef(0);
+  const finishedRef = useRef(false);
   const itemRef = useRef<string | null>(null);
   // Стартуем с nonce текущего request: при перемонтировании (например, после
   // переключения режима редактирования) старый тап не должен переоткрыть шторку.
@@ -102,22 +103,51 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
     setRemaining(request.seconds);
   }, [request, running]);
 
+  /* Финиш один раз на запуск: тик и возврат из фона могут сработать вместе.
+     После фона AudioContext подвешен — будим и только потом звоним. */
+  const finish = useCallback(() => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    setRunning(false);
+    const ctx = audioRef.current;
+    if (ctx && ctx.state === 'suspended') {
+      void ctx
+        .resume()
+        .then(() => beep(ctx))
+        .catch(() => undefined);
+    } else {
+      beep(ctx);
+    }
+    setFlash(true);
+    if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = window.setTimeout(() => setFlash(false), 1800);
+  }, []);
+
   // Тик: считаем от метки времени, чтобы прокрутка/троттлинг не сбивали отсчёт
   useEffect(() => {
     if (!running) return;
     const id = window.setInterval(() => {
       const rem = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000));
       setRemaining(rem);
-      if (rem <= 0) {
-        setRunning(false);
-        beep(audioRef.current);
-        setFlash(true);
-        if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
-        flashTimerRef.current = window.setTimeout(() => setFlash(false), 1800);
-      }
+      if (rem <= 0) finish();
     }, 200);
     return () => window.clearInterval(id);
-  }, [running]);
+  }, [running, finish]);
+
+  /* В фоне браузер замораживает таймеры и звук — «дзынь» в другом приложении
+     невозможен. Зато по возвращении сразу пересчитываем остаток и, если время
+     вышло, пока приложение было свёрнуто, — звоним не дожидаясь тика. */
+  useEffect(() => {
+    if (!running) return;
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      const rem = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000));
+      setRemaining(rem);
+      if (rem <= 0) finish();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [running, finish]);
 
   useEffect(
     () => () => {
@@ -147,6 +177,7 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
   const start = () => {
     ensureAudio();
     setFlash(false);
+    finishedRef.current = false;
     const base = remaining > 0 ? remaining : duration;
     if (remaining <= 0) setRemaining(duration);
     endAtRef.current = Date.now() + base * 1000;

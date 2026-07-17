@@ -9,7 +9,7 @@ import WorkoutEditor from '../components/edit/WorkoutEditor';
 import ItemCard from '../components/train/ItemCard';
 import RestTimer, { parseRestSeconds, type RestRequest } from '../components/train/RestTimer';
 import VideoLink from '../components/train/VideoLink';
-import { ChevronIcon } from '../components/train/icons';
+import { CheckIcon, ChevronIcon, VideoIcon } from '../components/train/icons';
 
 /**
  * Разбираем строку разминки из таблицы: маркеры «-», «•» убираем, нумерацию
@@ -77,7 +77,7 @@ export default function TrainingScreen() {
     (a, b) => (a.order ?? 0) - (b.order ?? 0),
   );
 
-  const warmupOpen = warmupOpenMap[w.id] ?? w.status === 'planned';
+  const warmupOpen = warmupOpenMap[w.id] ?? (w.status === 'planned' && !w.warmupDone);
   const notesOpen = notesOpenMap[w.id] ?? false;
 
   return (
@@ -88,10 +88,10 @@ export default function TrainingScreen() {
         <WorkoutEditor workout={w} />
       ) : (
         <>
-          {/* Разминка */}
+          {/* Разминка: шапка как у карточки упражнения — видео и «выполнено» */}
           {(w.warmup.length > 0 || w.warmupVideoUrl) && (
             <section className="rounded-2xl border border-border bg-card p-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-start gap-3">
                 <button
                   onClick={() =>
                     setWarmupOpenMap((m) => ({ ...m, [w.id]: !warmupOpen }))
@@ -99,7 +99,12 @@ export default function TrainingScreen() {
                   aria-expanded={warmupOpen}
                   className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left"
                 >
-                  <span className="text-sm font-semibold uppercase tracking-wide text-muted">
+                  <span
+                    className={
+                      'text-sm font-semibold uppercase tracking-wide ' +
+                      (w.warmupDone ? 'text-muted' : '')
+                    }
+                  >
                     Разминка
                   </span>
                   {w.warmup.length > 0 && (
@@ -109,10 +114,36 @@ export default function TrainingScreen() {
                     <ChevronIcon open={warmupOpen} size={18} />
                   </span>
                 </button>
-                {w.warmupVideoUrl && <VideoLink href={w.warmupVideoUrl} />}
+                {w.warmupVideoUrl && (
+                  <a
+                    href={w.warmupVideoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Видео разминки"
+                    title="Видео разминки"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"
+                  >
+                    <VideoIcon />
+                  </a>
+                )}
+                <button
+                  onClick={() => saveWorkout({ ...w, warmupDone: !w.warmupDone })}
+                  aria-pressed={w.warmupDone ?? false}
+                  aria-label={
+                    w.warmupDone ? 'Снять отметку «разминка выполнена»' : 'Разминка выполнена'
+                  }
+                  className={
+                    'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors ' +
+                    (w.warmupDone
+                      ? 'border-accent bg-accent text-accent-fg'
+                      : 'border-border bg-card text-muted')
+                  }
+                >
+                  <CheckIcon />
+                </button>
               </div>
               {warmupOpen && w.warmup.length > 0 && (
-                <ul className="mt-2 space-y-2.5">
+                <ul className={'mt-2 space-y-2.5 ' + (w.warmupDone ? 'opacity-70' : '')}>
                   {w.warmup.map((wu, i) => {
                     const line = parseWarmupLine(wu.text, i + 1);
                     return (

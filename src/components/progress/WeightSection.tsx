@@ -17,18 +17,17 @@ function repsLabel(item: WorkoutItem): string | null {
   return null;
 }
 
+/* Одно число на точку: записанный факт вытесняет план — как в карточках */
 function buildPoints(history: Occurrence[]): WeightPoint[] {
   const out: WeightPoint[] = [];
   for (const { workout, item } of history) {
-    const actual = item.actual?.weight ?? null;
-    const y = actual ?? item.weight?.value ?? null;
+    const y = item.actual?.weight ?? item.weight?.value ?? null;
     if (y == null) continue;
     const firstLine = item.myComment ? item.myComment.split('\n')[0].trim() : '';
     out.push({
       date: workout.date,
       t: parseTime(workout.date),
       y,
-      source: actual != null ? 'actual' : 'plan',
       reps: repsLabel(item),
       comment: firstLine !== '' ? firstLine : null,
     });
@@ -127,21 +126,7 @@ export default function WeightSection() {
 
           {points.length >= 2 ? (
             <>
-              <div className="mt-3 flex items-center justify-end gap-4 text-xs text-muted">
-                <span className="inline-flex items-center gap-1.5">
-                  <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-                    <circle cx="6" cy="6" r="4" fill="var(--accent)" />
-                  </svg>
-                  факт
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-                    <circle cx="6" cy="6" r="3.4" fill="var(--card)" stroke="var(--accent)" strokeWidth="1.7" />
-                  </svg>
-                  план
-                </span>
-              </div>
-              <div className="mt-1">
+              <div className="mt-2">
                 <WeightChart points={points} />
               </div>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-muted">

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp, type SyncInfo, type Tab } from './store';
 import { fmtDateShort, fmtWeekday } from './lib/dates';
 import { useWakeLock } from './hooks/useWakeLock';
@@ -46,10 +46,17 @@ export default function App() {
     });
   }, [settings.theme]);
 
-  // В шапке — не имя приложения, а где ты находишься: на «Тренировке» дата
-  // открытой тренировки, на остальных экранах название раздела.
+  // В шапке — не имя приложения, а где ты находишься. На «Тренировке» сверху
+  // дата и так крупно видна, поэтому в шапку она приходит только при прокрутке.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 130);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
   const title =
-    tab === 'train' && currentWorkout
+    tab === 'train' && scrolled && currentWorkout
       ? `${fmtDateShort(currentWorkout.date)}, ${fmtWeekday(currentWorkout.date)}`
       : (TABS.find((t) => t.id === tab)?.label ?? 'Тренировка');
 
@@ -79,7 +86,13 @@ export default function App() {
               </svg>
             </button>
           )}
-          <h1 className="min-w-0 truncate text-lg font-bold tracking-tight">{title}</h1>
+          {/* На десктопе разделы называет навигация — вместо заголовка «логотип» */}
+          <h1 className="min-w-0 truncate text-lg font-bold tracking-tight md:sr-only">
+            {title}
+          </h1>
+          <span className="hidden shrink-0 text-accent md:flex" aria-hidden="true">
+            <IconDumbbell active />
+          </span>
           {/* Навигация для больших экранов */}
           <nav className="ml-6 hidden gap-1 md:flex">
             {TABS.map((t) => (

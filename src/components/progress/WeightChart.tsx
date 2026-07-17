@@ -1,4 +1,4 @@
-// Линейный график веса по датам. Точки: ● — факт, ○ — план.
+// Линейный график веса по датам (факт вытесняет план ещё при сборке точек).
 // Тап/наведение на ближайшую точку показывает карточку-подсказку.
 
 import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react';
@@ -12,7 +12,6 @@ export interface WeightPoint {
   t: number;
   /** вес, кг */
   y: number;
-  source: 'actual' | 'plan';
   /** подписи для подсказки */
   reps: string | null;
   comment: string | null;
@@ -34,6 +33,17 @@ export default function WeightChart({ points }: { points: WeightPoint[] }) {
   useEffect(() => {
     setActive(null);
   }, [points]);
+
+  // Тап мимо графика убирает подсказку (на телефоне ей больше некуда деться)
+  useEffect(() => {
+    if (active == null) return;
+    const onDocDown = (e: PointerEvent) => {
+      const wrap = wrapRef.current;
+      if (wrap && !wrap.contains(e.target as Node)) setActive(null);
+    };
+    document.addEventListener('pointerdown', onDocDown);
+    return () => document.removeEventListener('pointerdown', onDocDown);
+  }, [active, wrapRef]);
 
   const w = Math.max(width, 220);
   const innerW = w - ML - MR;
@@ -151,30 +161,18 @@ export default function WeightChart({ points }: { points: WeightPoint[] }) {
             strokeLinejoin="round"
           />
 
-          {/* точки: факт — закрашенная, план — полая */}
-          {points.map((p, i) =>
-            p.source === 'actual' ? (
-              <circle
-                key={i}
-                cx={x(p.t)}
-                cy={y(p.y)}
-                r={4.5}
-                fill="var(--accent)"
-                stroke="var(--card)"
-                strokeWidth={2}
-              />
-            ) : (
-              <circle
-                key={i}
-                cx={x(p.t)}
-                cy={y(p.y)}
-                r={4.5}
-                fill="var(--card)"
-                stroke="var(--accent)"
-                strokeWidth={2}
-              />
-            ),
-          )}
+          {/* точки */}
+          {points.map((p, i) => (
+            <circle
+              key={i}
+              cx={x(p.t)}
+              cy={y(p.y)}
+              r={4.5}
+              fill="var(--accent)"
+              stroke="var(--card)"
+              strokeWidth={2}
+            />
+          ))}
 
           {/* кольцо вокруг активной точки */}
           {a && (
@@ -218,10 +216,7 @@ export default function WeightChart({ points }: { points: WeightPoint[] }) {
           }}
         >
           <div className="text-sm font-semibold">{fmtDate(a.date)}</div>
-          <div className="mt-0.5 text-base font-semibold">
-            {fmtNum(a.y)} кг{' '}
-            <span className="font-normal text-muted">· {a.source === 'actual' ? 'факт' : 'план'}</span>
-          </div>
+          <div className="mt-0.5 text-base font-semibold">{fmtNum(a.y)} кг</div>
           {a.reps && <div className="text-sm text-muted">{a.reps}</div>}
           {a.comment && (
             <div className="mt-1 line-clamp-2 break-words text-xs text-muted">{a.comment}</div>

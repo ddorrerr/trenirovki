@@ -73,6 +73,7 @@ export interface Workout {
   notes: string; // общие заметки к тренировке (вкл. хвостовые строки блока)
   warmup: WarmupItem[]; // общая разминка в начале
   warmupVideoUrl: string | null; // ссылка со строки "Разминка"
+  warmupDone?: boolean; // отметка «разминка выполнена» (в старых данных отсутствует)
   items: WorkoutItem[];
 }
 

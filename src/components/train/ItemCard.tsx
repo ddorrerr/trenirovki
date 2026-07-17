@@ -9,13 +9,13 @@ import VideoLink from './VideoLink';
 import {
   CheckIcon,
   ChevronIcon,
-  DeadFaceIcon,
-  DumbbellIcon,
   FlameIcon,
   HistoryIcon,
+  KettlebellIcon,
   PinIcon,
   RechargeIcon,
   RepeatIcon,
+  SkullIcon,
   VideoIcon,
 } from './icons';
 
@@ -97,9 +97,9 @@ export default function ItemCard({ item, num, exercise, last, onChange, onRest }
   const chips: { icon: ReactNode | null; name: string | null; text: string }[] = [];
   if (setsRepsText)
     chips.push({ icon: <RepeatIcon />, name: 'подходы × повторы', text: setsRepsText });
-  if (weightText) chips.push({ icon: <DumbbellIcon />, name: 'вес', text: weightText });
+  if (weightText) chips.push({ icon: <KettlebellIcon />, name: 'вес', text: weightText });
   if (item.pvr)
-    chips.push({ icon: <DeadFaceIcon />, name: 'ПВР — повторы в резерве', text: item.pvr });
+    chips.push({ icon: <SkullIcon />, name: 'ПВР — повторы в резерве', text: item.pvr });
   if (item.tempo) chips.push({ icon: null, name: null, text: `темп ${item.tempo}` });
 
   // Тап по карточке раскрывает её, но не когда попали в ссылку/кнопку/поле

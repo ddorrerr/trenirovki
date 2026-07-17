@@ -65,6 +65,17 @@ function FatigueChart({ entries }: { entries: FatiguePoint[] }) {
     setActive(null);
   }, [entries]);
 
+  // Тап мимо графика убирает подсказку — как на графике веса
+  useEffect(() => {
+    if (active == null) return;
+    const onDocDown = (e: PointerEvent) => {
+      const wrap = wrapRef.current;
+      if (wrap && !wrap.contains(e.target as Node)) setActive(null);
+    };
+    document.addEventListener('pointerdown', onDocDown);
+    return () => document.removeEventListener('pointerdown', onDocDown);
+  }, [active, wrapRef]);
+
   const w = Math.max(width, 220);
   const innerW = w - ML - MR;
 
