@@ -47,7 +47,10 @@ export default function CalendarHeatmap() {
 
   const { days, weekCount, labels, byDate } = useMemo(() => {
     const today = todayISO();
-    const start = addDaysISO(today, -364);
+    // лента покрывает всю историю (но минимум год), прокручивается по неделям
+    const yearAgo = addDaysISO(today, -364);
+    const firstWorkout = workouts.length > 0 ? workouts[0].date : today;
+    const start = firstWorkout < yearAgo ? firstWorkout : yearAgo;
     const startMonday = addDaysISO(start, -mondayIndex(start));
 
     const byDate = new Map<string, Workout>();
@@ -110,9 +113,40 @@ export default function CalendarHeatmap() {
     navigate('train', id);
   };
 
+  const scrollByWeeks = (weeks: number) => {
+    scrollRef.current?.scrollBy({ left: weeks * PITCH, behavior: 'smooth' });
+  };
+
   return (
     <section ref={sectionRef} className="relative rounded-2xl border border-border bg-card p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Календарь</h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Календарь</h2>
+        {/* листание ленты: вся история, минимум год */}
+        <div className="-my-1 flex gap-1">
+          <button
+            type="button"
+            onClick={() => scrollByWeeks(-8)}
+            aria-label="Раньше"
+            title="Раньше"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-bg text-muted"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M14.5 6l-6 6 6 6" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollByWeeks(8)}
+            aria-label="Позже"
+            title="Позже"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-bg text-muted"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M9.5 6l6 6-6 6" />
+            </svg>
+          </button>
+        </div>
+      </div>
 
       <div ref={scrollRef} className="mt-3 overflow-x-auto pb-1">
         <div style={{ width: weekCount * PITCH - GAP }}>
@@ -170,7 +204,7 @@ export default function CalendarHeatmap() {
 
       <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
         <span className="inline-block h-2.5 w-2.5 rounded-[3px] bg-accent" aria-hidden="true" />
-        дни с тренировками — тап покажет превью
+        вся история по неделям — лента листается, тап покажет превью
       </p>
 
       {/* Карточка-превью тренировки */}
@@ -200,9 +234,9 @@ export default function CalendarHeatmap() {
           <button
             type="button"
             onClick={() => open(preview.w.id)}
-            className="mt-2.5 w-full rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-accent-fg"
+            className="mt-2.5 w-full rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-accent-fg"
           >
-            Открыть тренировку
+            Открыть
           </button>
         </div>
       )}

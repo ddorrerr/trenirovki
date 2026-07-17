@@ -1,7 +1,7 @@
 // Экран «Тренировка»: текущая (или выбранная) тренировка целиком —
 // разминка, упражнения с чипами и быстрым логом, усталость, заметки тренера.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../store';
 import { fmtDate, fmtWeekday } from '../lib/dates';
 import type { Workout, WorkoutItem } from '../types';
@@ -53,6 +53,12 @@ export default function TrainingScreen() {
   /* Завершённая тренировка «закрыта»: отметки упражнений, разминки и ползунок
      усталости не реагируют, пока не открыть замок внизу (на время сессии). */
   const [unlockedMap, setUnlockedMap] = useState<Record<string, boolean>>({});
+  const [warmupPop, setWarmupPop] = useState(false);
+  const [celebrate, setCelebrate] = useState(false);
+  /* Слайд при листании тренировок (стрелки или свайп); null — без анимации */
+  const [wAnim, setWAnim] = useState<null | 'left' | 'right'>(null);
+  const prevIdRef = useRef<string | null>(null);
+  const touchRef = useRef<{ x: number; y: number; ok: boolean } | null>(null);
 
   if (loading) return null;
 
@@ -72,6 +78,35 @@ export default function TrainingScreen() {
   const prev = index > 0 ? workouts[index - 1] : null;
   const next = index >= 0 && index < workouts.length - 1 ? workouts[index + 1] : null;
 
+  // Направление слайда при смене открытой тренировки (derived-state паттерн)
+  if (prevIdRef.current === null) {
+    prevIdRef.current = w.id;
+  } else if (prevIdRef.current !== w.id) {
+    const prevW = workouts.find((x) => x.id === prevIdRef.current);
+    prevIdRef.current = w.id;
+    setWAnim(!prevW || prevW.date <= w.date ? 'right' : 'left');
+  }
+
+  /* Свайп влево/вправо листает тренировки; жест не перехватываем на полях,
+     ползунке и шторке таймера, в редакторе выключен целиком */
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    const el = e.target as HTMLElement;
+    const ok = !editMode && !el.closest('input, textarea, select, .fixed');
+    touchRef.current = { x: t.clientX, y: t.clientY, ok };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const s = touchRef.current;
+    touchRef.current = null;
+    if (!s || !s.ok || editMode) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - s.x;
+    const dy = t.clientY - s.y;
+    if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
+    const target = dx < 0 ? next : prev;
+    if (target) navigate('train', target.id);
+  };
+
   const saveItem = (itemId: string, patch: Partial<WorkoutItem>) => {
     saveWorkout({
       ...w,
@@ -88,7 +123,17 @@ export default function TrainingScreen() {
   const workoutLocked = w.status === 'done' && !unlockedMap[w.id];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      <div
+        key={w.id}
+        onAnimationEnd={(e) => {
+          if (e.target === e.currentTarget) setWAnim(null);
+        }}
+        className={
+          'space-y-4' +
+          (wAnim === 'right' ? ' anim-screen-right' : wAnim === 'left' ? ' anim-screen-left' : '')
+        }
+      >
       <TopBlock w={w} prev={prev} next={next} onOpen={(id) => navigate('train', id)} />
 
       {editMode ? (
@@ -138,7 +183,11 @@ export default function TrainingScreen() {
                   </a>
                 )}
                 <button
-                  onClick={() => saveWorkout({ ...w, warmupDone: !w.warmupDone })}
+                  onClick={() => {
+                    saveWorkout({ ...w, warmupDone: !w.warmupDone });
+                    setWarmupPop(true);
+                  }}
+                  onAnimationEnd={() => setWarmupPop(false)}
                   disabled={workoutLocked}
                   aria-pressed={w.warmupDone ?? false}
                   aria-label={
@@ -151,7 +200,8 @@ export default function TrainingScreen() {
                     'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors ' +
                     (w.warmupDone
                       ? 'border-accent bg-accent text-accent-fg'
-                      : 'border-border bg-card text-muted')
+                      : 'border-border bg-card text-muted') +
+                    (warmupPop ? ' anim-check' : '')
                   }
                 >
                   <CheckIcon />
@@ -209,7 +259,8 @@ export default function TrainingScreen() {
           </section>
 
           {/* Конец тренировки: усталость + завершение-замок */}
-          <section className="rounded-2xl border border-border bg-card p-4">
+          <section className="relative rounded-2xl border border-border bg-card p-4">
+            {celebrate && <ConfettiBurst />}
             <FatigueBlock
               w={w}
               workoutLocked={workoutLocked}
@@ -218,7 +269,13 @@ export default function TrainingScreen() {
             <div className="mt-4">
               {w.status === 'planned' ? (
                 <button
-                  onClick={() => saveWorkout({ ...w, status: 'done' })}
+                  onClick={() => {
+                    saveWorkout({ ...w, status: 'done' });
+                    // завершение всегда закрывает замок заново
+                    setUnlockedMap((m) => ({ ...m, [w.id]: false }));
+                    setCelebrate(true);
+                    window.setTimeout(() => setCelebrate(false), 1200);
+                  }}
                   className="w-full rounded-xl bg-accent px-4 py-2.5 text-lg font-semibold text-accent-fg"
                 >
                   Завершить тренировку
@@ -277,9 +334,12 @@ export default function TrainingScreen() {
             </section>
           )}
 
-          <RestTimer request={restRequest} />
         </>
       )}
+      </div>
+
+      {/* Таймер вне «листаемого» блока: смена тренировки не сбрасывает отсчёт */}
+      {!editMode && <RestTimer request={restRequest} />}
     </div>
   );
 }
@@ -371,6 +431,46 @@ function NavButton({
   );
 }
 
+/* --- Сдержанное конфетти на «Завершить тренировку» ------------------------- */
+
+const CONFETTI_DOTS = [
+  { dx: -90, dy: -120, d: 0, c: 'var(--accent)', s: 8 },
+  { dx: -50, dy: -150, d: 60, c: 'hsl(45 90% 55%)', s: 7 },
+  { dx: 0, dy: -170, d: 20, c: 'var(--ok)', s: 9 },
+  { dx: 55, dy: -145, d: 80, c: 'hsl(280 65% 60%)', s: 7 },
+  { dx: 95, dy: -110, d: 40, c: 'var(--accent)', s: 8 },
+  { dx: -120, dy: -60, d: 90, c: 'hsl(200 80% 55%)', s: 6 },
+  { dx: 120, dy: -55, d: 30, c: 'hsl(45 90% 55%)', s: 6 },
+  { dx: -70, dy: -35, d: 120, c: 'var(--ok)', s: 6 },
+  { dx: 70, dy: -28, d: 100, c: 'hsl(340 75% 60%)', s: 7 },
+  { dx: -25, dy: -95, d: 140, c: 'hsl(340 75% 60%)', s: 5 },
+  { dx: 30, dy: -120, d: 110, c: 'hsl(200 80% 55%)', s: 5 },
+  { dx: 0, dy: -60, d: 160, c: 'var(--accent)', s: 5 },
+];
+
+function ConfettiBurst() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-10">
+      {CONFETTI_DOTS.map((p, i) => (
+        <span
+          key={i}
+          className="anim-confetti confetti-dot absolute left-1/2 top-[72%] rounded-full"
+          style={
+            {
+              width: p.s,
+              height: p.s,
+              background: p.c,
+              animationDelay: `${p.d}ms`,
+              '--dx': `${p.dx}px`,
+              '--dy': `${p.dy}px`,
+            } as React.CSSProperties
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
 /* --- Усталость: ползунок со смайликом и замком от случайных сдвигов -------- */
 
 /** Каждой оценке — свой цвет: зелёный → жёлтый → оранжевый → красный */
@@ -444,21 +544,14 @@ function FatigueBlock({
 }) {
   const saved = w.fatigue;
   const [draft, setDraft] = useState<number | null>(null);
-  const [unlocked, setUnlocked] = useState(false);
 
   // другая тренировка — чистое состояние
   useEffect(() => {
     setDraft(null);
-    setUnlocked(false);
-  }, [w.id]);
+  }, [w.id, saved]);
 
-  // после сохранения черновик не нужен, а ползунок снова закрываем от случайных сдвигов
-  useEffect(() => {
-    setDraft(null);
-    setUnlocked(false);
-  }, [saved]);
-
-  const locked = workoutLocked || (saved != null && !unlocked);
+  // один замок на всю тренировку — свой у ползунка больше не нужен
+  const locked = workoutLocked;
   const marked = saved != null || draft != null;
   const value = draft ?? saved ?? 5;
   const color = fatigueColor(value);
@@ -481,24 +574,6 @@ function FatigueBlock({
             </>
           )}
         </h2>
-        {/* свой замочек нужен, только пока тренировку не закрыл общий замок */}
-        {saved != null && !workoutLocked && (
-          <button
-            type="button"
-            onClick={() => setUnlocked((u) => !u)}
-            aria-pressed={!locked}
-            aria-label={
-              locked ? 'Разблокировать ползунок усталости' : 'Заблокировать ползунок усталости'
-            }
-            title={locked ? 'Разблокировать' : 'Заблокировать'}
-            className={
-              '-my-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ' +
-              (locked ? 'text-muted' : 'text-accent')
-            }
-          >
-            <LockIcon open={!locked} />
-          </button>
-        )}
       </div>
 
       <div className="relative mt-10">
@@ -540,7 +615,7 @@ function FatigueBlock({
         </div>
       </div>
 
-      {!marked && (
+      {!marked && !locked && (
         <p className="mt-2 text-sm text-muted">Сдвинь ползунок, чтобы отметить усталость.</p>
       )}
       {marked && !locked && saved != null && (

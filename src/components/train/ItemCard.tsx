@@ -87,6 +87,8 @@ export default function ItemCard({
   onRest,
 }: ItemCardProps) {
   const [open, setOpen] = useState(false);
+  // «чпок» галочки только на живой тап, не при монтировании карточки
+  const [checkPop, setCheckPop] = useState(false);
 
   const name = exercise?.name ?? stripNumbering(item.nameRaw ?? '');
   const videoUrl = item.videoUrl ?? exercise?.videoUrl ?? null;
@@ -160,7 +162,11 @@ export default function ItemCard({
           </a>
         )}
         <button
-          onClick={() => onChange({ done: !item.done })}
+          onClick={() => {
+            onChange({ done: !item.done });
+            setCheckPop(true);
+          }}
+          onAnimationEnd={() => setCheckPop(false)}
           disabled={locked}
           aria-pressed={item.done}
           aria-label={item.done ? 'Снять отметку «выполнено»' : 'Отметить выполненным'}
@@ -169,7 +175,8 @@ export default function ItemCard({
             'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors ' +
             (item.done
               ? 'border-accent bg-accent text-accent-fg'
-              : 'border-border bg-card text-muted')
+              : 'border-border bg-card text-muted') +
+            (checkPop ? ' anim-check' : '')
           }
         >
           <CheckIcon />
