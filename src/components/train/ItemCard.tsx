@@ -143,12 +143,29 @@ export default function ItemCard({ item, exercise, last, onChange, onRest }: Ite
           </p>
         )}
 
-        {/* Примечание и запрос тренера — один компактный блок */}
+        {/* Заметки тренера: строки с 📌 — просьбы на этот день, показываем с булавкой */}
         {(item.ptNote || item.ptRequest) && (
           <div className="mt-2 space-y-1 text-sm">
-            {item.ptNote && (
-              <p className="whitespace-pre-line break-words text-muted">{item.ptNote}</p>
-            )}
+            {(item.ptNote ?? '')
+              .split('\n')
+              .map((line, i) => {
+                const t = line.trim();
+                if (!t) return null;
+                const pinned = t.startsWith('📌');
+                return pinned ? (
+                  <p key={i} className="flex items-start gap-1.5 break-words font-medium">
+                    <span className="mt-0.5 shrink-0 text-muted">
+                      <PinIcon />
+                    </span>
+                    <span className="min-w-0">{t.replace(/^📌\s*/, '')}</span>
+                  </p>
+                ) : (
+                  <p key={i} className="break-words text-muted">
+                    {t}
+                  </p>
+                );
+              })}
+            {/* совместимость со старыми данными, где запрос лежал отдельным полем */}
             {item.ptRequest && (
               <p className="flex items-start gap-1.5 break-words font-medium">
                 <span className="mt-0.5 shrink-0 text-muted">

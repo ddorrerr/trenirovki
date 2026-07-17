@@ -161,6 +161,16 @@ function WorkoutRow({ w }: { w: Workout }) {
 type FillMode = 'empty' | 'last' | 'pick';
 
 /**
+ * Строки-«просьбы» (начинаются с 📌) относятся к конкретному дню —
+ * при копировании тренировки их не переносим.
+ */
+function stripPinnedLines(note: string | null): string | null {
+  if (!note) return null;
+  const kept = note.split('\n').filter((l) => !l.trim().startsWith('📌'));
+  return kept.join('\n').trim() ? kept.join('\n') : null;
+}
+
+/**
  * Тип тренировки по дню недели: среда — «с тренером», вс/пн — «сама»
  * (правило Лизы; остальные дни — без типа, можно выбрать вручную).
  */
@@ -237,6 +247,7 @@ function NewWorkoutForm() {
             setsReps: it.setsReps ? { ...it.setsReps } : null,
             weight: it.weight ? { ...it.weight } : null,
             subNotes: (it.subNotes ?? []).map((s) => ({ ...s })),
+            ptNote: stripPinnedLines(it.ptNote),
             ptRequest: null, // просьба тренера относилась к конкретному дню
             myComment: '',
             actual: null,

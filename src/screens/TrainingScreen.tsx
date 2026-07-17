@@ -12,15 +12,17 @@ import VideoLink from '../components/train/VideoLink';
 import { ChevronIcon } from '../components/train/icons';
 
 /**
- * Убираем из текста разминки «наследие таблицы»: маркеры «-», «•» и нумерацию
- * вида «1.1», «2)» — в интерфейсе у пунктов и так есть своя структура.
- * Числа-содержание («10 приседаний») не трогаем.
+ * Разбираем строку разминки из таблицы: маркеры «-», «•» убираем, нумерацию
+ * вида «1.1», «2)» выносим в маленькую плашку перед текстом; если номера
+ * в тексте нет — берём порядковый. Числа-содержание («10 приседаний») не трогаем.
  */
-function cleanWarmupText(t: string): string {
-  const cleaned = t
-    .replace(/^\s*(?:[-–—•]\s*)?(?:(?:\d+(?:\.\d+)+[.)]?|\d+[.)])\s*)?(?:[-–—•]\s*)?/, '')
-    .trim();
-  return cleaned || t.trim();
+function parseWarmupLine(t: string, fallbackNum: number): { label: string; text: string } {
+  const m = /^\s*(?:[-–—•]\s*)?(?:((?:\d+(?:\.\d+)+[.)]?|\d+[.)]))\s*)?(?:[-–—•]\s*)?([\s\S]*)$/.exec(
+    t,
+  );
+  const label = m?.[1] ? m[1].replace(/[.)]$/, '') : String(fallbackNum);
+  const text = (m?.[2] ?? '').trim() || t.trim();
+  return { label, text };
 }
 
 export default function TrainingScreen() {
@@ -111,12 +113,20 @@ export default function TrainingScreen() {
               </div>
               {warmupOpen && w.warmup.length > 0 && (
                 <ul className="mt-2 space-y-2.5">
-                  {w.warmup.map((wu, i) => (
-                    <li key={i} className="break-words text-[15px] leading-snug">
-                      {cleanWarmupText(wu.text)}
-                      {wu.videoUrl && <VideoLink href={wu.videoUrl} className="ml-1.5" />}
-                    </li>
-                  ))}
+                  {w.warmup.map((wu, i) => {
+                    const line = parseWarmupLine(wu.text, i + 1);
+                    return (
+                      <li key={i} className="flex items-start gap-2 text-[15px] leading-snug">
+                        <span className="mt-0.5 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-bg px-1 text-[11px] font-semibold tabular-nums text-muted">
+                          {line.label}
+                        </span>
+                        <span className="min-w-0 break-words">
+                          {line.text}
+                          {wu.videoUrl && <VideoLink href={wu.videoUrl} className="ml-1.5" />}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </section>

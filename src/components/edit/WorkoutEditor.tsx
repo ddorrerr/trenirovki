@@ -279,17 +279,13 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
         Готово
       </button>
 
-      {/* --- Опасная зона --------------------------------------------------- */}
-      <section className="rounded-2xl border border-border bg-card p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-danger">Опасная зона</h2>
-        <button
-          type="button"
-          onClick={removeWorkout}
-          className="mt-3 w-full rounded-xl border border-border bg-card px-4 py-2.5 font-semibold text-danger"
-        >
-          Удалить тренировку
-        </button>
-      </section>
+      <button
+        type="button"
+        onClick={removeWorkout}
+        className="w-full rounded-xl border border-danger/40 bg-card px-4 py-2.5 font-semibold text-danger"
+      >
+        Удалить тренировку
+      </button>
     </div>
   );
 }
@@ -413,13 +409,8 @@ function ItemEditorCard({
         <TextAreaField
           label="Примечание тренера"
           value={item.ptNote ?? ''}
+          placeholder="заметки к упражнению; строка, начатая с 📌 — просьба на этот день"
           onCommit={(v) => patchItem(item.id, { ptNote: v.trim() ? v : null })}
-        />
-        <TextField
-          label="Запрос тренера"
-          value={item.ptRequest ?? ''}
-          placeholder="напр. жду видео сбоку"
-          onCommit={(v) => patchItem(item.id, { ptRequest: v.trim() || null })}
         />
         <TextField
           label="Видео (ссылка)"
