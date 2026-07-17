@@ -317,9 +317,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [adoptData]);
 
+  /* Навигация интегрирована с историей браузера: работают «назад/вперёд»
+     и жест возврата на телефоне. Каждый переход — запись в истории. */
+  const tabRef = useRef<Tab>('train');
+  const openIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    tabRef.current = tab;
+    openIdRef.current = openWorkoutId;
+  }, [tab, openWorkoutId]);
+
+  useEffect(() => {
+    history.replaceState({ t: tabRef.current, w: openIdRef.current }, '');
+    const onPop = (e: PopStateEvent) => {
+      const s = e.state as { t?: Tab; w?: string | null } | null;
+      if (!s?.t) return;
+      setTab(s.t);
+      setOpenWorkoutId(s.w ?? null);
+      window.scrollTo({ top: 0 });
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   const navigate = useCallback((nextTab: Tab, workoutId?: string | null) => {
+    const nextOpenId = workoutId !== undefined ? workoutId : openIdRef.current;
+    const same = nextTab === tabRef.current && nextOpenId === openIdRef.current;
     setTab(nextTab);
     if (workoutId !== undefined) setOpenWorkoutId(workoutId);
+    if (!same) history.pushState({ t: nextTab, w: nextOpenId }, '');
     window.scrollTo({ top: 0 });
   }, []);
 

@@ -11,6 +11,18 @@ import RestTimer, { parseRestSeconds, type RestRequest } from '../components/tra
 import VideoLink from '../components/train/VideoLink';
 import { ChevronIcon } from '../components/train/icons';
 
+/**
+ * Убираем из текста разминки «наследие таблицы»: маркеры «-», «•» и нумерацию
+ * вида «1.1», «2)» — в интерфейсе у пунктов и так есть своя структура.
+ * Числа-содержание («10 приседаний») не трогаем.
+ */
+function cleanWarmupText(t: string): string {
+  const cleaned = t
+    .replace(/^\s*(?:[-–—•]\s*)?(?:(?:\d+(?:\.\d+)+[.)]?|\d+[.)])\s*)?(?:[-–—•]\s*)?/, '')
+    .trim();
+  return cleaned || t.trim();
+}
+
 export default function TrainingScreen() {
   const {
     loading,
@@ -101,7 +113,7 @@ export default function TrainingScreen() {
                 <ul className="mt-2 space-y-2.5">
                   {w.warmup.map((wu, i) => (
                     <li key={i} className="break-words text-[15px] leading-snug">
-                      {wu.text}
+                      {cleanWarmupText(wu.text)}
                       {wu.videoUrl && <VideoLink href={wu.videoUrl} className="ml-1.5" />}
                     </li>
                   ))}

@@ -2,7 +2,7 @@
 // режим редактирования. Каждая правка сохраняется сразу (по blur или
 // изменению) через saveWorkout — общей кнопки «Сохранить» нет.
 
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 import type { Exercise, WarmupItem, Workout, WorkoutItem, WorkoutStatus } from '../../types';
 import { useApp } from '../../store';
 import { fmtDate } from '../../lib/dates';
@@ -84,8 +84,8 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
     saveWorkout({ ...workout, items: workout.items.filter((it) => it.id !== item.id) });
   };
 
-  const addItem = () => {
-    const order = workout.items.reduce((m, it) => Math.max(m, it.order), 0) + 1;
+  /** Пустая позиция; вставляется в указанное место списка (index = 0..n) */
+  const addItemAt = (index: number) => {
     const id = nextItemId(
       workout.id,
       workout.items.map((it) => it.id),
@@ -94,7 +94,7 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
       id,
       exerciseId: '',
       nameRaw: '',
-      order,
+      order: index + 1,
       warmupSets: null,
       setsReps: null,
       weight: null,
@@ -109,8 +109,12 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
       actual: null,
       done: false,
     };
-    saveWorkout({ ...workout, items: [...workout.items, item] });
+    const items = [...sortedItems];
+    items.splice(index, 0, item);
+    saveWorkout({ ...workout, items: items.map((it, i) => ({ ...it, order: i + 1 })) });
   };
+
+  const addItem = () => addItemAt(sortedItems.length);
 
   /** «создать новое» из комбобокса: сохраняем упражнение и сразу назначаем */
   const createExercise = (item: WorkoutItem, name: string) => {
@@ -237,17 +241,20 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
       <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Упражнения</h2>
         {sortedItems.map((item, index) => (
-          <ItemEditorCard
-            key={item.id}
-            item={item}
-            index={index}
-            total={sortedItems.length}
-            exercises={exercises}
-            patchItem={patchItem}
-            move={moveItem}
-            remove={removeItem}
-            createExercise={createExercise}
-          />
+          <Fragment key={item.id}>
+            {/* вставка нового упражнения прямо в это место списка */}
+            <InsertSlot onClick={() => addItemAt(index)} />
+            <ItemEditorCard
+              item={item}
+              index={index}
+              total={sortedItems.length}
+              exercises={exercises}
+              patchItem={patchItem}
+              move={moveItem}
+              remove={removeItem}
+              createExercise={createExercise}
+            />
+          </Fragment>
         ))}
         {workout.items.length === 0 && (
           <p className="rounded-2xl border border-border bg-card p-4 text-sm text-muted">
@@ -284,6 +291,26 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
         </button>
       </section>
     </div>
+  );
+}
+
+/* --- Тонкая кнопка «вставить сюда» между карточками ---------------------- */
+
+function InsertSlot({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Вставить упражнение сюда"
+      title="Вставить упражнение сюда"
+      className="-my-1 flex h-9 w-full items-center gap-2 px-2 text-muted"
+    >
+      <span className="h-px flex-1 bg-border" aria-hidden="true" />
+      <span className="flex h-6 w-6 items-center justify-center rounded-full border border-border bg-card">
+        <IconPlus size={13} />
+      </span>
+      <span className="h-px flex-1 bg-border" aria-hidden="true" />
+    </button>
   );
 }
 

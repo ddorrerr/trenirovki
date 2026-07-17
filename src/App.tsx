@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { useApp, type SyncInfo, type Tab } from './store';
+import { fmtDateShort, fmtWeekday } from './lib/dates';
 import { useWakeLock } from './hooks/useWakeLock';
 import TrainingScreen from './screens/TrainingScreen';
 import HistoryScreen from './screens/HistoryScreen';
@@ -25,8 +27,23 @@ export default function App() {
     editMode,
     setEditMode,
     settings,
+    currentWorkout,
   } = useApp();
   useWakeLock(settings.keepAwake);
+
+  // На экране «Тренировка» при прокрутке показываем в шапке дату тренировки,
+  // чтобы всегда было видно, где находишься.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 130);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  const headerDate =
+    tab === 'train' && scrolled && currentWorkout
+      ? `${fmtDateShort(currentWorkout.date)}, ${fmtWeekday(currentWorkout.date)}`
+      : null;
 
   if (authRequired) {
     return <KeyScreen />;
@@ -42,7 +59,9 @@ export default function App() {
     <div className="min-h-dvh">
       <header className="sticky top-0 z-20 border-b border-border bg-bg/90 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
-          <h1 className="text-lg font-bold tracking-tight">Тренировки</h1>
+          <h1 className="min-w-0 truncate text-lg font-bold tracking-tight">
+            {headerDate ?? 'Тренировки'}
+          </h1>
           {/* Навигация для больших экранов */}
           <nav className="ml-6 hidden gap-1 md:flex">
             {TABS.map((t) => (

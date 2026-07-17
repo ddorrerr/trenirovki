@@ -143,18 +143,20 @@ export default function ItemCard({ item, exercise, last, onChange, onRest }: Ite
           </p>
         )}
 
-        {/* Примечание тренера */}
-        {item.ptNote && (
-          <p className="mt-2 whitespace-pre-line break-words text-sm text-muted">{item.ptNote}</p>
-        )}
-
-        {/* Просьба тренера — выделена */}
-        {item.ptRequest && (
-          <div className="mt-2.5 flex items-start gap-2 rounded-xl bg-accent-soft px-3 py-2.5 text-sm font-medium">
-            <span className="mt-0.5 shrink-0">
-              <PinIcon />
-            </span>
-            <span className="min-w-0 whitespace-pre-line break-words">{item.ptRequest}</span>
+        {/* Примечание и запрос тренера — один компактный блок */}
+        {(item.ptNote || item.ptRequest) && (
+          <div className="mt-2 space-y-1 text-sm">
+            {item.ptNote && (
+              <p className="whitespace-pre-line break-words text-muted">{item.ptNote}</p>
+            )}
+            {item.ptRequest && (
+              <p className="flex items-start gap-1.5 break-words font-medium">
+                <span className="mt-0.5 shrink-0 text-muted">
+                  <PinIcon />
+                </span>
+                <span className="min-w-0 whitespace-pre-line">{item.ptRequest}</span>
+              </p>
+            )}
           </div>
         )}
 
