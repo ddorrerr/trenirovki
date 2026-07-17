@@ -106,6 +106,9 @@ export interface AppContextValue {
   /** Какая тренировка открыта на экране «Тренировка»; null = последняя по дате */
   openWorkoutId: string | null;
   navigate: (tab: Tab, workoutId?: string | null) => void;
+  /** Есть куда возвращаться внутри приложения (для стрелки «назад» в шапке) */
+  canGoBack: boolean;
+  goBack: () => void;
 
   /** Режим редактирования (глобальный тумблер) */
   editMode: boolean;
@@ -344,16 +347,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     openIdRef.current = openWorkoutId;
   }, [tab, openWorkoutId]);
 
+  const depthRef = useRef(0);
+  const [canGoBack, setCanGoBack] = useState(false);
+
   useEffect(() => {
-    history.replaceState({ t: tabRef.current, w: openIdRef.current }, '');
+    history.replaceState({ t: tabRef.current, w: openIdRef.current, d: 0 }, '');
     const onPop = (e: PopStateEvent) => {
-      const s = e.state as { t?: Tab; w?: string | null } | null;
+      const s = e.state as { t?: Tab; w?: string | null; d?: number } | null;
       if (!s?.t) return;
       if (!canLeave()) {
         // возвращаем запись истории на место — остаёмся в редакторе
-        history.pushState({ t: tabRef.current, w: openIdRef.current }, '');
+        history.pushState(
+          { t: tabRef.current, w: openIdRef.current, d: depthRef.current },
+          '',
+        );
         return;
       }
+      depthRef.current = s.d ?? 0;
+      setCanGoBack(depthRef.current > 0);
       setTab(s.t);
       setOpenWorkoutId(s.w ?? null);
       window.scrollTo({ top: 0 });
@@ -369,11 +380,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const same = nextTab === tabRef.current && nextOpenId === openIdRef.current;
       setTab(nextTab);
       if (workoutId !== undefined) setOpenWorkoutId(workoutId);
-      if (!same) history.pushState({ t: nextTab, w: nextOpenId }, '');
+      if (!same) {
+        depthRef.current += 1;
+        history.pushState({ t: nextTab, w: nextOpenId, d: depthRef.current }, '');
+        setCanGoBack(true);
+      }
       window.scrollTo({ top: 0 });
     },
     [canLeave],
   );
+
+  /** Стрелка «назад» в шапке: обычный шаг назад по истории браузера */
+  const goBack = useCallback(() => {
+    history.back();
+  }, []);
 
   const setEditMode = useCallback(
     (v: boolean) => {
@@ -499,6 +519,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     tab,
     openWorkoutId,
     navigate,
+    canGoBack,
+    goBack,
     editMode: ui.editMode,
     setEditMode,
     setDirtyGuard,

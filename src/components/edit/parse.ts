@@ -19,14 +19,22 @@ export function parseSetsReps(raw: string): SetsReps | null {
 }
 
 /**
- * Вес: одно число, допустимы запятая-десятичная и суффикс «кг».
- * «27.5» -> 27.5, «2,5 кг» -> 2.5, «45 кг» -> 45; «4+4 кг», «5?» -> null.
+ * Вес: одно число («27.5», «2,5 кг», «45 кг») или пара гантелей «X+X»
+ * («12.5+12.5», «4+4 кг») — тогда value = вес ОДНОЙ гантели.
+ * Неравные пары («4+6») и прочее неоднозначное -> null.
  */
 export function parseWeight(raw: string): Weight | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
-  const m = /^(\d+(?:[.,]\d+)?)\s*(?:кг\.?)?$/i.exec(trimmed);
-  return { raw, value: m ? Number(m[1].replace(',', '.')) : null };
+  const single = /^(\d+(?:[.,]\d+)?)\s*(?:кг\.?)?$/i.exec(trimmed);
+  if (single) return { raw, value: Number(single[1].replace(',', '.')) };
+  const pair = /^(\d+(?:[.,]\d+)?)\s*\+\s*(\d+(?:[.,]\d+)?)\s*(?:кг\.?)?$/i.exec(trimmed);
+  if (pair) {
+    const a = Number(pair[1].replace(',', '.'));
+    const b = Number(pair[2].replace(',', '.'));
+    if (a === b) return { raw, value: a };
+  }
+  return { raw, value: null };
 }
 
 /**

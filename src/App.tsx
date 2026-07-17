@@ -24,6 +24,8 @@ export default function App() {
     changeAccessKey,
     tab,
     navigate,
+    canGoBack,
+    goBack,
     editMode,
     setEditMode,
     settings,
@@ -59,6 +61,18 @@ export default function App() {
     <div className="min-h-dvh">
       <header className="sticky top-0 z-20 border-b border-border bg-bg/90 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
+          {canGoBack && (
+            <button
+              onClick={goBack}
+              aria-label="Назад"
+              title="Назад"
+              className="-ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:text-fg"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </button>
+          )}
           <h1 className="min-w-0 truncate text-lg font-bold tracking-tight">
             {headerDate ?? 'Тренировки'}
           </h1>

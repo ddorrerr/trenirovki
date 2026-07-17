@@ -2,7 +2,7 @@
 // и библиотека упражнений. В режиме редактирования здесь же создаются
 // новые тренировки (пустые или копии) и правится библиотека.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Exercise, Workout, WorkoutItem } from '../types';
 import { useApp } from '../store';
 import {
@@ -34,8 +34,32 @@ const SEGMENTS: { id: Segment; label: string }[] = [
   { id: 'exercises', label: 'Упражнения' },
 ];
 
+/* Экран запоминает, где ты была (вкладка, раскрытое упражнение, прокрутка),
+   чтобы стрелка «назад» возвращала ровно туда же, а не в начало списка. */
+const paneMemory: { seg: Segment; expandedId: string | null; scroll: number } = {
+  seg: 'workouts',
+  expandedId: null,
+  scroll: 0,
+};
+
 export default function HistoryScreen() {
-  const [seg, setSeg] = useState<Segment>('workouts');
+  const [seg, setSegState] = useState<Segment>(paneMemory.seg);
+  const setSeg = (s: Segment) => {
+    paneMemory.seg = s;
+    if (s === 'workouts') paneMemory.expandedId = null;
+    setSegState(s);
+  };
+
+  // вернулись на экран: восстанавливаем прокрутку (после первого рендера)
+  useEffect(() => {
+    if (paneMemory.scroll > 0) {
+      const y = paneMemory.scroll;
+      requestAnimationFrame(() => window.scrollTo({ top: y }));
+    }
+    return () => {
+      paneMemory.scroll = window.scrollY;
+    };
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -374,7 +398,14 @@ function ExercisesPane() {
   const { exercises, exerciseHistory, editMode, saveExercise } = useApp();
   const [query, setQuery] = useState('');
   const [showArchive, setShowArchive] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedId, setExpandedIdState] = useState<string | null>(paneMemory.expandedId);
+  const setExpandedId = (v: string | null | ((cur: string | null) => string | null)) => {
+    setExpandedIdState((cur) => {
+      const next = typeof v === 'function' ? v(cur) : v;
+      paneMemory.expandedId = next;
+      return next;
+    });
+  };
   /** только что созданное упражнение держим наверху, пока его не свернули */
   const [pinnedId, setPinnedId] = useState<string | null>(null);
 
