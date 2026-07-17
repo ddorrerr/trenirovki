@@ -111,6 +111,16 @@ export interface AppContextValue {
   editMode: boolean;
   setEditMode: (v: boolean) => void;
 
+  /**
+   * Защита от потери несохранённых правок: редактор регистрирует функцию,
+   * которая спрашивает пользователя, можно ли уходить. null — правок нет.
+   */
+  setDirtyGuard: (fn: (() => boolean) | null) => void;
+
+  /** Открыть график веса конкретного упражнения на экране «Прогресс» */
+  openExerciseId: string | null;
+  showExerciseProgress: (exerciseId: string) => void;
+
   /** Настройки (пока только «не гасить экран») */
   settings: Settings;
   setSettings: (patch: Partial<Settings>) => void;
@@ -154,7 +164,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>({ exercises: [], workouts: [] });
   const [tab, setTab] = useState<Tab>('train');
   const [openWorkoutId, setOpenWorkoutId] = useState<string | null>(null);
+  const [openExerciseId, setOpenExerciseId] = useState<string | null>(null);
   const [ui, setUi] = useState<UiPersist>(() => readUi());
+
+  const dirtyGuardRef = useRef<(() => boolean) | null>(null);
+  const setDirtyGuard = useCallback((fn: (() => boolean) | null) => {
+    dirtyGuardRef.current = fn;
+  }, []);
+  /** true = уходить можно (правок нет или пользователь подтвердил) */
+  const canLeave = useCallback(() => !dirtyGuardRef.current || dirtyGuardRef.current(), []);
 
   const adapterRef = useRef<StorageAdapter | null>(null);
   const ghRef = useRef<GitHubAdapter | null>(null);
@@ -331,6 +349,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const onPop = (e: PopStateEvent) => {
       const s = e.state as { t?: Tab; w?: string | null } | null;
       if (!s?.t) return;
+      if (!canLeave()) {
+        // возвращаем запись истории на место — остаёмся в редакторе
+        history.pushState({ t: tabRef.current, w: openIdRef.current }, '');
+        return;
+      }
       setTab(s.t);
       setOpenWorkoutId(s.w ?? null);
       window.scrollTo({ top: 0 });
@@ -339,22 +362,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  const navigate = useCallback((nextTab: Tab, workoutId?: string | null) => {
-    const nextOpenId = workoutId !== undefined ? workoutId : openIdRef.current;
-    const same = nextTab === tabRef.current && nextOpenId === openIdRef.current;
-    setTab(nextTab);
-    if (workoutId !== undefined) setOpenWorkoutId(workoutId);
-    if (!same) history.pushState({ t: nextTab, w: nextOpenId }, '');
-    window.scrollTo({ top: 0 });
-  }, []);
+  const navigate = useCallback(
+    (nextTab: Tab, workoutId?: string | null) => {
+      if (!canLeave()) return;
+      const nextOpenId = workoutId !== undefined ? workoutId : openIdRef.current;
+      const same = nextTab === tabRef.current && nextOpenId === openIdRef.current;
+      setTab(nextTab);
+      if (workoutId !== undefined) setOpenWorkoutId(workoutId);
+      if (!same) history.pushState({ t: nextTab, w: nextOpenId }, '');
+      window.scrollTo({ top: 0 });
+    },
+    [canLeave],
+  );
 
-  const setEditMode = useCallback((v: boolean) => {
-    setUi((prev) => {
-      const next = { ...prev, editMode: v };
-      writeUi(next);
-      return next;
-    });
-  }, []);
+  const setEditMode = useCallback(
+    (v: boolean) => {
+      if (!v && !canLeave()) return;
+      setUi((prev) => {
+        const next = { ...prev, editMode: v };
+        writeUi(next);
+        return next;
+      });
+    },
+    [canLeave],
+  );
+
+  const showExerciseProgress = useCallback(
+    (exerciseId: string) => {
+      setOpenExerciseId(exerciseId);
+      navigate('progress');
+    },
+    [navigate],
+  );
 
   const setSettings = useCallback((patch: Partial<Settings>) => {
     setUi((prev) => {
@@ -462,6 +501,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     navigate,
     editMode: ui.editMode,
     setEditMode,
+    setDirtyGuard,
+    openExerciseId,
+    showExerciseProgress,
     settings: { keepAwake: ui.keepAwake },
     setSettings,
     exerciseById,

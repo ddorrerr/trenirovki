@@ -1,6 +1,6 @@
 // Секция «Вес по упражнению»: выбор упражнения, график, максимум и последний раз.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useApp, type Occurrence } from '../../store';
 import type { WorkoutItem } from '../../types';
 import { fmtDateShort, todayISO } from '../../lib/dates';
@@ -83,6 +83,11 @@ export default function WeightSection() {
   }, [options, counts]);
 
   const [pickedId, setPickedId] = useState<string | null>(null);
+  // переход «График веса» из библиотеки упражнений выбирает упражнение здесь
+  const { openExerciseId } = useApp();
+  useEffect(() => {
+    if (openExerciseId) setPickedId(openExerciseId);
+  }, [openExerciseId]);
   const selectedId = pickedId ?? defaultId;
 
   const points = useMemo(

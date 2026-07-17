@@ -186,7 +186,7 @@ function SyncBadge({
 function IconDumbbell({ active }: { active: boolean }) {
   return (
     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round">
-      <path d="M7 8v8M4.5 9.5v5M17 8v8M19.5 9.5v5M7 12h10" />
+      <path d="M6.5 7v10M3.5 9v6M17.5 7v10M20.5 9v6M6.5 12h11" />
     </svg>
   );
 }

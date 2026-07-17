@@ -3,7 +3,7 @@
 // новые тренировки (пустые или копии) и правится библиотека.
 
 import { useMemo, useState } from 'react';
-import type { Exercise, Workout } from '../types';
+import type { Exercise, Workout, WorkoutItem } from '../types';
 import { useApp } from '../store';
 import {
   fmtDate,
@@ -537,35 +537,72 @@ function ExerciseRow({ e, count, lastDate, expanded, onToggle }: ExerciseRowProp
   );
 }
 
+/** Короткая сводка «что делала» по позиции: факт, иначе план */
+function occurrenceSummary(it: WorkoutItem): string {
+  if (it.actual) {
+    const parts: string[] = [];
+    if (it.actual.weight != null) parts.push(`${it.actual.weight} кг`);
+    if (it.actual.sets != null && it.actual.reps != null)
+      parts.push(`${it.actual.sets}×${it.actual.reps}`);
+    if (parts.length) return parts.join(' · ');
+  }
+  const parts: string[] = [];
+  if (it.setsReps?.raw) parts.push(it.setsReps.raw);
+  if (it.weight?.raw) parts.push(`вес ${it.weight.raw}`);
+  return parts.join(' · ') || '—';
+}
+
 function ExerciseDetails({ e }: { e: Exercise }) {
-  const aliases = (e.aliases ?? []).filter((a) => a !== e.name);
+  const { exerciseHistory, navigate, showExerciseProgress } = useApp();
   const tags = e.tags ?? [];
-  const empty = !e.videoUrl && aliases.length === 0 && tags.length === 0;
+  const recent = useMemo(() => exerciseHistory(e.id).slice(-5).reverse(), [exerciseHistory, e.id]);
 
   return (
     <div className="space-y-3">
-      {e.videoUrl && (
-        <a
-          href={e.videoUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 font-medium text-accent"
-        >
-          <IconPlay size={16} /> Видео техники
-        </a>
-      )}
-      {aliases.length > 0 && (
+      <div className="flex flex-wrap items-center gap-3">
+        {e.videoUrl && (
+          <a
+            href={e.videoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 font-medium text-accent"
+          >
+            <IconPlay size={16} /> Видео техники
+          </a>
+        )}
+        {recent.length > 0 && (
+          <button
+            type="button"
+            onClick={() => showExerciseProgress(e.id)}
+            className="inline-flex items-center gap-1.5 font-medium text-accent"
+          >
+            График веса →
+          </button>
+        )}
+      </div>
+
+      {recent.length > 0 && (
         <div>
-          <div className="mb-1 text-sm text-muted">Также встречается как</div>
-          <div className="flex flex-wrap gap-1.5">
-            {aliases.map((a) => (
-              <Chip key={a} muted>
-                {a}
-              </Chip>
+          <div className="mb-1 text-sm text-muted">Последние разы</div>
+          <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+            {recent.map(({ workout, item }) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  onClick={() => navigate('train', workout.id)}
+                  className="flex min-h-11 w-full items-center gap-3 bg-bg px-3 py-2 text-left text-sm"
+                >
+                  <span className="shrink-0 font-medium">{fmtDateShort(workout.date)}</span>
+                  <span className="min-w-0 flex-1 truncate text-muted">
+                    {occurrenceSummary(item)}
+                  </span>
+                </button>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       )}
+
       {tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {tags.map((t) => (
@@ -573,14 +610,15 @@ function ExerciseDetails({ e }: { e: Exercise }) {
           ))}
         </div>
       )}
-      {empty && <p className="text-sm text-muted">Дополнительных деталей нет.</p>}
+      {recent.length === 0 && !e.videoUrl && tags.length === 0 && (
+        <p className="text-sm text-muted">Пока не встречалось в тренировках.</p>
+      )}
     </div>
   );
 }
 
 function ExerciseEditPanel({ e, used }: { e: Exercise; used: boolean }) {
   const { saveExercise, deleteExercise } = useApp();
-  const aliases = (e.aliases ?? []).filter((a) => a !== e.name);
 
   return (
     <div className="space-y-3">
@@ -605,18 +643,6 @@ function ExerciseEditPanel({ e, used }: { e: Exercise; used: boolean }) {
         placeholder="напр. спина, тренажёр"
         onCommit={(v) => saveExercise({ ...e, tags: splitTags(v) })}
       />
-      {aliases.length > 0 && (
-        <div>
-          <div className="mb-1 text-sm text-muted">Также встречается как</div>
-          <div className="flex flex-wrap gap-1.5">
-            {aliases.map((a) => (
-              <Chip key={a} muted>
-                {a}
-              </Chip>
-            ))}
-          </div>
-        </div>
-      )}
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <button
           type="button"

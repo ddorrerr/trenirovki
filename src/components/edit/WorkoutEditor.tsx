@@ -1,8 +1,8 @@
 // Редактор тренировки. Рендерится экраном «Тренировка», когда включён
 // режим редактирования. Каждая правка сохраняется сразу (по blur или
-// изменению) через saveWorkout — общей кнопки «Сохранить» нет.
+// изменению) в черновик; в данные попадает только по кнопке «Сохранить».
 
-import { Fragment, useMemo } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { Exercise, WarmupItem, Workout, WorkoutItem, WorkoutStatus } from '../../types';
 import { useApp } from '../../store';
 import { fmtDate } from '../../lib/dates';
@@ -26,15 +26,64 @@ const STATUS_OPTIONS: { value: WorkoutStatus; label: string }[] = [
 ];
 
 export default function WorkoutEditor({ workout }: { workout: Workout }) {
-  const { exercises, saveWorkout, deleteWorkout, saveExercise, setEditMode } = useApp();
+  const { exercises, saveWorkout, deleteWorkout, saveExercise, setEditMode, setDirtyGuard } =
+    useApp();
 
-  const patch = (p: Partial<Workout>) => saveWorkout({ ...workout, ...p });
+  /* Правки копятся в черновике и попадают в данные только по «Сохранить».
+     «Отмена» отбрасывает черновик. Попытка уйти с несохранёнными правками
+     перехватывается через dirty guard в store (подтверждение). */
+  const [draft, setDraft] = useState<Workout>(workout);
+  const baseRef = useRef<Workout>(workout);
+
+  // тренировка обновилась извне (синхронизация): чистый черновик подхватывает её
+  useEffect(() => {
+    setDraft((prev) =>
+      JSON.stringify(prev) === JSON.stringify(baseRef.current) ? workout : prev,
+    );
+    baseRef.current = workout;
+  }, [workout]);
+
+  const dirty = useMemo(
+    () => JSON.stringify(draft) !== JSON.stringify(workout),
+    [draft, workout],
+  );
+
+  useEffect(() => {
+    if (!dirty) {
+      setDirtyGuard(null);
+      return;
+    }
+    setDirtyGuard(() => window.confirm('Есть несохранённые изменения. Выйти без сохранения?'));
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => {
+      setDirtyGuard(null);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
+  }, [dirty, setDirtyGuard]);
+
+  const save = () => {
+    setDirtyGuard(null);
+    saveWorkout(draft);
+    setEditMode(false);
+  };
+
+  const cancel = () => {
+    if (dirty && !window.confirm('Отменить несохранённые изменения?')) return;
+    setDirtyGuard(null);
+    setDraft(workout);
+    setEditMode(false);
+  };
+
+  const patch = (p: Partial<Workout>) => setDraft((prev) => ({ ...prev, ...p }));
 
   const patchItem = (id: string, p: Partial<WorkoutItem>) =>
-    saveWorkout({
-      ...workout,
-      items: workout.items.map((it) => (it.id === id ? { ...it, ...p } : it)),
-    });
+    setDraft((prev) => ({
+      ...prev,
+      items: prev.items.map((it) => (it.id === id ? { ...it, ...p } : it)),
+    }));
 
   /* Тип тренировки — фиксированный список (все тренировки full body).
      Если у тренировки уже стоит нестандартное значение, показываем и его,
@@ -45,19 +94,19 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
       { value: 'с тренером', label: 'с тренером' },
       { value: 'сама', label: 'сама' },
     ];
-    const cur = workout.type ?? '';
+    const cur = draft.type ?? '';
     if (cur && !base.some((o) => o.value === cur)) base.push({ value: cur, label: cur });
     return base;
-  }, [workout.type]);
+  }, [draft.type]);
 
   /* --- Разминка --------------------------------------------------------- */
 
   const patchWarmup = (i: number, p: Partial<WarmupItem>) =>
-    patch({ warmup: workout.warmup.map((x, j) => (j === i ? { ...x, ...p } : x)) });
+    patch({ warmup: draft.warmup.map((x, j) => (j === i ? { ...x, ...p } : x)) });
 
-  const addWarmup = () => patch({ warmup: [...workout.warmup, { text: '', videoUrl: null }] });
+  const addWarmup = () => patch({ warmup: [...draft.warmup, { text: '', videoUrl: null }] });
 
-  const removeWarmup = (i: number) => patch({ warmup: workout.warmup.filter((_, j) => j !== i) });
+  const removeWarmup = (i: number) => patch({ warmup: draft.warmup.filter((_, j) => j !== i) });
 
   /* --- Упражнения ------------------------------------------------------- */
 
@@ -65,8 +114,8 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
      После любого перемещения order перенумеровывается в 1..n — это заодно
      чинит импортированные тренировки с дублями и «перепутанным» order. */
   const sortedItems = useMemo(
-    () => [...workout.items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
-    [workout.items],
+    () => [...draft.items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    [draft.items],
   );
 
   const moveItem = (index: number, dir: -1 | 1) => {
@@ -74,21 +123,21 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
     if (j < 0 || j >= sortedItems.length) return;
     const items = [...sortedItems];
     [items[index], items[j]] = [items[j], items[index]];
-    saveWorkout({ ...workout, items: items.map((it, i) => ({ ...it, order: i + 1 })) });
+    setDraft((prev) => ({ ...prev, items: items.map((it, i) => ({ ...it, order: i + 1 })) }));
   };
 
   const removeItem = (item: WorkoutItem) => {
     const ex = exercises.find((e) => e.id === item.exerciseId);
     const name = ex?.name || item.nameRaw || 'без названия';
     if (!window.confirm(`Убрать упражнение «${name}» из тренировки?`)) return;
-    saveWorkout({ ...workout, items: workout.items.filter((it) => it.id !== item.id) });
+    setDraft((prev) => ({ ...prev, items: prev.items.filter((it) => it.id !== item.id) }));
   };
 
   /** Пустая позиция; вставляется в указанное место списка (index = 0..n) */
   const addItemAt = (index: number) => {
     const id = nextItemId(
-      workout.id,
-      workout.items.map((it) => it.id),
+      draft.id,
+      draft.items.map((it) => it.id),
     );
     const item: WorkoutItem = {
       id,
@@ -111,7 +160,7 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
     };
     const items = [...sortedItems];
     items.splice(index, 0, item);
-    saveWorkout({ ...workout, items: items.map((it, i) => ({ ...it, order: i + 1 })) });
+    setDraft((prev) => ({ ...prev, items: items.map((it, i) => ({ ...it, order: i + 1 })) }));
   };
 
   const addItem = () => addItemAt(sortedItems.length);
@@ -131,16 +180,33 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
   };
 
   const removeWorkout = () => {
-    if (!window.confirm(`Удалить тренировку от ${fmtDate(workout.date)}? Это действие нельзя отменить.`))
+    if (!window.confirm(`Удалить тренировку от ${fmtDate(draft.date)}? Это действие нельзя отменить.`))
       return;
-    deleteWorkout(workout.id);
+    setDirtyGuard(null); // удаление подтверждено — черновик больше не охраняем
+    deleteWorkout(draft.id);
+    setEditMode(false);
   };
 
   return (
     <div className="space-y-4">
-      <p className="px-1 text-sm text-muted">
-        Все изменения сохраняются автоматически — отдельной кнопки «Сохранить» нет.
-      </p>
+      {/* Панель действий: липнет под шапкой, всегда под рукой */}
+      <div className="sticky top-[60px] z-10 -mx-1 flex items-center gap-2 rounded-xl border border-border bg-bg/95 p-2 backdrop-blur">
+        <button
+          type="button"
+          onClick={cancel}
+          className="rounded-lg border border-border bg-card px-4 py-2 font-medium"
+        >
+          Отмена
+        </button>
+        <button
+          type="button"
+          onClick={save}
+          disabled={!dirty}
+          className="flex-1 rounded-lg bg-accent px-4 py-2 font-semibold text-accent-fg disabled:opacity-40"
+        >
+          {dirty ? 'Сохранить' : 'Нет изменений'}
+        </button>
+      </div>
 
       {/* --- Шапка --------------------------------------------------------- */}
       <section className="rounded-2xl border border-border bg-card p-4">
@@ -149,14 +215,14 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
           <TextField
             label="Дата"
             type="date"
-            value={workout.date}
+            value={draft.date}
             onCommit={(v) => {
               if (v) patch({ date: v });
             }}
           />
           <SelectField
             label="Тип"
-            value={workout.type ?? ''}
+            value={draft.type ?? ''}
             options={typeOptions}
             onCommit={(v) => patch({ type: v || null })}
           />
@@ -164,13 +230,13 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <TextField
             label="Название"
-            value={workout.title ?? ''}
+            value={draft.title ?? ''}
             placeholder="необязательно"
             onCommit={(v) => patch({ title: v.trim() || null })}
           />
           <SelectField
             label="Статус"
-            value={workout.status}
+            value={draft.status}
             options={STATUS_OPTIONS}
             onCommit={(v) => patch({ status: v as WorkoutStatus })}
           />
@@ -178,7 +244,7 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
         <div className="mt-3">
           <TextAreaField
             label="Заметки тренера"
-            value={workout.notes}
+            value={draft.notes}
             placeholder="общие заметки к тренировке"
             onCommit={(v) => patch({ notes: v })}
           />
@@ -192,14 +258,14 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
           <TextField
             label="Видео разминки (ссылка)"
             type="url"
-            value={workout.warmupVideoUrl ?? ''}
+            value={draft.warmupVideoUrl ?? ''}
             placeholder="https://…"
             onCommit={(v) => patch({ warmupVideoUrl: v.trim() || null })}
           />
         </div>
-        {workout.warmup.length > 0 && (
+        {draft.warmup.length > 0 && (
           <ul className="mt-3 space-y-3">
-            {workout.warmup.map((wu, i) => (
+            {draft.warmup.map((wu, i) => (
               <li key={i} className="rounded-xl border border-border p-3">
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1 space-y-3">
@@ -225,7 +291,7 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
             ))}
           </ul>
         )}
-        {workout.warmup.length === 0 && (
+        {draft.warmup.length === 0 && (
           <p className="mt-3 text-sm text-muted">Разминки пока нет.</p>
         )}
         <button
@@ -256,7 +322,7 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
             />
           </Fragment>
         ))}
-        {workout.items.length === 0 && (
+        {draft.items.length === 0 && (
           <p className="rounded-2xl border border-border bg-card p-4 text-sm text-muted">
             Упражнений пока нет — добавь первое.
           </p>
@@ -269,15 +335,6 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
           <IconPlus size={16} /> Упражнение
         </button>
       </section>
-
-      {/* --- Готово: выйти из режима редактирования ------------------------- */}
-      <button
-        type="button"
-        onClick={() => setEditMode(false)}
-        className="w-full rounded-xl bg-accent px-4 py-2.5 text-lg font-semibold text-accent-fg"
-      >
-        Готово
-      </button>
 
       <button
         type="button"
