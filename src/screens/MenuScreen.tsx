@@ -124,7 +124,7 @@ export default function MenuScreen() {
         <div className="space-y-1 px-4 py-3.5 text-sm text-muted">
           <p>{workoutsLine}</p>
           <p>{exercisesLine}</p>
-          <p>Версия 0.17.0</p>
+          <p>Версия 0.18.0</p>
         </div>
       </Section>
     </div>

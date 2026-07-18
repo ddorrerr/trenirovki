@@ -171,6 +171,57 @@ export default function HomeScreen() {
     return Math.round(kg);
   }, [lastDone]);
 
+  /* Во что «переводится» поднятый объём — весёлый эквивалент; единица
+     выбирается из подходящих по величине и меняется от тренировки к
+     тренировке (детерминированно по id, чтобы не мигало) */
+  const equivalent = useMemo(() => {
+    if (tonnage <= 0 || !lastDone) return null;
+    const UNITS = [
+      { kg: 110, emoji: '🐼', one: 'панда', few: 'панды', many: 'панд', gen: 'панды' },
+      { kg: 250, emoji: '🎹', one: 'пианино', few: 'пианино', many: 'пианино', gen: 'пианино' },
+      { kg: 500, emoji: '🐎', one: 'лошадь', few: 'лошади', many: 'лошадей', gen: 'лошади' },
+      {
+        kg: 1500,
+        emoji: '🚗',
+        one: 'Toyota Camry',
+        few: 'Toyota Camry',
+        many: 'Toyota Camry',
+        gen: 'Toyota Camry',
+      },
+      {
+        kg: 3600,
+        emoji: '🚐',
+        one: 'гонконгский минибас',
+        few: 'гонконгских минибаса',
+        many: 'гонконгских минибасов',
+        gen: 'гонконгского минибаса',
+      },
+      { kg: 4000, emoji: '🐘', one: 'слон', few: 'слона', many: 'слонов', gen: 'слона' },
+      {
+        kg: 12000,
+        emoji: '🚌',
+        one: 'двухэтажный автобус',
+        few: 'двухэтажных автобуса',
+        many: 'двухэтажных автобусов',
+        gen: 'двухэтажного автобуса',
+      },
+    ];
+    const fitting = UNITS.filter((u) => tonnage / u.kg >= 0.95);
+    let seed = 0;
+    for (const ch of lastDone.id) seed = (seed + ch.charCodeAt(0)) % 997;
+    const u = fitting.length ? fitting[seed % fitting.length] : UNITS[0];
+    const count = tonnage / u.kg;
+    const rounded = Math.round(count);
+    const isInt = Math.abs(count - rounded) < 0.05 && rounded >= 1;
+    const text = isInt
+      ? `≈ ${plural(rounded, u.one, u.few, u.many)}`
+      : `≈ ${count.toLocaleString('ru-RU', {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1,
+        })} ${u.gen}`;
+    return { text, icons: u.emoji.repeat(Math.min(5, Math.max(1, rounded))) };
+  }, [tonnage, lastDone]);
+
   /* Какие группы мышц были в работе за последние 7 дней */
   const groups7 = useMemo(() => {
     const set = new Set<string>();
@@ -398,7 +449,14 @@ export default function HomeScreen() {
               Поднято за прошлую
             </p>
             <p className="mt-2 text-xl font-extrabold tabular-nums">{fmtKg(tonnage)}</p>
-            <p className="mt-0.5 text-xs font-medium text-muted">сумма за все подходы</p>
+            {equivalent && (
+              <p className="mt-1 text-xs font-medium text-muted">
+                <span aria-hidden="true" className="mr-1 text-sm leading-none">
+                  {equivalent.icons}
+                </span>
+                {equivalent.text}
+              </p>
+            )}
           </div>
         )}
         <div className="rounded-2xl border border-border bg-card p-3.5">
@@ -408,7 +466,7 @@ export default function HomeScreen() {
           <div className="mt-2.5">
             <WeekBars counts={weekCounts} />
           </div>
-          <p className="mt-1.5 text-xs font-medium text-muted">тренировок в неделю · 8 недель</p>
+          <p className="mt-1.5 text-xs font-medium text-muted">тренировок в неделю</p>
         </div>
         {groups7.length > 0 && (
           <div className="rounded-2xl border border-border bg-card p-3.5">
@@ -518,15 +576,16 @@ function Ring({ pct, label }: { pct: number; label: string }) {
   );
 }
 
-/* Мини-столбики: тренировок в неделю, текущая неделя — ярким вольтом */
+/* Мини-столбики: тренировок в неделю, текущая неделя — ярким вольтом.
+   Ширина столбиков фиксированная, чтобы на широких экранах не расползались */
 function WeekBars({ counts }: { counts: number[] }) {
   const max = Math.max(1, ...counts);
   return (
-    <div className="flex h-10 items-end gap-1">
+    <div className="flex h-10 items-end gap-1.5">
       {counts.map((n, i) => (
         <span
           key={i}
-          className={'flex-1 rounded-sm ' + (i === counts.length - 1 ? 'bg-ok' : 'bg-ok-soft')}
+          className={'w-3 rounded-[3px] ' + (i === counts.length - 1 ? 'bg-ok' : 'bg-ok-soft')}
           style={{ height: `${n === 0 ? 6 : Math.max(14, (n / max) * 100)}%` }}
         />
       ))}
