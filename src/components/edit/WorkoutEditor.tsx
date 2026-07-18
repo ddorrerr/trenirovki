@@ -131,7 +131,7 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
 
   const removeItem = (item: WorkoutItem) => {
     const ex = exercises.find((e) => e.id === item.exerciseId);
-    const name = ex?.name || item.nameRaw || t.editor.untitled;
+    const name = t.catalog.exercise(ex?.name || item.nameRaw || t.editor.untitled);
     if (!window.confirm(t.editor.removeItemConfirm(name))) return;
     setDraft((prev) => ({ ...prev, items: prev.items.filter((it) => it.id !== item.id) }));
   };

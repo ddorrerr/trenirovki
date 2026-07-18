@@ -31,7 +31,12 @@ export default function ExercisePicker({ options, selectedId, onSelect }: Props)
 
   const selected = options.find((o) => o.id === selectedId) ?? null;
   const q = query.trim().toLowerCase();
-  const filtered = q ? options.filter((o) => o.search.includes(q)) : options;
+  // в en-режиме поиск находит и по английскому названию
+  const filtered = q
+    ? options.filter(
+        (o) => o.search.includes(q) || t.catalog.exercise(o.name).toLowerCase().includes(q),
+      )
+    : options;
 
   const close = () => {
     setOpen(false);
@@ -48,7 +53,7 @@ export default function ExercisePicker({ options, selectedId, onSelect }: Props)
         className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-left"
       >
         <span className="min-w-0 flex-1 truncate font-medium">
-          {selected ? selected.name : t.combo.pick}
+          {selected ? t.catalog.exercise(selected.name) : t.combo.pick}
         </span>
         <svg
           width="16"
@@ -97,7 +102,7 @@ export default function ExercisePicker({ options, selectedId, onSelect }: Props)
                       (o.id === selectedId ? 'bg-accent-soft font-medium' : 'hover:bg-accent-soft/50')
                     }
                   >
-                    <span className="min-w-0 flex-1 truncate">{o.name}</span>
+                    <span className="min-w-0 flex-1 truncate">{t.catalog.exercise(o.name)}</span>
                     <span className="shrink-0 text-sm tabular-nums text-muted">{o.count}</span>
                   </button>
                 </li>

@@ -4,6 +4,7 @@
 
 import type { EquivForms } from './lang';
 import type { ru } from './ru';
+import { exerciseEn } from './exercises-en';
 
 /** "5 exercises", "1 time", … */
 function pl(n: number, one: string, many: string): string {
@@ -83,6 +84,7 @@ export const en: typeof ru = {
     muscle: (v) => MUSCLE_LABELS[v] ?? v,
     equip: (v) => EQUIP_LABELS[v] ?? v,
     workoutType: (v) => TYPE_LABELS[v] ?? v,
+    exercise: (v) => exerciseEn(v),
   },
 
   sync: {

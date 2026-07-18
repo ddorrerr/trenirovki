@@ -30,10 +30,12 @@ export default function ExerciseCombobox({ exercises, value, onSelect, onCreate 
         (e) =>
           !q ||
           e.name.toLowerCase().includes(q) ||
+          // в en-режиме поиск находит и по английскому названию
+          t.catalog.exercise(e.name).toLowerCase().includes(q) ||
           (e.aliases ?? []).some((a) => a.toLowerCase().includes(q)),
       )
       .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
-  }, [exercises, q]);
+  }, [exercises, q, t]);
 
   const close = () => {
     setOpen(false);
@@ -48,7 +50,9 @@ export default function ExerciseCombobox({ exercises, value, onSelect, onCreate 
         className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-left"
       >
         {current ? (
-          <span className="block break-words text-lg font-semibold leading-snug">{current.name}</span>
+          <span className="block break-words text-lg font-semibold leading-snug">
+            {t.catalog.exercise(current.name)}
+          </span>
         ) : (
           <span className="text-muted">{t.combo.pick}</span>
         )}
@@ -86,7 +90,9 @@ export default function ExerciseCombobox({ exercises, value, onSelect, onCreate 
                     }
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block break-words font-medium leading-snug">{e.name}</span>
+                      <span className="block break-words font-medium leading-snug">
+                        {t.catalog.exercise(e.name)}
+                      </span>
                       {viaAlias && (
                         <span className="block break-words text-sm text-muted">{viaAlias}</span>
                       )}

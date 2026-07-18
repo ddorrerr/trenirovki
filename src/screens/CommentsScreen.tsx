@@ -64,7 +64,7 @@ export default function CommentsScreen() {
             <ul className="space-y-2.5">
               {g.entries.map((e) => (
                 <li key={e.itemId} className="text-sm leading-snug">
-                  <span className="font-bold">{e.name}</span>
+                  <span className="font-bold">{t.catalog.exercise(e.name)}</span>
                   {e.pvr && (
                     <span className="ml-1.5 inline-flex items-center gap-1 rounded-lg bg-chip px-1.5 py-0.5 align-middle text-xs font-bold tabular-nums">
                       <span className="text-muted">

@@ -91,7 +91,7 @@ export default function ItemCard({
   // «чпок» галочки только на живой тап, не при монтировании карточки
   const [checkPop, setCheckPop] = useState(false);
 
-  const name = exercise?.name ?? stripNumbering(item.nameRaw ?? '');
+  const name = t.catalog.exercise(exercise?.name ?? stripNumbering(item.nameRaw ?? ''));
   const videoUrl = item.videoUrl ?? exercise?.videoUrl ?? null;
   const myComment = (item.myComment ?? '').trim();
 

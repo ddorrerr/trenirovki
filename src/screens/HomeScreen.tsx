@@ -205,7 +205,8 @@ export default function HomeScreen() {
     }
     return latest;
   }, [past, today]);
-  const recordName = record ? (exerciseById(record.exerciseId)?.name ?? null) : null;
+  const rawRecordName = record ? (exerciseById(record.exerciseId)?.name ?? null) : null;
+  const recordName = rawRecordName ? t.catalog.exercise(rawRecordName) : null;
 
   const lastComments = last
     ? last.items.filter((i) => i.myComment && i.myComment.trim() !== '').length
@@ -356,7 +357,7 @@ export default function HomeScreen() {
             <ul className="mt-2 space-y-2.5">
               {feedbackItems.map((f) => (
                 <li key={f.id} className="text-sm leading-snug">
-                  <span className="font-bold">{f.name}</span>
+                  <span className="font-bold">{t.catalog.exercise(f.name)}</span>
                   {f.pvr && (
                     <span className="ml-1.5 inline-flex items-center gap-1 rounded-lg bg-chip px-1.5 py-0.5 align-middle text-xs font-bold tabular-nums">
                       <span className="text-muted">
@@ -389,7 +390,9 @@ export default function HomeScreen() {
             <ul className="mt-2 space-y-1 text-sm">
               {frequent.map((f) => (
                 <li key={f.id} className="flex items-baseline justify-between gap-2">
-                  <span className="min-w-0 flex-1 truncate font-medium">{f.name}</span>
+                  <span className="min-w-0 flex-1 truncate font-medium">
+                    {t.catalog.exercise(f.name)}
+                  </span>
                   <span className="shrink-0 text-muted">{t.counted.entries(f.n)}</span>
                 </li>
               ))}

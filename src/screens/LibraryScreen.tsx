@@ -105,6 +105,8 @@ export default function LibraryScreen() {
         (e) =>
           !q ||
           e.name.toLowerCase().includes(q) ||
+          // в en-режиме поиск находит и по английскому названию
+          t.catalog.exercise(e.name).toLowerCase().includes(q) ||
           (e.aliases ?? []).some((a) => a.toLowerCase().includes(q)),
       )
       .sort((a, b) => {
@@ -113,7 +115,7 @@ export default function LibraryScreen() {
         const d = (stats.get(b.id)?.count ?? 0) - (stats.get(a.id)?.count ?? 0);
         return d !== 0 ? d : a.name.localeCompare(b.name, 'ru');
       });
-  }, [exercises, query, showArchive, stats, pinnedId, fMuscle, fEquip]);
+  }, [exercises, query, showArchive, stats, pinnedId, fMuscle, fEquip, t]);
 
   const addExercise = () => {
     const ex: Exercise = {
@@ -290,7 +292,9 @@ function ExerciseRow({ e, count, lastDate, expanded, onToggle }: ExerciseRowProp
       <button type="button" onClick={onToggle} className="flex w-full items-center gap-3 p-4 text-left">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="break-words text-lg font-semibold leading-snug">{e.name}</span>
+            <span className="break-words text-lg font-semibold leading-snug">
+              {t.catalog.exercise(e.name)}
+            </span>
             {e.archived && (
               <span className="rounded-lg border border-border bg-bg px-2 py-0.5 text-xs font-medium text-muted">
                 {t.lib.archiveChip}
@@ -476,7 +480,7 @@ function ExerciseEditPanel({ e, used }: { e: Exercise; used: boolean }) {
           disabled={used}
           title={used ? t.lib.usedInWorkouts : t.lib.deleteExercise}
           onClick={() => {
-            if (window.confirm(t.lib.deleteConfirm(e.name))) deleteExercise(e.id);
+            if (window.confirm(t.lib.deleteConfirm(t.catalog.exercise(e.name)))) deleteExercise(e.id);
           }}
           className={
             'rounded-xl border border-border bg-card px-4 py-2.5 font-medium text-danger ' +

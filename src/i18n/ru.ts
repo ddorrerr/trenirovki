@@ -62,6 +62,7 @@ export const ru = {
     muscle: (v: string) => v,
     equip: (v: string) => v,
     workoutType: (v: string) => v,
+    exercise: (v: string) => v,
   },
 
   sync: {
