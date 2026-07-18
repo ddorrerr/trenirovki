@@ -272,10 +272,12 @@ function IconDumbbell({ active }: { active: boolean }) {
   );
 }
 
+/* Циферблат с круговой стрелкой назад — «перемотка» истории */
 function IconHistory({ active }: { active: boolean }) {
   return (
     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
       <path d="M12 7.5V12l3.5 2" />
     </svg>
   );

@@ -4,9 +4,11 @@
 
 import { useMemo } from 'react';
 import { useApp } from '../store';
-import { daysBetween, fmtDate, fmtWeekday, todayISO } from '../lib/dates';
+import type { Workout } from '../types';
+import { daysBetween, fmtDate, fmtDateShort, fmtWeekday, todayISO } from '../lib/dates';
 import { plural } from '../components/edit/ui';
-import { BarbellIcon, CommentIcon, FlameIcon } from '../components/train/icons';
+import NewWorkoutForm from '../components/edit/NewWorkoutForm';
+import { BarbellIcon, CommentIcon, FlameIcon, SkullIcon } from '../components/train/icons';
 
 /** Понедельник недели данной даты (UTC), ISO-строкой */
 function mondayISO(iso: string): string {
@@ -43,7 +45,7 @@ function fmtDayTitle(iso: string): string {
 }
 
 export default function HomeScreen() {
-  const { workouts, navigate, exerciseById, showExerciseProgress } = useApp();
+  const { workouts, navigate, editMode, exerciseById, showExerciseProgress } = useApp();
   const today = todayISO();
 
   const past = useMemo(() => workouts.filter((w) => w.date <= today), [workouts, today]);
@@ -96,6 +98,104 @@ export default function HomeScreen() {
   const lastComments = last
     ? last.items.filter((i) => i.myComment && i.myComment.trim() !== '').length
     : 0;
+
+  /* --- Режим тренера: фидбэк Лизы по последней выполненной ---------------- */
+
+  const lastDone = useMemo(
+    () => [...past].reverse().find((w) => w.status === 'done') ?? null,
+    [past],
+  );
+
+  const feedbackItems = useMemo(() => {
+    if (!lastDone) return [];
+    return lastDone.items
+      .filter((i) => (i.myComment ?? '').trim() !== '')
+      .map((i) => ({
+        id: i.id,
+        name:
+          exerciseById(i.exerciseId)?.name ??
+          i.nameRaw.replace(/^\s*\d+(?:\.\d+)*\s*[.)]\s*/, ''),
+        pvr: i.pvr,
+        comment: (i.myComment ?? '').trim(),
+      }));
+  }, [lastDone, exerciseById]);
+
+  /* Упражнения, к которым за месяц было ≥2 комментариев — что даётся тяжело */
+  const frequent = useMemo(() => {
+    const cutoff = addDaysISO(today, -28);
+    const counts = new Map<string, number>();
+    for (const w of past) {
+      if (w.date < cutoff) continue;
+      for (const it of w.items) {
+        if ((it.myComment ?? '').trim() === '' || !it.exerciseId) continue;
+        counts.set(it.exerciseId, (counts.get(it.exerciseId) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .filter(([, n]) => n >= 2)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([id, n]) => ({ id, name: exerciseById(id)?.name ?? id, n }));
+  }, [past, today, exerciseById]);
+
+  /* Режим тренера: добавить тренировку + фидбэк, без мотивационных блоков */
+  if (editMode) {
+    return (
+      <div className="space-y-3">
+        <NewWorkoutForm />
+
+        {lastDone && (
+          <section className="rounded-2xl border border-border bg-card p-4">
+            <p className="text-[12px] font-bold uppercase tracking-wider text-muted">
+              Фидбэк Лизы · {fmtDateShort(lastDone.date)}
+            </p>
+            {feedbackItems.length === 0 ? (
+              <p className="mt-1.5 text-sm text-muted">
+                Комментариев к прошлой тренировке нет.
+              </p>
+            ) : (
+              <ul className="mt-2 space-y-2.5">
+                {feedbackItems.map((f) => (
+                  <li key={f.id} className="text-sm leading-snug">
+                    <span className="font-bold">{f.name}</span>
+                    {f.pvr && (
+                      <span className="ml-1.5 inline-flex items-center gap-1 rounded-lg bg-chip px-1.5 py-0.5 align-middle text-xs font-bold tabular-nums">
+                        <span className="text-muted">
+                          <SkullIcon size={12} />
+                        </span>
+                        {f.pvr}
+                      </span>
+                    )}
+                    <span className="block text-muted">«{f.comment}»</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
+
+        {frequent.length > 0 && (
+          <section className="rounded-2xl border border-border bg-card p-4">
+            <p className="text-[12px] font-bold uppercase tracking-wider text-muted">
+              Часто в комментариях · месяц
+            </p>
+            <ul className="mt-2 space-y-1 text-sm">
+              {frequent.map((f) => (
+                <li key={f.id} className="flex items-baseline justify-between gap-2">
+                  <span className="min-w-0 flex-1 truncate font-medium">{f.name}</span>
+                  <span className="shrink-0 text-muted">
+                    {plural(f.n, 'запись', 'записи', 'записей')}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {last && <LastCard w={last} comments={lastComments} onOpen={() => navigate('train', last.id)} />}
+      </div>
+    );
+  }
 
   if (workouts.length === 0) {
     return (
@@ -179,33 +279,7 @@ export default function HomeScreen() {
       )}
 
       {/* Прошлая тренировка */}
-      {last && (
-        <button
-          type="button"
-          onClick={() => navigate('train', last.id)}
-          className="w-full rounded-2xl border border-border bg-card p-4 text-left"
-        >
-          <p className="text-[12px] font-bold uppercase tracking-wider text-muted">Прошлая</p>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="text-base font-bold">{fmtDayTitle(last.date)}</span>
-            {last.status === 'done' && (
-              <span className="rounded-full bg-ok-soft px-2.5 py-0.5 text-xs font-bold text-ok-text">
-                выполнена
-              </span>
-            )}
-          </div>
-          {(last.fatigue != null || lastComments > 0) && (
-            <p className="mt-1.5 flex items-center gap-2.5 text-xs text-muted">
-              {last.fatigue != null && <span>усталость {last.fatigue}/10</span>}
-              {lastComments > 0 && (
-                <span className="inline-flex items-center gap-1">
-                  <CommentIcon size={13} /> {lastComments}
-                </span>
-              )}
-            </p>
-          )}
-        </button>
-      )}
+      {last && <LastCard w={last} comments={lastComments} onOpen={() => navigate('train', last.id)} />}
 
       {/* Свежий рекорд — тап открывает график этого упражнения */}
       {record && recordName && (
@@ -224,6 +298,37 @@ export default function HomeScreen() {
         </button>
       )}
     </div>
+  );
+}
+
+/* Карточка «Прошлая» — общая для обычного режима и режима тренера */
+function LastCard({ w, comments, onOpen }: { w: Workout; comments: number; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full rounded-2xl border border-border bg-card p-4 text-left"
+    >
+      <p className="text-[12px] font-bold uppercase tracking-wider text-muted">Прошлая</p>
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="text-base font-bold">{fmtDayTitle(w.date)}</span>
+        {w.status === 'done' && (
+          <span className="rounded-full bg-ok-soft px-2.5 py-0.5 text-xs font-bold text-ok-text">
+            выполнена
+          </span>
+        )}
+      </div>
+      {(w.fatigue != null || comments > 0) && (
+        <p className="mt-1.5 flex items-center gap-2.5 text-xs text-muted">
+          {w.fatigue != null && <span>усталость {w.fatigue}/10</span>}
+          {comments > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <CommentIcon size={13} /> {comments}
+            </span>
+          )}
+        </p>
+      )}
+    </button>
   );
 }
 
