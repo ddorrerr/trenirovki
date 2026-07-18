@@ -10,6 +10,13 @@ import { daysBetween, fmtDate, fmtDateShort, fmtWeekday, todayISO } from '../lib
 import { plural } from '../components/edit/ui';
 import NewWorkoutForm from '../components/edit/NewWorkoutForm';
 import { BarbellIcon, CommentIcon, FlameIcon, SkullIcon } from '../components/train/icons';
+/* Свои рисованные иконки гонконгских эквивалентов (нарезаны из одного спрайта) */
+import unitLion from '../assets/units/lion.png';
+import unitTaxi from '../assets/units/taxi.png';
+import unitCablecar from '../assets/units/cablecar.png';
+import unitMinibus from '../assets/units/minibus.png';
+import unitBus from '../assets/units/bus.png';
+import unitTram from '../assets/units/tram.png';
 
 const WEEKDAYS = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
 
@@ -177,13 +184,23 @@ export default function HomeScreen() {
   const equivalent = useMemo(() => {
     if (tonnage <= 0 || !lastDone) return null;
     /* Гонконгский каталог: кабаны, панды, танцующие львы, дикие коровы,
-       красные такси, кабинки Ngong Ping 360, минибасы, слоны, автобусы, трамваи */
-    const UNITS = [
+       красные такси, кабинки Ngong Ping 360, минибасы, слоны, автобусы,
+       трамваи. У льва и транспорта — свои рисованные иконки, у зверей — эмодзи */
+    const UNITS: {
+      kg: number;
+      emoji: string;
+      img?: string;
+      one: string;
+      few: string;
+      many: string;
+      gen: string;
+    }[] = [
       { kg: 100, emoji: '🐗', one: 'кабан', few: 'кабана', many: 'кабанов', gen: 'кабана' },
       { kg: 110, emoji: '🐼', one: 'панда', few: 'панды', many: 'панд', gen: 'панды' },
       {
         kg: 160,
         emoji: '🦁',
+        img: unitLion,
         one: 'танцующий лев',
         few: 'танцующих льва',
         many: 'танцующих львов',
@@ -200,6 +217,7 @@ export default function HomeScreen() {
       {
         kg: 1500,
         emoji: '🚗',
+        img: unitTaxi,
         one: 'красное такси',
         few: 'красных такси',
         many: 'красных такси',
@@ -208,6 +226,7 @@ export default function HomeScreen() {
       {
         kg: 2500,
         emoji: '🚠',
+        img: unitCablecar,
         one: 'кабинка Ngong Ping 360',
         few: 'кабинки Ngong Ping 360',
         many: 'кабинок Ngong Ping 360',
@@ -216,6 +235,7 @@ export default function HomeScreen() {
       {
         kg: 3600,
         emoji: '🚐',
+        img: unitMinibus,
         one: 'гонконгский минибас',
         few: 'гонконгских минибаса',
         many: 'гонконгских минибасов',
@@ -225,12 +245,13 @@ export default function HomeScreen() {
       {
         kg: 12000,
         emoji: '🚌',
+        img: unitBus,
         one: 'двухэтажный автобус',
         few: 'двухэтажных автобуса',
         many: 'двухэтажных автобусов',
         gen: 'двухэтажного автобуса',
       },
-      { kg: 12000, emoji: '🚋', one: 'трамвай', few: 'трамвая', many: 'трамваев', gen: 'трамвая' },
+      { kg: 12000, emoji: '🚋', img: unitTram, one: 'трамвай', few: 'трамвая', many: 'трамваев', gen: 'трамвая' },
     ];
     /* Красиво читается один знак: берём юниты, где выходит от 1 до ~10 штук;
        если вес огромный — самый крупный юнит, если крошечный — панды с дробью */
@@ -253,7 +274,8 @@ export default function HomeScreen() {
           minimumFractionDigits: 1,
           maximumFractionDigits: 1,
         })} ${u.gen}`;
-    return { text, icons: u.emoji.repeat(Math.min(5, Math.max(1, rounded))) };
+    const iconCount = Math.min(5, Math.max(1, rounded));
+    return { text, icons: u.emoji.repeat(iconCount), img: u.img, count: iconCount };
   }, [tonnage, lastDone]);
 
   /* Какие группы мышц были в работе за последние 7 дней */
@@ -485,9 +507,17 @@ export default function HomeScreen() {
             <p className="mt-2 text-xl font-extrabold tabular-nums">{fmtKg(tonnage)}</p>
             {equivalent && (
               <p className="mt-1 text-xs font-medium text-muted">
-                <span aria-hidden="true" className="mr-1 text-sm leading-none">
-                  {equivalent.icons}
-                </span>
+                {equivalent.img ? (
+                  <span aria-hidden="true" className="mb-1 flex flex-wrap items-center gap-1">
+                    {Array.from({ length: equivalent.count }, (_, i) => (
+                      <img key={i} src={equivalent.img} alt="" className="h-6 w-auto" />
+                    ))}
+                  </span>
+                ) : (
+                  <span aria-hidden="true" className="mr-1 text-sm leading-none">
+                    {equivalent.icons}
+                  </span>
+                )}
                 {equivalent.text}
               </p>
             )}

@@ -185,7 +185,8 @@ export default function TrainingScreen() {
                 <button
                   onClick={() => {
                     saveWorkout({ ...w, warmupDone: !w.warmupDone });
-                    setWarmupPop(true);
+                    // «чпок» — только при отметке; снятие отметки происходит без праздника
+                    if (!w.warmupDone) setWarmupPop(true);
                   }}
                   onAnimationEnd={() => setWarmupPop(false)}
                   disabled={workoutLocked}
@@ -604,12 +605,14 @@ function FatigueBlock({
         </h2>
       </div>
 
-      <div className="relative mt-10">
+      <div className="relative mt-10 @container">
+        {/* сдвиг через transform (GPU, не даёт пересчёта раскладки при каждом
+            шаге); 100cqw — ширина родителя, ему для этого дан @container */}
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute -top-8 transition-[left,color] duration-100"
+          className="pointer-events-none absolute left-0 -top-8 transition-[transform,color] duration-100"
           style={{
-            left: `calc(${((value - 1) / 9).toFixed(4)} * (100% - 28px) + 1px)`,
+            transform: `translateX(calc(${((value - 1) / 9).toFixed(4)} * (100cqw - 28px) + 1px))`,
             color: marked ? color : 'var(--muted)',
           }}
         >

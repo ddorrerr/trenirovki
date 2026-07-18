@@ -177,7 +177,7 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
     }
   }, []);
 
-  /* При reduced-motion анимаций нет — закрываем сразу, не ждём onAnimationEnd */
+  /* При reduced-motion переходов нет — закрываем сразу, не ждём transitionend */
   const closeSheet = useCallback(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       setOpen(false);
@@ -249,20 +249,23 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
             aria-label="Закрыть таймер"
             onClick={closeSheet}
             className={
-              (closing ? 'anim-fade-out' : 'anim-fade') +
-              ' absolute inset-0 h-full w-full cursor-default bg-bg/70 backdrop-blur-sm'
+              'anim-fade ' +
+              (closing ? 'anim-fade-out ' : '') +
+              'absolute inset-0 h-full w-full cursor-default bg-bg/70 backdrop-blur-sm'
             }
           />
           <div
-            onAnimationEnd={(e) => {
-              if (closing && e.target === e.currentTarget) {
+            onTransitionEnd={(e) => {
+              /* transitionend всплывает и от кнопок внутри — ловим только свой transform */
+              if (closing && e.target === e.currentTarget && e.propertyName === 'transform') {
                 setOpen(false);
                 setClosing(false);
               }
             }}
             className={
-              (closing ? 'anim-sheet-out' : 'anim-sheet') +
-              ' absolute inset-x-0 bottom-0 mx-auto w-full max-w-md rounded-t-2xl border border-b-0 border-border bg-card p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl'
+              'anim-sheet ' +
+              (closing ? 'anim-sheet-out ' : '') +
+              'absolute inset-x-0 bottom-0 mx-auto w-full max-w-md rounded-t-2xl border border-b-0 border-border bg-card p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl'
             }
           >
             <div className="flex items-center justify-between">

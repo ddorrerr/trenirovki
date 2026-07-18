@@ -222,18 +222,28 @@ input[type="range"].fatigue::-moz-range-thumb {
   .anim-rise {
     animation: rise-in 0.18s var(--ease-out-strong);
   }
-  /* нижняя шторка таймера и её фон: закрытие быстрее открытия */
+  /* нижняя шторка таймера и её фон: transition вместо keyframes, чтобы
+     закрытие, начатое посреди открытия, продолжало движение с текущего
+     места, а не прыгало; закрытие быстрее открытия */
   .anim-sheet {
-    animation: sheet-up 0.32s var(--ease-drawer);
+    transition: transform 0.32s var(--ease-drawer);
+    @starting-style {
+      transform: translateY(100%);
+    }
   }
   .anim-sheet-out {
-    animation: sheet-down 0.22s var(--ease-drawer) forwards;
+    transform: translateY(100%);
+    transition-duration: 0.22s;
   }
   .anim-fade {
-    animation: fade-in 0.2s ease-out;
+    transition: opacity 0.2s ease-out;
+    @starting-style {
+      opacity: 0;
+    }
   }
   .anim-fade-out {
-    animation: fade-out 0.18s ease-out forwards;
+    opacity: 0;
+    transition-duration: 0.18s;
   }
   /* карточка упражнения: открытие 0.3s, закрытие быстрее (0.22s);
      содержимое чуть съезжает и проявляется с малой задержкой */
@@ -322,25 +332,5 @@ input[type="range"].fatigue::-moz-range-thumb {
   from {
     opacity: 0;
     transform: translateY(-4px);
-  }
-}
-@keyframes sheet-up {
-  from {
-    transform: translateY(100%);
-  }
-}
-@keyframes sheet-down {
-  to {
-    transform: translateY(100%);
-  }
-}
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-}
-@keyframes fade-out {
-  to {
-    opacity: 0;
   }
 }

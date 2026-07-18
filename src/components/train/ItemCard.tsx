@@ -179,7 +179,8 @@ export default function ItemCard({
         <button
           onClick={() => {
             onChange({ done: !item.done });
-            setCheckPop(true);
+            // «чпок» — только при отметке; снятие отметки происходит без праздника
+            if (!item.done) setCheckPop(true);
           }}
           onAnimationEnd={() => setCheckPop(false)}
           disabled={locked}

@@ -76,8 +76,13 @@ export default function App() {
   const slideDirRef = useRef<'left' | 'right'>('right');
   if (prevTabRef.current !== tab) {
     const order = TABS.map((t) => t.id);
-    slideDirRef.current =
-      order.indexOf(tab) >= order.indexOf(prevTabRef.current) ? 'right' : 'left';
+    // «Настройки» и «Комментарии» вне нижней навигации — считаем их «дальними»:
+    // вход к ним ощущается шагом вперёд, возврат — шагом назад
+    const pos = (t: Tab) => {
+      const i = order.indexOf(t);
+      return i < 0 ? order.length : i;
+    };
+    slideDirRef.current = pos(tab) >= pos(prevTabRef.current) ? 'right' : 'left';
     prevTabRef.current = tab;
   }
 
