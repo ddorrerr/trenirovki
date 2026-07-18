@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp, type SyncInfo, type Tab } from './store';
 import { fmtDateShort, fmtWeekday } from './lib/dates';
 import { useWakeLock } from './hooks/useWakeLock';
+import HomeScreen from './screens/HomeScreen';
 import TrainingScreen from './screens/TrainingScreen';
 import HistoryScreen from './screens/HistoryScreen';
 import LibraryScreen from './screens/LibraryScreen';
@@ -9,12 +10,13 @@ import ProgressScreen from './screens/ProgressScreen';
 import MenuScreen from './screens/MenuScreen';
 import KeyScreen from './screens/KeyScreen';
 
+/* «Настройки» больше не вкладка — шестерёнка в шапке Главной */
 const TABS: { id: Tab; label: string; icon: (active: boolean) => React.ReactNode }[] = [
+  { id: 'home', label: 'Главная', icon: (a) => <IconHome active={a} /> },
   { id: 'train', label: 'Тренировка', icon: (a) => <IconDumbbell active={a} /> },
   { id: 'history', label: 'История', icon: (a) => <IconHistory active={a} /> },
   { id: 'library', label: 'Библиотека', icon: (a) => <IconLibrary active={a} /> },
   { id: 'progress', label: 'Прогресс', icon: (a) => <IconChart active={a} /> },
-  { id: 'menu', label: 'Настройки', icon: (a) => <IconCog active={a} /> },
 ];
 
 export default function App() {
@@ -60,7 +62,11 @@ export default function App() {
   const title =
     tab === 'train' && scrolled && currentWorkout
       ? `${fmtDateShort(currentWorkout.date)}, ${fmtWeekday(currentWorkout.date)}`
-      : (TABS.find((t) => t.id === tab)?.label ?? 'Тренировка');
+      : tab === 'home'
+        ? 'Тренировки'
+        : tab === 'menu'
+          ? 'Настройки'
+          : (TABS.find((t) => t.id === tab)?.label ?? 'Тренировка');
 
   // Экран «въезжает» со стороны, куда шагнула навигация (по порядку вкладок)
   const prevTabRef = useRef(tab);
@@ -122,6 +128,16 @@ export default function App() {
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <SyncBadge sync={sync} onRetry={() => void syncNow()} onAuth={changeAccessKey} />
+            {tab === 'home' && (
+              <button
+                onClick={() => navigate('menu')}
+                aria-label="Настройки"
+                title="Настройки"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:text-fg"
+              >
+                <IconCog active={false} size={22} />
+              </button>
+            )}
             <button
               onClick={() => setEditMode(!editMode)}
               aria-label={editMode ? 'Выключить режим редактирования' : 'Включить режим редактирования'}
@@ -141,6 +157,7 @@ export default function App() {
 
       <main className="mx-auto max-w-3xl overflow-x-clip px-4 pb-28 pt-4 md:pb-10">
         <div key={tab} className={slideDirRef.current === 'right' ? 'anim-screen-right' : 'anim-screen-left'}>
+          {tab === 'home' && <HomeScreen />}
           {tab === 'train' && <TrainingScreen />}
           {tab === 'history' && <HistoryScreen />}
           {tab === 'library' && <LibraryScreen />}
@@ -235,10 +252,22 @@ function SyncBadge({
 
 /* Иконки: простые инлайновые SVG, наследуют currentColor */
 
+/* Иконки навигации — тот же набор, что в утверждённом макете Главной */
+
+function IconHome({ active }: { active: boolean }) {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3.5 11.5L12 3l8.5 8.5" />
+      <path d="M5.5 10v9a1.5 1.5 0 0 0 1.5 1.5h10a1.5 1.5 0 0 0 1.5-1.5v-9" />
+      <path d="M9.5 20.5v-6a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v6" />
+    </svg>
+  );
+}
+
 function IconDumbbell({ active }: { active: boolean }) {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round">
-      <path d="M6.5 7v10M3.5 9v6M17.5 7v10M20.5 9v6M6.5 12h11" />
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6.5 6.5v11M3.5 8.5v7M17.5 6.5v11M20.5 8.5v7M6.5 12h11M2 12h1.5M20.5 12H22" />
     </svg>
   );
 }
@@ -246,9 +275,8 @@ function IconDumbbell({ active }: { active: boolean }) {
 function IconHistory({ active }: { active: boolean }) {
   return (
     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-      <path d="M3 3v5h5" />
-      <path d="M12 7v5l4 2" />
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3.5 2" />
     </svg>
   );
 }
@@ -272,9 +300,9 @@ function IconChart({ active }: { active: boolean }) {
   );
 }
 
-function IconCog({ active }: { active: boolean }) {
+function IconCog({ active, size = 26 }: { active: boolean; size?: number }) {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.1 : 1.7} strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.1 : 1.7} strokeLinecap="round" strokeLinejoin="round">
       <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
       <circle cx="12" cy="12" r="3" />
     </svg>

@@ -29,7 +29,7 @@ import {
   type SyncState,
 } from './storage/github';
 
-export type Tab = 'train' | 'history' | 'library' | 'progress' | 'menu';
+export type Tab = 'home' | 'train' | 'history' | 'library' | 'progress' | 'menu';
 
 /** Тема оформления: как в системе / всегда светлая / всегда тёмная */
 export type Theme = 'system' | 'light' | 'dark';
@@ -170,7 +170,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     conflicts: 0,
   });
   const [data, setData] = useState<AppData>({ exercises: [], workouts: [] });
-  const [tab, setTab] = useState<Tab>('train');
+  const [tab, setTab] = useState<Tab>('home');
   const [openWorkoutId, setOpenWorkoutId] = useState<string | null>(null);
   const [openExerciseId, setOpenExerciseId] = useState<string | null>(null);
   const [ui, setUi] = useState<UiPersist>(() => readUi());
@@ -345,7 +345,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   /* Навигация интегрирована с историей браузера: работают «назад/вперёд»
      и жест возврата на телефоне. Каждый переход — запись в истории. */
-  const tabRef = useRef<Tab>('train');
+  const tabRef = useRef<Tab>('home');
   const openIdRef = useRef<string | null>(null);
   useEffect(() => {
     tabRef.current = tab;
