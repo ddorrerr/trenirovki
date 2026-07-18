@@ -54,23 +54,33 @@ function median(nums: number[]): number {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-/** «2,4 т» для больших объёмов, «840 кг» для маленьких */
+/** «1 100 кг» — всегда в килограммах, с разбивкой тысяч */
 function fmtKg(kg: number): string {
-  return kg >= 1000
-    ? `${(kg / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} т`
-    : `${kg} кг`;
+  return `${kg.toLocaleString('ru-RU')} кг`;
 }
 
 export default function HomeScreen() {
   const { workouts, navigate, editMode, exerciseById, showExerciseProgress } = useApp();
   const today = todayISO();
 
-  const past = useMemo(() => workouts.filter((w) => w.date <= today), [workouts, today]);
-  const last = past.length ? past[past.length - 1] : null;
+  /* Только реально выполненные: запланированная (даже на сегодня) не должна
+     раздувать счётчики, серию и кольцо недели */
+  const past = useMemo(
+    () => workouts.filter((w) => w.date <= today && w.status === 'done'),
+    [workouts, today],
+  );
   const next = useMemo(
     () => workouts.find((w) => w.date >= today && w.status === 'planned') ?? null,
     [workouts, today],
   );
+  /* «Прошлая» — не та же, что «следующая»: запланированная на сегодня
+     тренировка показывается только карточкой «Сегодня» */
+  const last = useMemo(() => {
+    for (let i = past.length - 1; i >= 0; i--) {
+      if (past[i].id !== next?.id) return past[i];
+    }
+    return null;
+  }, [past, next]);
   const daysSince = last ? Math.max(0, daysBetween(last.date, today)) : null;
 
   /* Серия: сколько недель подряд была хотя бы одна тренировка.
@@ -385,19 +395,20 @@ export default function HomeScreen() {
         {tonnage > 0 && (
           <div className="rounded-2xl border border-border bg-card p-3.5">
             <p className="text-[11px] font-bold uppercase tracking-wider text-muted">
-              Объём прошлой
+              Поднято за прошлую
             </p>
             <p className="mt-2 text-xl font-extrabold tabular-nums">{fmtKg(tonnage)}</p>
-            <p className="mt-0.5 text-xs font-medium text-muted">вес × подходы × повторы</p>
+            <p className="mt-0.5 text-xs font-medium text-muted">сумма за все подходы</p>
           </div>
         )}
         <div className="rounded-2xl border border-border bg-card p-3.5">
           <p className="text-[11px] font-bold uppercase tracking-wider text-muted">
-            Ритм · 8 недель
+            По неделям
           </p>
           <div className="mt-2.5">
             <WeekBars counts={weekCounts} />
           </div>
+          <p className="mt-1.5 text-xs font-medium text-muted">тренировок в неделю · 8 недель</p>
         </div>
         {groups7.length > 0 && (
           <div className="rounded-2xl border border-border bg-card p-3.5">
@@ -418,14 +429,14 @@ export default function HomeScreen() {
         )}
       </div>
 
-      {/* Следующая запланированная */}
+      {/* Следующая запланированная — петрольная карточка: «иди делать» */}
       {next && (
         <button
           type="button"
           onClick={() => navigate('train', next.id)}
-          className="w-full rounded-2xl border border-border bg-card p-4 text-left"
+          className="w-full rounded-2xl bg-accent-soft p-4 text-left"
         >
-          <p className="text-[12px] font-bold uppercase tracking-wider text-muted">
+          <p className="text-[12px] font-bold uppercase tracking-wider text-accent">
             {next.date === today ? 'Сегодня' : 'Следующая'}
           </p>
           <div className="mt-1 flex items-center gap-2">
