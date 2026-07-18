@@ -4,6 +4,7 @@ import { fmtDateShort, fmtWeekday } from './lib/dates';
 import { useWakeLock } from './hooks/useWakeLock';
 import TrainingScreen from './screens/TrainingScreen';
 import HistoryScreen from './screens/HistoryScreen';
+import LibraryScreen from './screens/LibraryScreen';
 import ProgressScreen from './screens/ProgressScreen';
 import MenuScreen from './screens/MenuScreen';
 import KeyScreen from './screens/KeyScreen';
@@ -11,6 +12,7 @@ import KeyScreen from './screens/KeyScreen';
 const TABS: { id: Tab; label: string; icon: (active: boolean) => React.ReactNode }[] = [
   { id: 'train', label: 'Тренировка', icon: (a) => <IconDumbbell active={a} /> },
   { id: 'history', label: 'История', icon: (a) => <IconHistory active={a} /> },
+  { id: 'library', label: 'Библиотека', icon: (a) => <IconLibrary active={a} /> },
   { id: 'progress', label: 'Прогресс', icon: (a) => <IconChart active={a} /> },
   { id: 'menu', label: 'Настройки', icon: (a) => <IconCog active={a} /> },
 ];
@@ -141,6 +143,7 @@ export default function App() {
         <div key={tab} className={slideDirRef.current === 'right' ? 'anim-screen-right' : 'anim-screen-left'}>
           {tab === 'train' && <TrainingScreen />}
           {tab === 'history' && <HistoryScreen />}
+          {tab === 'library' && <LibraryScreen />}
           {tab === 'progress' && <ProgressScreen />}
           {tab === 'menu' && <MenuScreen />}
         </div>
@@ -148,7 +151,7 @@ export default function App() {
 
       {/* Нижняя навигация для телефона: только иконки */}
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 backdrop-blur md:hidden">
-        <div className="grid grid-cols-4 pb-[env(safe-area-inset-bottom)]">
+        <div className="grid grid-cols-5 pb-[env(safe-area-inset-bottom)]">
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -246,6 +249,15 @@ function IconHistory({ active }: { active: boolean }) {
       <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
       <path d="M3 3v5h5" />
       <path d="M12 7v5l4 2" />
+    </svg>
+  );
+}
+
+function IconLibrary({ active }: { active: boolean }) {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.5 6h11M9.5 12h11M9.5 18h11" />
+      <path d="M4 6h.01M4 12h.01M4 18h.01" />
     </svg>
   );
 }
