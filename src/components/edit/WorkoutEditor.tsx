@@ -192,7 +192,7 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
   return (
     <div className="space-y-4">
       {/* Панель действий: липнет под шапкой, всегда под рукой */}
-      <div className="sticky top-[60px] z-10 -mx-1 flex items-center gap-2 rounded-xl border border-border bg-bg/95 p-2 backdrop-blur">
+      <div className="sticky top-[calc(60px+env(safe-area-inset-top))] z-10 -mx-1 flex items-center gap-2 rounded-xl border border-border bg-bg/95 p-2 backdrop-blur">
         <button
           type="button"
           onClick={cancel}

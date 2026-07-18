@@ -106,7 +106,9 @@ export default function App() {
 
   return (
     <div className="min-h-dvh">
-      <header className="sticky top-0 z-20 border-b border-border bg-bg/90 backdrop-blur">
+      {/* pt-safe: в установленном приложении шапка подкладывается под часы
+          (black-translucent), в обычном браузере env() = 0 и ничего не меняется */}
+      <header className="sticky top-0 z-20 border-b border-border bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           {canGoBack && (
             <button
