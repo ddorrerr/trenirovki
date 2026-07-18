@@ -120,7 +120,7 @@ export default function CalendarHeatmap() {
   return (
     <section ref={sectionRef} className="relative rounded-2xl border border-border bg-card p-4">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Календарь</h2>
+        <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted">Календарь</h2>
         {/* листание ленты: вся история, минимум год */}
         <div className="-my-1 flex gap-1">
           <button

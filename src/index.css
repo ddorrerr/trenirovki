@@ -3,6 +3,7 @@
 /* Дизайн-токены. Тема следует за системной (светлая/тёмная).
    Роли: петроль (--accent) — только действия и интерактив;
    вольт-лайм (--ok) — только «сделано» и достижения;
+   янтарь (--warn) — шкала усталости и категория «Инвентарь» в фильтрах;
    --chip — нейтральная подложка информационных чипов и полей ввода. */
 :root {
   --bg: #f4f6f5;
@@ -20,6 +21,8 @@
   --ok-text: #4a7207;
   --danger: #d92d20;
   --warn: #f59e0b;
+  --warn-soft: #fdf0d9;
+  --warn-text: #96610b;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -38,6 +41,8 @@
     --ok-text: #cdf56a;
     --danger: #ff6f61;
     --warn: #fbbf24;
+    --warn-soft: #3a2f10;
+    --warn-text: #fcd34d;
   }
 }
 
@@ -59,6 +64,8 @@
   --ok-text: #4a7207;
   --danger: #d92d20;
   --warn: #f59e0b;
+  --warn-soft: #fdf0d9;
+  --warn-text: #96610b;
 }
 :root[data-theme="dark"] {
   --bg: #0d1110;
@@ -76,6 +83,8 @@
   --ok-text: #cdf56a;
   --danger: #ff6f61;
   --warn: #fbbf24;
+  --warn-soft: #3a2f10;
+  --warn-text: #fcd34d;
 }
 
 @theme inline {
@@ -90,6 +99,8 @@
   --color-accent-fg: var(--accent-fg);
   --color-danger: var(--danger);
   --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-text: var(--warn-text);
   --color-ok: var(--ok);
   --color-ok-fg: var(--ok-fg);
   --color-ok-soft: var(--ok-soft);

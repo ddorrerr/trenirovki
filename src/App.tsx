@@ -126,8 +126,10 @@ export default function App() {
                 key={t.id}
                 onClick={() => navigate(t.id)}
                 className={
-                  'rounded-lg px-3 py-1.5 text-sm font-medium ' +
-                  (tab === t.id ? 'bg-accent-soft text-fg' : 'text-muted hover:text-fg')
+                  'rounded-lg px-3 py-1.5 text-sm ' +
+                  (tab === t.id
+                    ? 'font-bold text-accent'
+                    : 'font-medium text-muted hover:text-fg')
                 }
               >
                 {t.label}
@@ -186,11 +188,17 @@ export default function App() {
               title={t.label}
               aria-current={tab === t.id ? 'page' : undefined}
               className={
-                'flex items-center justify-center py-3 ' +
+                'relative flex items-center justify-center py-3 ' +
                 (tab === t.id ? 'text-accent' : 'text-muted')
               }
             >
               {t.icon(tab === t.id)}
+              {tab === t.id && (
+                <span
+                  aria-hidden="true"
+                  className="absolute bottom-1 h-1 w-1 rounded-full bg-accent"
+                />
+              )}
             </button>
           ))}
         </div>
@@ -265,7 +273,7 @@ function SyncBadge({
 
 function IconHome({ active }: { active: boolean }) {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 1.8} strokeLinecap="round" strokeLinejoin="round">
       <path d="M3.5 11.5L12 3l8.5 8.5" />
       <path d="M5.5 10v9a1.5 1.5 0 0 0 1.5 1.5h10a1.5 1.5 0 0 0 1.5-1.5v-9" />
       <path d="M9.5 20.5v-6a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v6" />
@@ -275,7 +283,7 @@ function IconHome({ active }: { active: boolean }) {
 
 function IconDumbbell({ active }: { active: boolean }) {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 1.8} strokeLinecap="round" strokeLinejoin="round">
       <path d="M6.5 6.5v11M3.5 8.5v7M17.5 6.5v11M20.5 8.5v7M6.5 12h11M2 12h1.5M20.5 12H22" />
     </svg>
   );
@@ -284,7 +292,7 @@ function IconDumbbell({ active }: { active: boolean }) {
 /* Циферблат с круговой стрелкой назад — «перемотка» истории */
 function IconHistory({ active }: { active: boolean }) {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 1.8} strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
       <path d="M3 3v5h5" />
       <path d="M12 7.5V12l3.5 2" />
@@ -294,7 +302,7 @@ function IconHistory({ active }: { active: boolean }) {
 
 function IconLibrary({ active }: { active: boolean }) {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 1.8} strokeLinecap="round" strokeLinejoin="round">
       <path d="M9.5 6h11M9.5 12h11M9.5 18h11" />
       <path d="M4 6h.01M4 12h.01M4 18h.01" />
     </svg>
@@ -303,7 +311,7 @@ function IconLibrary({ active }: { active: boolean }) {
 
 function IconChart({ active }: { active: boolean }) {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 1.8} strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 19V5" />
       <path d="M4 19h16" />
       <path d="M8 15l3.5-4 3 2.5L19 8" />

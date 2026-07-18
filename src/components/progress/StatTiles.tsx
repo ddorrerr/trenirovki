@@ -26,12 +26,13 @@ function useCountUp(target: number, ms = 650): number {
   return v;
 }
 
+/* Плитка в том же языке, что дашборд Главной: капс-подпись + крупное число */
 function Tile({ label, value, fmt }: { label: string; value: number | null; fmt: (v: number) => string }) {
   const v = useCountUp(value ?? 0);
   return (
-    <div className="rounded-2xl border border-border bg-card p-4">
-      <div className="text-sm text-muted">{label}</div>
-      <div className="mt-1 text-3xl font-bold tabular-nums">
+    <div className="rounded-2xl border border-border bg-card p-3.5">
+      <div className="text-[11px] font-bold uppercase tracking-wider text-muted">{label}</div>
+      <div className="mt-2 text-2xl font-extrabold tabular-nums">
         {value == null ? '—' : fmt(v)}
       </div>
     </div>
@@ -54,7 +55,7 @@ export default function StatTiles() {
   const round = (v: number) => Math.round(v).toLocaleString('ru-RU');
 
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
       <Tile label="Тренировок" value={total} fmt={round} />
       <Tile label="Недель с начала" value={weeks} fmt={round} />
       <Tile label="В неделю в среднем" value={avg} fmt={fmtNum1} />

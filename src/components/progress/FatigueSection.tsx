@@ -38,7 +38,7 @@ export default function FatigueSection() {
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Усталость</h2>
+      <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted">Усталость</h2>
 
       {entries.length === 0 ? (
         <p className="py-8 text-center text-muted">Пока нет отметок усталости после тренировок.</p>

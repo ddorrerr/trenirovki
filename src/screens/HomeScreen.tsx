@@ -17,6 +17,7 @@ import unitCablecar from '../assets/units/cablecar.png';
 import unitMinibus from '../assets/units/minibus.png';
 import unitBus from '../assets/units/bus.png';
 import unitTram from '../assets/units/tram.png';
+import { muscleIcon } from '../components/catalogIcons';
 
 const WEEKDAYS = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
 
@@ -204,7 +205,7 @@ export default function HomeScreen() {
         one: 'танцующий лев',
         few: 'танцующих льва',
         many: 'танцующих львов',
-        gen: 'танцующего льва',
+        gen: 'танцующих льва',
       },
       {
         kg: 500,
@@ -212,7 +213,7 @@ export default function HomeScreen() {
         one: 'дикая корова',
         few: 'дикие коровы',
         many: 'диких коров',
-        gen: 'дикой коровы',
+        gen: 'диких коровы',
       },
       {
         kg: 1500,
@@ -221,7 +222,7 @@ export default function HomeScreen() {
         one: 'красное такси',
         few: 'красных такси',
         many: 'красных такси',
-        gen: 'красного такси',
+        gen: 'красных такси',
       },
       {
         kg: 2500,
@@ -239,7 +240,7 @@ export default function HomeScreen() {
         one: 'гонконгский минибас',
         few: 'гонконгских минибаса',
         many: 'гонконгских минибасов',
-        gen: 'гонконгского минибаса',
+        gen: 'гонконгских минибаса',
       },
       { kg: 4000, emoji: '🐘', one: 'слон', few: 'слона', many: 'слонов', gen: 'слона' },
       {
@@ -249,7 +250,7 @@ export default function HomeScreen() {
         one: 'двухэтажный автобус',
         few: 'двухэтажных автобуса',
         many: 'двухэтажных автобусов',
-        gen: 'двухэтажного автобуса',
+        gen: 'двухэтажных автобуса',
       },
       { kg: 12000, emoji: '🚋', img: unitTram, one: 'трамвай', few: 'трамвая', many: 'трамваев', gen: 'трамвая' },
     ];
@@ -446,9 +447,10 @@ export default function HomeScreen() {
         </div>
       </div>
 
-      {/* Текущая неделя: точки тренировок, тап открывает день */}
+      {/* Текущая неделя: точки тренировок, тап открывает день.
+          На широком экране дни не расползаются — сетка ограничена по ширине */}
       <div className="rounded-2xl border border-border bg-card p-3">
-        <div className="grid grid-cols-7">
+        <div className="mx-auto grid max-w-sm grid-cols-7">
           {weekDays.map((d) => {
             const w = byDate.get(d.iso);
             const isToday = d.iso === today;
@@ -487,8 +489,9 @@ export default function HomeScreen() {
         </div>
       </div>
 
-      {/* Плитки: неделя против ритма, объём, ритм, группы мышц */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* Плитки: неделя против ритма, объём, ритм, группы мышц.
+          На широком экране — в один ряд, чтобы карточки не пустели */}
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <div className="rounded-2xl border border-border bg-card p-3.5">
           <p className="text-[11px] font-bold uppercase tracking-wider text-muted">Эта неделя</p>
           <div className="mt-2 flex items-center gap-3">
@@ -536,11 +539,18 @@ export default function HomeScreen() {
           <div className="rounded-2xl border border-border bg-card p-3.5">
             <p className="text-[11px] font-bold uppercase tracking-wider text-muted">За 7 дней</p>
             <div className="mt-2 flex flex-wrap gap-1">
-              {groups7.slice(0, 4).map((m) => (
-                <span key={m} className="rounded-lg bg-chip px-1.5 py-0.5 text-[11px] font-bold">
-                  {m}
-                </span>
-              ))}
+              {groups7.slice(0, 4).map((m) => {
+                const ic = muscleIcon(m, 12);
+                return (
+                  <span
+                    key={m}
+                    className="inline-flex items-center gap-1 rounded-lg bg-chip px-1.5 py-0.5 text-[11px] font-bold"
+                  >
+                    {ic && <span className="text-accent">{ic}</span>}
+                    {m}
+                  </span>
+                );
+              })}
               {groups7.length > 4 && (
                 <span className="rounded-lg bg-chip px-1.5 py-0.5 text-[11px] font-bold text-muted">
                   +{groups7.length - 4}
@@ -584,26 +594,33 @@ export default function HomeScreen() {
         </button>
       )}
 
-      {/* Прошлая тренировка */}
-      {last && (
-        <LastCard w={last} comments={lastComments} onOpen={() => navigate('train', last.id)} />
-      )}
-
-      {/* Свежий рекорд — тап открывает график этого упражнения */}
-      {record && recordName && (
-        <button
-          type="button"
-          onClick={() => showExerciseProgress(record.exerciseId)}
-          className="w-full rounded-2xl bg-ok-soft p-4 text-left"
-        >
-          <p className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-ok-text">
-            <TrophyIcon /> Новый максимум
-          </p>
-          <p className="mt-1 text-base font-bold text-ok-text">
-            {recordName} — {record.weight} кг{' '}
-            <span className="text-xs font-semibold opacity-80">{fmtDate(record.date)}</span>
-          </p>
-        </button>
+      {/* Прошлая тренировка и свежий рекорд: на широком экране — рядом */}
+      {(last || (record && recordName)) && (
+        <div className="space-y-3 md:flex md:gap-3 md:space-y-0">
+          {last && (
+            <div className="min-w-0 md:flex-1">
+              <LastCard w={last} comments={lastComments} onOpen={() => navigate('train', last.id)} />
+            </div>
+          )}
+          {/* Свежий рекорд — тап открывает график этого упражнения */}
+          {record && recordName && (
+            <div className="min-w-0 md:flex-1">
+              <button
+                type="button"
+                onClick={() => showExerciseProgress(record.exerciseId)}
+                className="h-full w-full rounded-2xl bg-ok-soft p-4 text-left"
+              >
+                <p className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-ok-text">
+                  <TrophyIcon /> Новый максимум
+                </p>
+                <p className="mt-1 text-base font-bold text-ok-text">
+                  {recordName} — {record.weight} кг{' '}
+                  <span className="text-xs font-semibold opacity-80">{fmtDate(record.date)}</span>
+                </p>
+              </button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -663,7 +680,7 @@ function LastCard({ w, comments, onOpen }: { w: Workout; comments: number; onOpe
     <button
       type="button"
       onClick={onOpen}
-      className="w-full rounded-2xl border border-border bg-card p-4 text-left"
+      className="h-full w-full rounded-2xl border border-border bg-card p-4 text-left"
     >
       <p className="text-[12px] font-bold uppercase tracking-wider text-muted">Прошлая</p>
       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">

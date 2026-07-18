@@ -128,11 +128,14 @@ export function ChipPicker({
   options,
   value,
   onChange,
+  icon,
 }: {
   label: string;
   options: string[];
   value: string[];
   onChange: (next: string[]) => void;
+  /** необязательная иконка значения (например, из catalogIcons) */
+  icon?: (name: string, size?: number) => ReactNode;
 }) {
   const all = [...options, ...value.filter((v) => !options.includes(v))];
   return (
@@ -141,6 +144,7 @@ export function ChipPicker({
       <div className="flex flex-wrap gap-1.5">
         {all.map((opt) => {
           const on = value.includes(opt);
+          const ic = icon?.(opt);
           return (
             <button
               key={opt}
@@ -148,12 +152,13 @@ export function ChipPicker({
               aria-pressed={on}
               onClick={() => onChange(on ? value.filter((v) => v !== opt) : [...value, opt])}
               className={
-                'rounded-lg border px-2.5 py-1.5 text-sm ' +
+                'flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm ' +
                 (on
                   ? 'border-accent bg-accent-soft font-semibold text-accent'
                   : 'border-border bg-card font-medium text-muted')
               }
             >
+              {ic}
               {opt}
             </button>
           );

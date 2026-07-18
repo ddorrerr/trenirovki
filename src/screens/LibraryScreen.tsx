@@ -18,6 +18,7 @@ import {
   plural,
 } from '../components/edit/ui';
 import { VideoIcon } from '../components/train/icons';
+import { equipIcon, muscleIcon } from '../components/catalogIcons';
 
 /* Экран запоминает, где ты была (раскрытое упражнение, фильтры, прокрутка),
    чтобы стрелка «назад» возвращала ровно туда же. */
@@ -161,8 +162,22 @@ export default function LibraryScreen() {
         className={inputCls}
       />
 
-      <FilterChips label="Группа мышц" options={muscleChips} value={fMuscle} onChange={setFMuscle} />
-      <FilterChips label="Инвентарь" options={equipChips} value={fEquip} onChange={setFEquip} />
+      <FilterChips
+        label="Группа мышц"
+        options={muscleChips}
+        value={fMuscle}
+        onChange={setFMuscle}
+        tone="muscle"
+        icon={muscleIcon}
+      />
+      <FilterChips
+        label="Инвентарь"
+        options={equipChips}
+        value={fEquip}
+        onChange={setFEquip}
+        tone="equip"
+        icon={equipIcon}
+      />
 
       {exercises.length === 0 && (
         <div className="rounded-2xl border border-border bg-card p-6 text-center text-muted">
@@ -205,18 +220,28 @@ export default function LibraryScreen() {
 }
 
 /* Лента чипов-фильтров: горизонтальная прокрутка до краёв экрана,
-   выбран максимум один, повторный тап снимает */
+   выбран максимум один, повторный тап снимает.
+   У каждой категории свой цвет: группы мышц — петроль, инвентарь — янтарь */
 function FilterChips({
   label,
   options,
   value,
   onChange,
+  tone,
+  icon,
 }: {
   label: string;
   options: string[];
   value: string | null;
   onChange: (v: string | null) => void;
+  tone: 'muscle' | 'equip';
+  icon: (name: string, size?: number) => React.ReactNode;
 }) {
+  const onCls =
+    tone === 'muscle'
+      ? 'border-accent bg-accent-soft font-semibold text-accent'
+      : 'border-warn bg-warn-soft font-semibold text-warn-text';
+  const iconTint = tone === 'muscle' ? 'text-accent' : 'text-warn-text';
   return (
     <div
       className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -226,6 +251,7 @@ function FilterChips({
       <div className="flex w-max gap-1.5 pb-0.5">
         {options.map((opt) => {
           const on = value === opt;
+          const ic = icon(opt);
           return (
             <button
               key={opt}
@@ -233,12 +259,11 @@ function FilterChips({
               aria-pressed={on}
               onClick={() => onChange(on ? null : opt)}
               className={
-                'shrink-0 rounded-full border px-3 py-1.5 text-sm ' +
-                (on
-                  ? 'border-accent bg-accent-soft font-semibold text-accent'
-                  : 'border-border bg-card font-medium text-muted')
+                'flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm ' +
+                (on ? onCls : 'border-border bg-card font-medium text-muted')
               }
             >
+              {ic && <span className={on ? '' : iconTint}>{ic}</span>}
               {opt}
             </button>
           );
@@ -320,11 +345,19 @@ function ExerciseDetails({ e }: { e: Exercise }) {
       {(muscles.length > 0 || equipment.length > 0) && (
         <div className="flex flex-wrap gap-1.5">
           {muscles.map((m) => (
-            <Chip key={'m-' + m}>{m}</Chip>
+            <Chip key={'m-' + m}>
+              <span className="inline-flex items-center gap-1.5">
+                {muscleIcon(m, 13) && <span className="text-accent">{muscleIcon(m, 13)}</span>}
+                {m}
+              </span>
+            </Chip>
           ))}
           {equipment.map((q) => (
             <Chip key={'q-' + q} muted>
-              {q}
+              <span className="inline-flex items-center gap-1.5">
+                {equipIcon(q, 13) && <span className="text-warn-text">{equipIcon(q, 13)}</span>}
+                {q}
+              </span>
             </Chip>
           ))}
         </div>
@@ -412,12 +445,14 @@ function ExerciseEditPanel({ e, used }: { e: Exercise; used: boolean }) {
         options={MUSCLE_GROUPS}
         value={e.muscles ?? []}
         onChange={(muscles) => saveExercise({ ...e, muscles })}
+        icon={muscleIcon}
       />
       <ChipPicker
         label="Инвентарь"
         options={EQUIPMENT}
         value={e.equipment ?? []}
         onChange={(equipment) => saveExercise({ ...e, equipment })}
+        icon={equipIcon}
       />
       <TextField
         label="Метки (через запятую)"

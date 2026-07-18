@@ -110,7 +110,7 @@ export default function WeightSection() {
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+      <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted">
         Вес по упражнению
       </h2>
 
