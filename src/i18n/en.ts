@@ -163,6 +163,8 @@ export const en: typeof ru = {
   },
 
   home: {
+    greetUser: 'Hi, Liza!',
+    greetTrainer: 'Hi, Tanya!',
     heroStart: 'Shall we start?',
     heroToday: 'Today',
     heroTodaySub: 'you trained',

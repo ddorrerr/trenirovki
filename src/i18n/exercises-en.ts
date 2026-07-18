@@ -24,7 +24,8 @@ const NAMES: [ru: string, en: string][] = [
   ['Тяга гантелей лёжа на скамье', 'Chest-supported dumbbell row'],
   ['Тяга 1 рукой в упоре на скамью', 'One-arm dumbbell row'],
   ['Тяга лежа по диагонали', 'Lying diagonal pull'],
-  ['Подтягивания к штанге', 'Inverted row'],
+  // её правка: это подводящие подтягивания на штанге в раме (с резинкой), не inverted row
+  ['Подтягивания к штанге', 'Pull-ups'],
   ['Жим гантелей лёжа', 'Dumbbell bench press'],
   ['Жим в тренажёре сидя', 'Seated machine chest press'],
   ['Жим 2 руками сидя', 'Seated shoulder press, two arms'],

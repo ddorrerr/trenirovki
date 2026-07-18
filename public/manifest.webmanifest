@@ -1,6 +1,6 @@
 {
-  "name": "Тренировки",
-  "short_name": "Тренировки",
+  "name": "Workouts",
+  "short_name": "Workouts",
   "display": "standalone",
   "start_url": "./",
   "scope": "./",

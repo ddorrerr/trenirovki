@@ -69,11 +69,14 @@ export default function App() {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+  // На Главной вместо имени приложения — приветствие: Лизе или Тане (режим тренера)
   const title =
     tab === 'train' && scrolled && currentWorkout
       ? `${fmtDateShort(currentWorkout.date)}, ${fmtWeekday(currentWorkout.date)}`
       : tab === 'home'
-        ? t.appTitle
+        ? editMode
+          ? t.home.greetTrainer
+          : t.home.greetUser
         : t.nav[tab];
 
   // Экран «въезжает» со стороны, куда шагнула навигация (по порядку вкладок)
