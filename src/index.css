@@ -130,13 +130,18 @@ body {
   overscroll-behavior-y: none;
 }
 
-button, input, textarea, select {
-  font: inherit;
-  color: inherit;
-}
+/* Нормализация контролов — строго в слое base: неслойное правило било бы
+   слойные утилиты Tailwind (слои: неслойный CSS сильнее любого @layer),
+   из-за этого font-*/text-* классы на кнопках молча не работали */
+@layer base {
+  button, input, textarea, select {
+    font: inherit;
+    color: inherit;
+  }
 
-button {
-  touch-action: manipulation;
+  button {
+    touch-action: manipulation;
+  }
 }
 
 /* iOS Safari: у input[type=date] есть «родная» минимальная ширина,
@@ -279,12 +284,14 @@ input[type="range"].fatigue::-moz-range-thumb {
       transform 0.3s var(--ease-out-strong);
   }
   /* отклик на нажатие: чуть «утапливаем» любую кнопку.
-     :where даёт нулевую специфичность — Tailwind-переходы не ломаются */
-  :where(button:not(:disabled)) {
-    transition: transform 0.15s var(--ease-out-strong);
-  }
-  button:not(:disabled):active {
-    transform: scale(0.96);
+     В слое base, чтобы transition-утилиты Tailwind не перекрывались */
+  @layer base {
+    :where(button:not(:disabled)) {
+      transition: transform 0.15s var(--ease-out-strong);
+    }
+    button:not(:disabled):active {
+      transform: scale(0.96);
+    }
   }
   /* пружинистый «чпок» галочки при отметке выполнения */
   .anim-check {

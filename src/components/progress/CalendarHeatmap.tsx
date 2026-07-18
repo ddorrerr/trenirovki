@@ -181,9 +181,9 @@ export default function CalendarHeatmap() {
                     if (e.pointerType === 'mouse') showPreview(workout, e.currentTarget);
                   }}
                   onClick={(e) => {
-                    // тап: сначала превью; повторный тап по той же клетке — переход
-                    if (preview?.w.id === workout.id) open(workout.id);
-                    else showPreview(workout, e.currentTarget);
+                    // клетка мелкая: по ней — только превью,
+                    // переход — исключительно кнопкой «Открыть» в карточке
+                    showPreview(workout, e.currentTarget);
                   }}
                   aria-label={'Тренировка ' + fmtDate(d)}
                   aria-expanded={preview?.w.id === workout.id}
