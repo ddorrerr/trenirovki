@@ -182,6 +182,14 @@ export default function HomeScreen() {
       { kg: 500, emoji: '🐎', one: 'лошадь', few: 'лошади', many: 'лошадей', gen: 'лошади' },
       {
         kg: 1500,
+        emoji: '🚕',
+        one: 'красное такси',
+        few: 'красных такси',
+        many: 'красных такси',
+        gen: 'красного такси',
+      },
+      {
+        kg: 1550,
         emoji: '🚗',
         one: 'Toyota Camry',
         few: 'Toyota Camry',
@@ -206,7 +214,15 @@ export default function HomeScreen() {
         gen: 'двухэтажного автобуса',
       },
     ];
-    const fitting = UNITS.filter((u) => tonnage / u.kg >= 0.95);
+    /* Красиво читается один знак: берём юниты, где выходит от 1 до ~10 штук;
+       если вес огромный — самый крупный юнит, если крошечный — панды с дробью */
+    const inRange = UNITS.filter((u) => {
+      const c = tonnage / u.kg;
+      return c >= 0.95 && c <= 9.95;
+    });
+    const fitting = inRange.length
+      ? inRange
+      : UNITS.filter((u) => tonnage / u.kg >= 0.95).slice(-1);
     let seed = 0;
     for (const ch of lastDone.id) seed = (seed + ch.charCodeAt(0)) % 997;
     const u = fitting.length ? fitting[seed % fitting.length] : UNITS[0];
