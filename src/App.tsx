@@ -39,7 +39,7 @@ export default function App() {
     const root = document.documentElement;
     if (settings.theme === 'system') delete root.dataset.theme;
     else root.dataset.theme = settings.theme;
-    const bg: Record<string, string> = { light: '#f6f7f8', dark: '#101214' };
+    const bg: Record<string, string> = { light: '#f4f6f5', dark: '#0d1110' };
     document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((m) => {
       const own = m.media.includes('dark') ? bg.dark : bg.light;
       m.content = settings.theme === 'system' ? own : bg[settings.theme];

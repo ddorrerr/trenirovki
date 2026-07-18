@@ -199,7 +199,7 @@ export default function TrainingScreen() {
                   className={
                     'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors ' +
                     (w.warmupDone
-                      ? 'border-accent bg-accent text-accent-fg'
+                      ? 'border-ok bg-ok text-ok-fg'
                       : 'border-border bg-card text-muted') +
                     (warmupPop ? ' anim-check' : '')
                   }
@@ -213,7 +213,7 @@ export default function TrainingScreen() {
                     const line = parseWarmupLine(wu.text, i + 1);
                     return (
                       <li key={i} className="flex items-start gap-2 text-[15px] leading-snug">
-                        <span className="mt-0.5 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-bg px-1 text-[11px] font-semibold tabular-nums text-muted">
+                        <span className="mt-0.5 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-chip px-1 text-[11px] font-semibold tabular-nums text-muted">
                           {line.label}
                         </span>
                         <span className="min-w-0 break-words">
@@ -276,7 +276,7 @@ export default function TrainingScreen() {
                     setCelebrate(true);
                     window.setTimeout(() => setCelebrate(false), 1200);
                   }}
-                  className="w-full rounded-xl bg-accent px-4 py-2.5 text-lg font-semibold text-accent-fg"
+                  className="w-full rounded-xl bg-accent px-4 py-2.5 text-lg font-bold text-accent-fg"
                 >
                   Завершить тренировку
                 </button>
@@ -355,7 +355,7 @@ function TopBlock({
   w: Workout;
   prev: Workout | null;
   next: Workout | null;
-  onOpen: (id: string) => void;
+  onOpen: (id: string | null) => void;
 }) {
   return (
     <div className="flex items-center gap-2">
@@ -365,13 +365,13 @@ function TopBlock({
         onClick={() => prev && onOpen(prev.id)}
       />
       <div className="min-w-0 flex-1 text-center">
-        <h2 className="text-lg font-bold leading-snug">
+        <h2 className="text-xl font-extrabold leading-snug tracking-tight">
           {fmtDate(w.date)}, {fmtWeekday(w.date)}
         </h2>
         {w.title && <div className="mt-0.5 break-words text-sm text-muted">{w.title}</div>}
         <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
           {w.status === 'done' ? (
-            <span className="rounded-full border border-ok/40 bg-ok/10 px-2.5 py-1 text-xs font-semibold text-ok">
+            <span className="rounded-full bg-ok-soft px-2.5 py-1 text-xs font-bold text-ok-text">
               выполнена
             </span>
           ) : (
@@ -385,6 +385,29 @@ function TopBlock({
             </span>
           )}
         </div>
+        {/* Быстрый возврат из старых тренировок к самой свежей */}
+        {next && (
+          <button
+            type="button"
+            onClick={() => onOpen(null)}
+            className="anim-rise mx-auto mt-2 flex items-center gap-1 rounded-full bg-accent-soft px-3 py-1 text-xs font-bold text-accent"
+          >
+            к последней тренировке
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M5 6l6 6-6 6M13 6l6 6-6 6" />
+            </svg>
+          </button>
+        )}
       </div>
       <NavButton
         dir="next"
@@ -433,18 +456,19 @@ function NavButton({
 
 /* --- Сдержанное конфетти на «Завершить тренировку» ------------------------- */
 
+/* Цвета конфетти — из палитры: вольт солирует, петроль и янтарь поддерживают */
 const CONFETTI_DOTS = [
   { dx: -90, dy: -120, d: 0, c: 'var(--accent)', s: 8 },
-  { dx: -50, dy: -150, d: 60, c: 'hsl(45 90% 55%)', s: 7 },
+  { dx: -50, dy: -150, d: 60, c: 'var(--warn)', s: 7 },
   { dx: 0, dy: -170, d: 20, c: 'var(--ok)', s: 9 },
-  { dx: 55, dy: -145, d: 80, c: 'hsl(280 65% 60%)', s: 7 },
+  { dx: 55, dy: -145, d: 80, c: 'var(--ok)', s: 7 },
   { dx: 95, dy: -110, d: 40, c: 'var(--accent)', s: 8 },
-  { dx: -120, dy: -60, d: 90, c: 'hsl(200 80% 55%)', s: 6 },
-  { dx: 120, dy: -55, d: 30, c: 'hsl(45 90% 55%)', s: 6 },
+  { dx: -120, dy: -60, d: 90, c: 'var(--danger)', s: 6 },
+  { dx: 120, dy: -55, d: 30, c: 'var(--warn)', s: 6 },
   { dx: -70, dy: -35, d: 120, c: 'var(--ok)', s: 6 },
-  { dx: 70, dy: -28, d: 100, c: 'hsl(340 75% 60%)', s: 7 },
-  { dx: -25, dy: -95, d: 140, c: 'hsl(340 75% 60%)', s: 5 },
-  { dx: 30, dy: -120, d: 110, c: 'hsl(200 80% 55%)', s: 5 },
+  { dx: 70, dy: -28, d: 100, c: 'var(--warn)', s: 7 },
+  { dx: -25, dy: -95, d: 140, c: 'var(--danger)', s: 5 },
+  { dx: 30, dy: -120, d: 110, c: 'var(--ok)', s: 5 },
   { dx: 0, dy: -60, d: 160, c: 'var(--accent)', s: 5 },
 ];
 
@@ -473,10 +497,10 @@ function ConfettiBurst() {
 
 /* --- Усталость: ползунок со смайликом и замком от случайных сдвигов -------- */
 
-/** Каждой оценке — свой цвет: зелёный → жёлтый → оранжевый → красный */
+/** Каждой оценке — свой цвет по палитре: лайм → янтарь → коралл */
 function fatigueColor(level: number): string {
-  const hue = Math.round(145 - ((level - 1) / 9) * 145);
-  return `hsl(${hue} 72% 44%)`;
+  const hue = Math.round(85 - ((level - 1) / 9) * 85);
+  return `hsl(${hue} 78% 44%)`;
 }
 
 /** Лицо едет вместе с ползунком: улыбка → гримаса → крестики-глаза */
@@ -568,7 +592,11 @@ function FatigueBlock({
           {marked && (
             <>
               {' — '}
-              <span style={{ color }} className="tabular-nums">
+              {/* подмешиваем цвет текста к --fg: читаемо и в светлой, и в тёмной теме */}
+              <span
+                style={{ color: `color-mix(in oklab, ${color} 55%, var(--fg))` }}
+                className="tabular-nums"
+              >
                 {value}/10
               </span>
             </>

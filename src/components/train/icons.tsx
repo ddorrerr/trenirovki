@@ -116,8 +116,8 @@ export function RepeatIcon({ size = 16 }: { size?: number }) {
   );
 }
 
-/** ПВР — повторы «в резерве»: смайлик с крестиками-глазами (до отказа) */
-export function DeadFaceIcon({ size = 17 }: { size?: number }) {
+/** ПВР — повторы «в резерве»: череп, работа до отказа */
+export function SkullIcon({ size = 16 }: { size?: number }) {
   return (
     <svg
       width={size}
@@ -130,15 +130,15 @@ export function DeadFaceIcon({ size = 17 }: { size?: number }) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M7.4 7.9l3 3M10.4 7.9l-3 3" />
-      <path d="M13.6 7.9l3 3M16.6 7.9l-3 3" />
-      <path d="M8.4 15.8c1 .95 2.2 1.4 3.6 1.4s2.6-.45 3.6-1.4" />
+      <path d="M12 3.5c4.2 0 7.5 3 7.5 6.8 0 1.9-.85 3.6-2.2 4.8l-.8.7v3.2a1.5 1.5 0 0 1-1.5 1.5H9a1.5 1.5 0 0 1-1.5-1.5v-3.2l-.8-.7c-1.35-1.2-2.2-2.9-2.2-4.8 0-3.8 3.3-6.8 7.5-6.8z" />
+      <circle cx="9.3" cy="11" r="1.25" fill="currentColor" stroke="none" />
+      <circle cx="14.7" cy="11" r="1.25" fill="currentColor" stroke="none" />
+      <path d="M10.3 18v1.6M13.7 18v1.6" />
     </svg>
   );
 }
 
-/** Темп — «звуковые полоски»: ритм движения */
+/** Темп — синусоида: ритм движения */
 export function TempoIcon({ size = 16 }: { size?: number }) {
   return (
     <svg
@@ -151,16 +151,13 @@ export function TempoIcon({ size = 16 }: { size?: number }) {
       strokeLinecap="round"
       aria-hidden="true"
     >
-      <path d="M5 9.5v5" />
-      <path d="M9.7 5.5v13" />
-      <path d="M14.3 8v8" />
-      <path d="M19 10.5v3" />
+      <path d="M3 12c1.4-4.8 2.9-7.2 4.5-7.2s3.1 2.4 4.5 7.2 2.9 7.2 4.5 7.2 3.1-2.4 4.5-7.2" />
     </svg>
   );
 }
 
-/** Вес — гиря: силуэт читается лучше гантели на мелком размере */
-export function KettlebellIcon({ size = 17 }: { size?: number }) {
+/** Вес — штанга: блины и гриф, в одном семействе с гантелей в навигации */
+export function BarbellIcon({ size = 17 }: { size?: number }) {
   return (
     <svg
       width={size}
@@ -173,34 +170,12 @@ export function KettlebellIcon({ size = 17 }: { size?: number }) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M8.2 10.2C7 6.2 8.6 3.5 12 3.5s5 2.7 3.8 6.7" />
-      <circle cx="12" cy="15" r="6" />
+      <path d="M6.5 6.5v11M3.5 8.5v7M17.5 6.5v11M20.5 8.5v7M6.5 12h11M2 12h1.5M20.5 12H22" />
     </svg>
   );
 }
 
-/** Отдых — «подзарядка»: батарейка с молнией */
-export function RechargeIcon({ size = 17 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="2" y="7" width="16" height="10" rx="2" />
-      <path d="M22 11v2" />
-      <path d="M10.5 8.6l-3.2 3.9h2.8l-.6 2.9 3.2-3.9h-2.8l.6-2.9z" fill="currentColor" strokeWidth="0.8" strokeLinejoin="miter" />
-    </svg>
-  );
-}
-
-/** Твой комментарий — простой квадратный пузырь речи */
+/** Твой комментарий — круглый пузырь речи */
 export function CommentIcon({ size = 15 }: { size?: number }) {
   return (
     <svg
@@ -214,7 +189,7 @@ export function CommentIcon({ size = 15 }: { size?: number }) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 4V6z" />
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
     </svg>
   );
 }
@@ -240,8 +215,8 @@ export function HistoryIcon({ size = 15 }: { size?: number }) {
   );
 }
 
-/** Видео техники упражнения — «экран» с плеем, крупнее остальных */
-export function VideoIcon({ size = 22 }: { size?: number }) {
+/** Видео техники упражнения — треугольник «плей», как в макете */
+export function VideoIcon({ size = 20 }: { size?: number }) {
   return (
     <svg
       width={size}
@@ -249,12 +224,12 @@ export function VideoIcon({ size = 22 }: { size?: number }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.8"
+      strokeWidth="2"
+      strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <rect x="2.5" y="4.5" width="19" height="15" rx="3.5" />
-      <path d="M10 9.2v5.6l5-2.8z" fill="currentColor" stroke="none" />
+      <path d="M8 5v14l11-7z" />
     </svg>
   );
 }

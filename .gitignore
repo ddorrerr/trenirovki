@@ -3,3 +3,11 @@ dist
 .venv
 .DS_Store
 *.local
+
+# local-only: agent config and private material must never reach this PUBLIC repo
+CLAUDE.md
+.claude/
+.agents/
+.codex/
+skills-lock.json
+tools/

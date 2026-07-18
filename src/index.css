@@ -1,63 +1,87 @@
 @import "tailwindcss";
 
-/* Дизайн-токены. Тема следует за системной (светлая/тёмная). */
+/* Дизайн-токены. Тема следует за системной (светлая/тёмная).
+   Роли: петроль (--accent) — только действия и интерактив;
+   вольт-лайм (--ok) — только «сделано» и достижения;
+   --chip — нейтральная подложка информационных чипов и полей ввода. */
 :root {
-  --bg: #f6f7f8;
+  --bg: #f4f6f5;
   --card: #ffffff;
-  --fg: #16181c;
-  --muted: #6b7280;
-  --border: #e4e7eb;
-  --accent: #0f766e;
-  --accent-soft: #d5f5f0;
+  --chip: #eef1ef;
+  --fg: #171b1a;
+  --muted: #5d6a66;
+  --border: #e3e8e5;
+  --accent: #0b6e63;
+  --accent-soft: #d7f0eb;
   --accent-fg: #ffffff;
-  --danger: #b91c1c;
-  --ok: #15803d;
+  --ok: #65a30d;
+  --ok-fg: #ffffff;
+  --ok-soft: #e9f6d0;
+  --ok-text: #4a7207;
+  --danger: #d92d20;
+  --warn: #f59e0b;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #101214;
-    --card: #1a1d21;
-    --fg: #f2f4f6;
-    --muted: #9aa2ad;
-    --border: #2a2f36;
-    --accent: #2dd4bf;
-    --accent-soft: #11403b;
-    --accent-fg: #04211d;
-    --danger: #f87171;
-    --ok: #4ade80;
+    --bg: #0d1110;
+    --card: #171c1b;
+    --chip: #212927;
+    --fg: #f0f4f2;
+    --muted: #9aa6a1;
+    --border: #2c3532;
+    --accent: #35d9c2;
+    --accent-soft: #123f39;
+    --accent-fg: #062420;
+    --ok: #b8f13e;
+    --ok-fg: #131711;
+    --ok-soft: #2b3a12;
+    --ok-text: #cdf56a;
+    --danger: #ff6f61;
+    --warn: #fbbf24;
   }
 }
 
 /* Принудительная тема из настроек (data-theme на <html>); селектор с атрибутом
    специфичнее голого :root, поэтому побеждает и медиазапрос, и дефолт. */
 :root[data-theme="light"] {
-  --bg: #f6f7f8;
+  --bg: #f4f6f5;
   --card: #ffffff;
-  --fg: #16181c;
-  --muted: #6b7280;
-  --border: #e4e7eb;
-  --accent: #0f766e;
-  --accent-soft: #d5f5f0;
+  --chip: #eef1ef;
+  --fg: #171b1a;
+  --muted: #5d6a66;
+  --border: #e3e8e5;
+  --accent: #0b6e63;
+  --accent-soft: #d7f0eb;
   --accent-fg: #ffffff;
-  --danger: #b91c1c;
-  --ok: #15803d;
+  --ok: #65a30d;
+  --ok-fg: #ffffff;
+  --ok-soft: #e9f6d0;
+  --ok-text: #4a7207;
+  --danger: #d92d20;
+  --warn: #f59e0b;
 }
 :root[data-theme="dark"] {
-  --bg: #101214;
-  --card: #1a1d21;
-  --fg: #f2f4f6;
-  --muted: #9aa2ad;
-  --border: #2a2f36;
-  --accent: #2dd4bf;
-  --accent-soft: #11403b;
-  --accent-fg: #04211d;
-  --danger: #f87171;
-  --ok: #4ade80;
+  --bg: #0d1110;
+  --card: #171c1b;
+  --chip: #212927;
+  --fg: #f0f4f2;
+  --muted: #9aa6a1;
+  --border: #2c3532;
+  --accent: #35d9c2;
+  --accent-soft: #123f39;
+  --accent-fg: #062420;
+  --ok: #b8f13e;
+  --ok-fg: #131711;
+  --ok-soft: #2b3a12;
+  --ok-text: #cdf56a;
+  --danger: #ff6f61;
+  --warn: #fbbf24;
 }
 
 @theme inline {
   --color-bg: var(--bg);
   --color-card: var(--card);
+  --color-chip: var(--chip);
   --color-fg: var(--fg);
   --color-muted: var(--muted);
   --color-border: var(--border);
@@ -65,7 +89,22 @@
   --color-accent-soft: var(--accent-soft);
   --color-accent-fg: var(--accent-fg);
   --color-danger: var(--danger);
+  --color-warn: var(--warn);
   --color-ok: var(--ok);
+  --color-ok-fg: var(--ok-fg);
+  --color-ok-soft: var(--ok-soft);
+  --color-ok-text: var(--ok-text);
+}
+
+/* Шрифт и шкала текста: Manrope (кириллица, табличные цифры);
+   базовый текст 15px, подписи 13px — читаемее в зале. */
+@theme {
+  --font-sans: 'Manrope Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: calc(22 / 15);
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: calc(18 / 13);
 }
 
 html {
@@ -75,8 +114,7 @@ html {
 body {
   background: var(--bg);
   color: var(--fg);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
 }
@@ -103,7 +141,7 @@ input[type="date"]::-webkit-date-and-time-value {
 }
 
 /* Ползунок усталости: крупный палец, заполнение и палец красятся оценкой
-   (--fill / --fill-color задаёт компонент: зелёный → жёлтый → красный) */
+   (--fill / --fill-color задаёт компонент: лайм → янтарь → коралл) */
 input[type="range"].fatigue {
   -webkit-appearance: none;
   appearance: none;
@@ -146,33 +184,83 @@ input[type="range"].fatigue::-moz-range-thumb {
 }
 
 /* --- Базовые анимации: аккуратные появления и «живые» нажатия ------------ */
+
+/* Кривые движения: выраженный ease-out (быстрый старт, мягкое торможение)
+   и «айосовская» кривая нижней шторки */
+:root {
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Раскрытие карточки упражнения: высоту анимирует сетка (0fr → 1fr),
+   поэтому плавно работают и открытие, и закрытие, и смена на полпути */
+.expander {
+  display: grid;
+  grid-template-rows: 0fr;
+}
+.expander > div {
+  min-height: 0;
+  overflow: hidden;
+}
+.expander-open {
+  grid-template-rows: 1fr;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   /* смена экрана: лёгкий сдвиг в сторону навигации */
   .anim-screen-right {
-    animation: screen-in-right 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+    animation: screen-in-right 0.22s var(--ease-out-strong);
   }
   .anim-screen-left {
-    animation: screen-in-left 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+    animation: screen-in-left 0.22s var(--ease-out-strong);
   }
   /* всплывающие карточки (превью, подсказки графиков) */
   .anim-pop {
-    animation: pop-in 0.16s cubic-bezier(0.2, 0.8, 0.3, 1);
+    animation: pop-in 0.16s var(--ease-out-strong);
   }
   /* раскрывающийся контент (разминка, заметки, быстрый лог) */
   .anim-rise {
-    animation: rise-in 0.18s ease-out;
+    animation: rise-in 0.18s var(--ease-out-strong);
   }
-  /* нижняя шторка таймера и её фон */
+  /* нижняя шторка таймера и её фон: закрытие быстрее открытия */
   .anim-sheet {
-    animation: sheet-up 0.26s cubic-bezier(0.2, 0.9, 0.3, 1);
+    animation: sheet-up 0.32s var(--ease-drawer);
+  }
+  .anim-sheet-out {
+    animation: sheet-down 0.22s var(--ease-drawer) forwards;
   }
   .anim-fade {
     animation: fade-in 0.2s ease-out;
   }
+  .anim-fade-out {
+    animation: fade-out 0.18s ease-out forwards;
+  }
+  /* карточка упражнения: открытие 0.3s, закрытие быстрее (0.22s);
+     содержимое чуть съезжает и проявляется с малой задержкой */
+  .expander {
+    transition: grid-template-rows 0.22s var(--ease-out-strong);
+  }
+  .expander-open {
+    transition-duration: 0.3s;
+  }
+  .expander > div {
+    opacity: 0;
+    transform: translateY(-6px);
+    transition:
+      opacity 0.15s ease-out,
+      transform 0.22s var(--ease-out-strong);
+  }
+  .expander-open > div {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 0.2s ease-out 0.05s,
+      transform 0.3s var(--ease-out-strong);
+  }
   /* отклик на нажатие: чуть «утапливаем» любую кнопку.
      :where даёт нулевую специфичность — Tailwind-переходы не ломаются */
   :where(button:not(:disabled)) {
-    transition: transform 0.12s ease;
+    transition: transform 0.15s var(--ease-out-strong);
   }
   button:not(:disabled):active {
     transform: scale(0.96);
@@ -241,8 +329,18 @@ input[type="range"].fatigue::-moz-range-thumb {
     transform: translateY(100%);
   }
 }
+@keyframes sheet-down {
+  to {
+    transform: translateY(100%);
+  }
+}
 @keyframes fade-in {
   from {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
     opacity: 0;
   }
 }

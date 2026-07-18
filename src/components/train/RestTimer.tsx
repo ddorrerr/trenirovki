@@ -79,6 +79,8 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
   const [duration, setDuration] = useState(FALLBACK_SECONDS);
   const [remaining, setRemaining] = useState(FALLBACK_SECONDS);
   const [flash, setFlash] = useState(false);
+  /* Закрытие шторки с анимацией: сначала уезжает вниз, потом размонтируется */
+  const [closing, setClosing] = useState(false);
 
   const endAtRef = useRef(0);
   const finishedRef = useRef(false);
@@ -95,6 +97,7 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
     lastNonceRef.current = request.nonce;
     const sameItem = itemRef.current === request.itemId;
     itemRef.current = request.itemId;
+    setClosing(false);
     setOpen(true);
     if (running && sameItem) return; // отсчёт уже идёт — просто показать
     setRunning(false);
@@ -174,6 +177,15 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
     }
   }, []);
 
+  /* При reduced-motion анимаций нет — закрываем сразу, не ждём onAnimationEnd */
+  const closeSheet = useCallback(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setOpen(false);
+      return;
+    }
+    setClosing(true);
+  }, []);
+
   const start = () => {
     ensureAudio();
     setFlash(false);
@@ -235,16 +247,30 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
         <div className="fixed inset-0 z-40">
           <button
             aria-label="Закрыть таймер"
-            onClick={() => setOpen(false)}
-            className="anim-fade absolute inset-0 h-full w-full cursor-default bg-bg/70 backdrop-blur-sm"
+            onClick={closeSheet}
+            className={
+              (closing ? 'anim-fade-out' : 'anim-fade') +
+              ' absolute inset-0 h-full w-full cursor-default bg-bg/70 backdrop-blur-sm'
+            }
           />
-          <div className="anim-sheet absolute inset-x-0 bottom-0 mx-auto w-full max-w-md rounded-t-2xl border border-b-0 border-border bg-card p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl">
+          <div
+            onAnimationEnd={(e) => {
+              if (closing && e.target === e.currentTarget) {
+                setOpen(false);
+                setClosing(false);
+              }
+            }}
+            className={
+              (closing ? 'anim-sheet-out' : 'anim-sheet') +
+              ' absolute inset-x-0 bottom-0 mx-auto w-full max-w-md rounded-t-2xl border border-b-0 border-border bg-card p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl'
+            }
+          >
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold uppercase tracking-wide text-muted">
                 Отдых
               </span>
               <button
-                onClick={() => setOpen(false)}
+                onClick={closeSheet}
                 aria-label="Закрыть"
                 className="-mr-2 -mt-2 flex h-11 w-11 items-center justify-center rounded-xl text-muted"
               >
@@ -255,8 +281,8 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
             <div
               aria-live="off"
               className={
-                'py-4 text-center text-7xl font-bold leading-none tabular-nums ' +
-                (flash ? 'animate-pulse text-accent' : remaining === 0 ? 'text-accent' : '')
+                'py-4 text-center text-7xl font-extrabold leading-none tabular-nums ' +
+                (flash ? 'animate-pulse text-ok-text' : remaining === 0 ? 'text-ok-text' : '')
               }
             >
               {fmtClock(remaining)}

@@ -5,7 +5,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
 /** Единый вид текстовых полей редактора */
-export const inputCls = 'w-full rounded-xl border border-border bg-bg px-3 py-2';
+export const inputCls =
+  'w-full rounded-xl border border-border bg-chip px-3 py-2 outline-none focus:border-accent';
 
 export function Labelled({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
@@ -126,7 +127,7 @@ export function Chip({ children, muted = false }: { children: ReactNode; muted?:
     <span
       className={
         'rounded-lg px-2 py-1 text-sm font-medium ' +
-        (muted ? 'border border-border bg-bg text-muted' : 'bg-accent-soft')
+        (muted ? 'border border-border bg-bg text-muted' : 'bg-chip')
       }
     >
       {children}

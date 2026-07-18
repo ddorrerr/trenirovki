@@ -190,8 +190,8 @@ export default function CalendarHeatmap() {
                   className={
                     'relative rounded-[3px] after:absolute after:-inset-0.5 after:content-[""] ' +
                     (preview?.w.id === workout.id
-                      ? 'bg-accent ring-2 ring-accent ring-offset-1 ring-offset-card'
-                      : 'bg-accent')
+                      ? 'bg-ok ring-2 ring-ok ring-offset-1 ring-offset-card'
+                      : 'bg-ok')
                   }
                 />
               ) : (
@@ -203,7 +203,7 @@ export default function CalendarHeatmap() {
       </div>
 
       <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
-        <span className="inline-block h-2.5 w-2.5 rounded-[3px] bg-accent" aria-hidden="true" />
+        <span className="inline-block h-2.5 w-2.5 rounded-[3px] bg-ok" aria-hidden="true" />
         вся история по неделям — лента листается, тап покажет превью
       </p>
 

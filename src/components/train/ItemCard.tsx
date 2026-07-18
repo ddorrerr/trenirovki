@@ -7,16 +7,15 @@ import type { Occurrence } from '../../store';
 import { fmtDateShort } from '../../lib/dates';
 import VideoLink from './VideoLink';
 import {
+  BarbellIcon,
   CheckIcon,
   ChevronIcon,
   CommentIcon,
-  DeadFaceIcon,
   FlameIcon,
   HistoryIcon,
-  KettlebellIcon,
   PinIcon,
-  RechargeIcon,
   RepeatIcon,
+  SkullIcon,
   TempoIcon,
   VideoIcon,
 } from './icons';
@@ -108,13 +107,29 @@ export default function ItemCard({
         ? weightLabel(item.weight.raw)
         : '';
 
-  const chips: { icon: ReactNode | null; name: string | null; text: string }[] = [];
+  /* Свёрнутая карточка показывает только главное — повторы, вес и отдых;
+     ПВР и темп уезжают в раскрытую часть. bold — жирные цифры-факты */
+  const mainChips: { icon: ReactNode | null; name: string | null; text: string; bold: boolean }[] =
+    [];
   if (setsRepsText)
-    chips.push({ icon: <RepeatIcon />, name: 'подходы × повторы', text: setsRepsText });
-  if (weightText) chips.push({ icon: <KettlebellIcon />, name: 'вес', text: weightText });
+    mainChips.push({
+      icon: <RepeatIcon />,
+      name: 'подходы × повторы',
+      text: setsRepsText,
+      bold: true,
+    });
+  if (weightText)
+    mainChips.push({ icon: <BarbellIcon />, name: 'вес', text: weightText, bold: true });
+  const detailChips: typeof mainChips = [];
   if (item.pvr)
-    chips.push({ icon: <DeadFaceIcon />, name: 'ПВР — повторы в резерве', text: item.pvr });
-  if (item.tempo) chips.push({ icon: <TempoIcon />, name: 'темп', text: item.tempo });
+    detailChips.push({
+      icon: <SkullIcon />,
+      name: 'ПВР — повторы в резерве',
+      text: `ПВР ${item.pvr}`,
+      bold: true,
+    });
+  if (item.tempo)
+    detailChips.push({ icon: <TempoIcon />, name: 'темп', text: item.tempo, bold: false });
 
   // Тап по карточке раскрывает её, но не когда попали в ссылку/кнопку/поле
   const handleCardClick = (e: MouseEvent<HTMLDivElement>) => {
@@ -134,14 +149,14 @@ export default function ItemCard({
           aria-hidden="true"
           className={
             'mt-0.5 flex h-6 min-w-6 shrink-0 items-center justify-center rounded-lg px-1 text-[13px] font-bold tabular-nums ' +
-            (item.done ? 'bg-bg text-muted' : 'bg-accent-soft text-accent')
+            (item.done ? 'bg-bg text-muted' : 'bg-chip text-muted')
           }
         >
           {num}
         </span>
         <h3
           className={
-            'min-w-0 flex-1 break-words text-lg font-semibold leading-snug ' +
+            'min-w-0 flex-1 break-words text-xl font-bold leading-snug ' +
             (item.done ? 'text-muted' : '')
           }
         >
@@ -174,7 +189,7 @@ export default function ItemCard({
           className={
             'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors ' +
             (item.done
-              ? 'border-accent bg-accent text-accent-fg'
+              ? 'border-ok bg-ok text-ok-fg'
               : 'border-border bg-card text-muted') +
             (checkPop ? ' anim-check' : '')
           }
@@ -186,9 +201,9 @@ export default function ItemCard({
       <div className={item.done ? 'opacity-70' : ''}>
         {/* Разминка упражнения — первой: с неё начинают и её читают первой */}
         {item.warmupSets && (
-          <p title="разминка" className="mt-2.5 flex items-start gap-1.5 text-sm">
-            <span className="mt-0.5 shrink-0 text-accent">
-              <FlameIcon />
+          <p title="разминка" className="mt-2.5 flex items-start gap-1.5 text-xs">
+            <span className="mt-0.5 shrink-0 text-muted">
+              <FlameIcon size={14} />
             </span>
             <span className="sr-only">разминка: </span>
             <span className="min-w-0 whitespace-pre-line break-words text-muted">
@@ -197,118 +212,140 @@ export default function ItemCard({
           </p>
         )}
 
-        {/* Чипы параметров */}
-        {(chips.length > 0 || item.rest) && (
-          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            {chips.map((c, i) => (
-              <span
-                key={i}
-                title={c.name ?? undefined}
-                className="inline-flex max-w-full items-center gap-1 rounded-lg bg-accent-soft px-2 py-1 text-sm font-medium"
-              >
-                {c.icon && <span className="shrink-0 text-accent">{c.icon}</span>}
-                {c.name && <span className="sr-only">{c.name}: </span>}
-                <span className="min-w-0 break-words">{c.text}</span>
-              </span>
-            ))}
-            {item.rest && (
-              <button
-                onClick={() => onRest(item)}
-                aria-label="Запустить таймер отдыха"
-                title="отдых"
-                className="relative inline-flex max-w-full items-center gap-1 rounded-lg bg-accent-soft px-2 py-1 text-left text-sm font-medium underline decoration-dotted underline-offset-2 after:absolute after:-inset-1.5 after:content-['']"
-              >
-                <span className="shrink-0 text-accent">
-                  <RechargeIcon />
-                </span>
-                <span className="sr-only">отдых: </span>
-                <span className="min-w-0 break-words">{restLabel(item.rest)}</span>
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Техника: подсказки-подпункты */}
-        {item.subNotes.length > 0 && (
-          <ul className="mt-2 space-y-1">
-            {item.subNotes.map((sn, i) => (
-              <li key={i} className="break-words text-sm leading-snug text-muted">
-                {sn.text}
-                {sn.videoUrl && <VideoLink href={sn.videoUrl} className="ml-1.5" />}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {/* Примечание тренера — всегда последним и всегда с булавкой;
-            строки с 📌 — просьбы на этот день, они выделены жирнее */}
-        {(item.ptNote || item.ptRequest) && (
-          <div className="mt-2.5 flex items-start gap-1.5 text-sm">
-            <span className="mt-0.5 shrink-0 text-muted">
-              <PinIcon />
-            </span>
-            <div className="min-w-0 flex-1 space-y-1">
-              {(item.ptNote ?? '')
-                .split('\n')
-                .map((line, i) => {
-                  const t = line.trim();
-                  if (!t) return null;
-                  const pinned = t.startsWith('📌');
-                  return (
-                    <p key={i} className={'break-words ' + (pinned ? 'font-medium' : 'text-muted')}>
-                      {t.replace(/^📌\s*/, '')}
-                    </p>
-                  );
-                })}
-              {/* совместимость со старыми данными, где запрос лежал отдельным полем */}
-              {item.ptRequest && (
-                <p className="whitespace-pre-line break-words font-medium">{item.ptRequest}</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Твой комментарий — в свёрнутом виде одной-двумя строками */}
-        {!open && myComment && (
-          <p title="твой комментарий" className="mt-2 flex items-start gap-1.5 text-sm italic text-muted">
-            <span className="mt-0.5 shrink-0" aria-hidden="true">
-              <CommentIcon />
-            </span>
-            <span className="sr-only">твой комментарий: </span>
-            <span className="min-w-0 break-words line-clamp-2">{myComment}</span>
-          </p>
-        )}
-
-        {/* Прошлый раз (иконка «Истории») + шеврон */}
-        <div className="mt-3 flex items-center gap-2">
-          {last ? (
-            <p
-              title="прошлый раз"
-              className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-muted"
+        {/* Строка данных: повторы × вес + отдых; справа — значки
+            «есть комментарий» / «есть заметка тренера» и шеврон раскрытия */}
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          {mainChips.map((c, i) => (
+            <span
+              key={i}
+              title={c.name ?? undefined}
+              className={
+                'inline-flex max-w-full items-center gap-1 rounded-lg bg-chip px-2 py-1 text-sm tabular-nums ' +
+                (c.bold ? 'font-bold' : 'font-medium')
+              }
             >
-              <span className="shrink-0" aria-hidden="true">
-                <HistoryIcon />
-              </span>
-              <span className="sr-only">прошлый раз, </span>
-              <span className="min-w-0 flex-1 truncate">
-                {fmtDateShort(last.workout.date)}: {lastSummary(last.item)}
-              </span>
-            </p>
-          ) : (
-            <span className="flex-1" />
+              {c.icon && <span className="shrink-0 text-muted">{c.icon}</span>}
+              {c.name && <span className="sr-only">{c.name}: </span>}
+              <span className="min-w-0 break-words">{c.text}</span>
+            </span>
+          ))}
+          {item.rest && (
+            <button
+              onClick={() => onRest(item)}
+              aria-label="Запустить таймер отдыха"
+              title="отдых"
+              className="relative inline-flex max-w-full items-center gap-1 rounded-lg bg-accent-soft px-2 py-1 text-left text-sm font-bold text-accent underline decoration-dotted underline-offset-2 after:absolute after:-inset-1.5 after:content-['']"
+            >
+              <span className="sr-only">отдых: </span>
+              <span className="min-w-0 break-words">{restLabel(item.rest)}</span>
+            </button>
           )}
-          <button
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-            aria-label={open ? 'Свернуть' : 'Развернуть'}
-            className="relative -my-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted after:absolute after:-inset-1.5 after:content-['']"
-          >
-            <ChevronIcon open={open} />
-          </button>
+          <span className="ml-auto flex items-center gap-1 text-muted">
+            {myComment && (
+              <span title="есть твой комментарий" className="flex h-8 w-6 items-center justify-center">
+                <CommentIcon />
+                <span className="sr-only">есть твой комментарий</span>
+              </span>
+            )}
+            {(item.ptNote || item.ptRequest) && (
+              <span title="есть заметка тренера" className="flex h-8 w-6 items-center justify-center">
+                <PinIcon />
+                <span className="sr-only">есть заметка тренера</span>
+              </span>
+            )}
+            <button
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+              aria-label={open ? 'Свернуть' : 'Развернуть'}
+              className="relative -my-1 flex h-9 w-9 items-center justify-center rounded-lg after:absolute after:-inset-1 after:content-['']"
+            >
+              <ChevronIcon open={open} />
+            </button>
+          </span>
         </div>
+
       </div>
 
-      {open && <ItemEditor item={item} onChange={onChange} />}
+      {/* Раскрытая часть всегда в DOM: высота плавно едет классом .expander
+          в обе стороны, закрытое содержимое недоступно для фокуса (inert) */}
+      <div className={'expander' + (open ? ' expander-open' : '')} inert={!open}>
+        <div>
+          <div className={item.done ? 'opacity-70' : ''}>
+            {detailChips.length > 0 && (
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                {detailChips.map((c, i) => (
+                  <span
+                    key={i}
+                    title={c.name ?? undefined}
+                    className={
+                      'inline-flex max-w-full items-center gap-1 rounded-lg bg-chip px-2 py-1 text-sm tabular-nums ' +
+                      (c.bold ? 'font-bold' : 'font-medium')
+                    }
+                  >
+                    {c.icon && <span className="shrink-0 text-muted">{c.icon}</span>}
+                    {c.name && <span className="sr-only">{c.name}: </span>}
+                    <span className="min-w-0 break-words">{c.text}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Техника: подсказки-подпункты */}
+            {item.subNotes.length > 0 && (
+              <ul className="mt-2.5 space-y-1">
+                {item.subNotes.map((sn, i) => (
+                  <li key={i} className="break-words text-sm leading-snug text-muted">
+                    {sn.text}
+                    {sn.videoUrl && <VideoLink href={sn.videoUrl} className="ml-1.5" />}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* Примечание тренера — с булавкой; строки с 📌 — просьбы
+                на этот день, они выделены жирнее */}
+            {(item.ptNote || item.ptRequest) && (
+              <div className="mt-2.5 flex items-start gap-1.5 text-sm">
+                <span className="mt-0.5 shrink-0 text-muted">
+                  <PinIcon />
+                </span>
+                <div className="min-w-0 flex-1 space-y-1">
+                  {(item.ptNote ?? '')
+                    .split('\n')
+                    .map((line, i) => {
+                      const t = line.trim();
+                      if (!t) return null;
+                      const pinned = t.startsWith('📌');
+                      return (
+                        <p key={i} className={'break-words ' + (pinned ? 'font-semibold' : 'text-muted')}>
+                          {t.replace(/^📌\s*/, '')}
+                        </p>
+                      );
+                    })}
+                  {/* совместимость со старыми данными, где запрос лежал отдельным полем */}
+                  {item.ptRequest && (
+                    <p className="whitespace-pre-line break-words font-semibold">{item.ptRequest}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Прошлый раз — над полями «Факт», чтобы сверяться при записи */}
+            {last && (
+              <p title="прошлый раз" className="mt-2.5 flex items-start gap-1.5 text-xs text-muted">
+                <span className="mt-0.5 shrink-0" aria-hidden="true">
+                  <HistoryIcon />
+                </span>
+                <span className="sr-only">прошлый раз, </span>
+                <span className="min-w-0 flex-1">
+                  {fmtDateShort(last.workout.date)}: {lastSummary(last.item)}
+                </span>
+              </p>
+            )}
+          </div>
+          <ItemEditor item={item} open={open} onChange={onChange} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -335,19 +372,32 @@ function parseIntOrNull(s: string): number | null {
 
 function ItemEditor({
   item,
+  open,
   onChange,
 }: {
   item: WorkoutItem;
+  /** Карточка раскрыта: редактор постоянно смонтирован ради анимации высоты */
+  open: boolean;
   onChange: (patch: Partial<WorkoutItem>) => void;
 }) {
   const [comment, setComment] = useState(item.myComment ?? '');
   const [wStr, setWStr] = useState(numToStr(item.actual?.weight ?? item.weight?.value));
   const [sStr, setSStr] = useState(numToStr(item.actual?.sets ?? item.setsReps?.sets));
   const [rStr, setRStr] = useState(numToStr(item.actual?.reps ?? item.setsReps?.reps));
-  const [tStr, setTStr] = useState(item.actual?.text ?? '');
   const [factDirty, setFactDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const savedTimerRef = useRef<number | null>(null);
+
+  /* Редактор больше не размонтируется при закрытии карточки, поэтому
+     при каждом раскрытии (и смене записи) подтягиваем свежие значения */
+  useEffect(() => {
+    if (!open) return;
+    setComment(item.myComment ?? '');
+    setWStr(numToStr(item.actual?.weight ?? item.weight?.value));
+    setSStr(numToStr(item.actual?.sets ?? item.setsReps?.sets));
+    setRStr(numToStr(item.actual?.reps ?? item.setsReps?.reps));
+    setFactDirty(false);
+  }, [open, item]);
 
   useEffect(
     () => () => {
@@ -368,13 +418,15 @@ function ItemEditor({
     flashSaved();
   };
 
-  // Сохраняем факт только если поля реально трогали — иначе не выдумываем actual
+  // Сохраняем факт только если поля реально трогали — иначе не выдумываем actual.
+  // Отдельного поля «заметка к факту» больше нет: старый текст, если он был
+  // в записи, бережно переносим как есть.
   const commitFact = () => {
     if (!factDirty) return;
     const weight = parseNum(wStr);
     const sets = parseIntOrNull(sStr);
     const reps = parseIntOrNull(rStr);
-    const text = tStr.trim();
+    const text = (item.actual?.text ?? '').trim();
     const actual: Actual | null =
       weight == null && sets == null && reps == null && text === ''
         ? null
@@ -385,12 +437,12 @@ function ItemEditor({
   };
 
   const fieldCls =
-    'mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-base outline-none focus:border-accent';
+    'mt-1 w-full rounded-xl border border-border bg-chip px-3 py-2.5 text-base outline-none focus:border-accent';
 
   return (
     <div className="anim-rise mt-4 border-t border-border pt-4" onClick={(e) => e.stopPropagation()}>
       <label className="block">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+        <span className="text-[12px] font-bold uppercase tracking-wider text-muted">
           Твой комментарий
         </span>
         <textarea
@@ -405,11 +457,11 @@ function ItemEditor({
 
       <div className="mt-3">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted">Факт</span>
+          <span className="text-[12px] font-bold uppercase tracking-wider text-muted">Факт</span>
           <span
             aria-live="polite"
             className={
-              'text-xs font-medium text-ok transition-opacity duration-300 ' +
+              'text-xs font-medium text-ok-text transition-opacity duration-300 ' +
               (saved ? 'opacity-100' : 'opacity-0')
             }
           >
@@ -430,7 +482,7 @@ function ItemEditor({
                 setFactDirty(true);
               }}
               onBlur={commitFact}
-              className={fieldCls + ' tabular-nums'}
+              className={fieldCls + ' font-semibold tabular-nums'}
             />
           </label>
           <label className="block">
@@ -446,7 +498,7 @@ function ItemEditor({
                 setFactDirty(true);
               }}
               onBlur={commitFact}
-              className={fieldCls + ' tabular-nums'}
+              className={fieldCls + ' font-semibold tabular-nums'}
             />
           </label>
           <label className="block">
@@ -462,22 +514,16 @@ function ItemEditor({
                 setFactDirty(true);
               }}
               onBlur={commitFact}
-              className={fieldCls + ' tabular-nums'}
+              className={fieldCls + ' font-semibold tabular-nums'}
             />
           </label>
         </div>
 
-        <input
-          type="text"
-          value={tStr}
-          onChange={(e) => {
-            setTStr(e.target.value);
-            setFactDirty(true);
-          }}
-          onBlur={commitFact}
-          placeholder="Заметка к факту (необязательно)"
-          className={fieldCls + ' mt-2'}
-        />
+        {(item.actual?.text ?? '').trim() !== '' && (
+          <p className="mt-2 text-xs text-muted">
+            Заметка к факту (старая запись): {item.actual?.text}
+          </p>
+        )}
       </div>
     </div>
   );
