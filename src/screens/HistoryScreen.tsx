@@ -14,10 +14,12 @@ import {
   todayISO,
 } from '../lib/dates';
 import { itemId, nextExerciseId, workoutIdForDate } from '../lib/ids';
+import { EQUIPMENT, MUSCLE_GROUPS } from '../lib/catalog';
 import { splitTags } from '../components/edit/parse';
 import NewWorkoutForm from '../components/edit/NewWorkoutForm';
 import {
   Chip,
+  ChipPicker,
   IconCheck,
   IconComment,
   IconPlus,
@@ -35,12 +37,20 @@ const SEGMENTS: { id: Segment; label: string }[] = [
   { id: 'exercises', label: 'Упражнения' },
 ];
 
-/* Экран запоминает, где ты была (вкладка, раскрытое упражнение, прокрутка),
-   чтобы стрелка «назад» возвращала ровно туда же, а не в начало списка. */
-const paneMemory: { seg: Segment; expandedId: string | null; scroll: number } = {
+/* Экран запоминает, где ты была (вкладка, раскрытое упражнение, фильтры,
+   прокрутка), чтобы стрелка «назад» возвращала ровно туда же. */
+const paneMemory: {
+  seg: Segment;
+  expandedId: string | null;
+  scroll: number;
+  fMuscle: string | null;
+  fEquip: string | null;
+} = {
   seg: 'workouts',
   expandedId: null,
   scroll: 0,
+  fMuscle: null,
+  fEquip: null,
 };
 
 export default function HistoryScreen() {
@@ -202,6 +212,32 @@ function ExercisesPane() {
   /** только что созданное упражнение держим наверху, пока его не свернули */
   const [pinnedId, setPinnedId] = useState<string | null>(null);
 
+  /* Фильтры: одна группа мышц + один инвентарь (тап по чипу второй раз — сброс) */
+  const [fMuscle, setFMuscleState] = useState<string | null>(paneMemory.fMuscle);
+  const [fEquip, setFEquipState] = useState<string | null>(paneMemory.fEquip);
+  const setFMuscle = (v: string | null) => {
+    paneMemory.fMuscle = v;
+    setFMuscleState(v);
+  };
+  const setFEquip = (v: string | null) => {
+    paneMemory.fEquip = v;
+    setFEquipState(v);
+  };
+
+  /* Чипы фильтра: справочник + свои значения, встретившиеся в библиотеке */
+  const muscleChips = useMemo(() => {
+    const extra = new Set<string>();
+    for (const e of exercises)
+      for (const m of e.muscles ?? []) if (!MUSCLE_GROUPS.includes(m)) extra.add(m);
+    return [...MUSCLE_GROUPS, ...[...extra].sort((a, b) => a.localeCompare(b, 'ru'))];
+  }, [exercises]);
+  const equipChips = useMemo(() => {
+    const extra = new Set<string>();
+    for (const e of exercises)
+      for (const q of e.equipment ?? []) if (!EQUIPMENT.includes(q)) extra.add(q);
+    return [...EQUIPMENT, ...[...extra].sort((a, b) => a.localeCompare(b, 'ru'))];
+  }, [exercises]);
+
   const stats = useMemo(() => {
     const m = new Map<string, { count: number; lastDate: string | null }>();
     for (const e of exercises) {
@@ -220,6 +256,8 @@ function ExercisesPane() {
     const q = query.trim().toLowerCase();
     return exercises
       .filter((e) => showArchive || !e.archived)
+      .filter((e) => !fMuscle || (e.muscles ?? []).includes(fMuscle))
+      .filter((e) => !fEquip || (e.equipment ?? []).includes(fEquip))
       .filter(
         (e) =>
           !q ||
@@ -232,7 +270,7 @@ function ExercisesPane() {
         const d = (stats.get(b.id)?.count ?? 0) - (stats.get(a.id)?.count ?? 0);
         return d !== 0 ? d : a.name.localeCompare(b.name, 'ru');
       });
-  }, [exercises, query, showArchive, stats, pinnedId]);
+  }, [exercises, query, showArchive, stats, pinnedId, fMuscle, fEquip]);
 
   const addExercise = () => {
     const ex: Exercise = {
@@ -276,6 +314,9 @@ function ExercisesPane() {
         className={inputCls}
       />
 
+      <FilterChips label="Группа мышц" options={muscleChips} value={fMuscle} onChange={setFMuscle} />
+      <FilterChips label="Инвентарь" options={equipChips} value={fEquip} onChange={setFEquip} />
+
       {exercises.length === 0 && (
         <div className="rounded-2xl border border-border bg-card p-6 text-center text-muted">
           Библиотека пока пустая.
@@ -312,6 +353,50 @@ function ExercisesPane() {
           {showArchive ? 'скрыть архив' : `показать архив (${archivedCount})`}
         </button>
       )}
+    </div>
+  );
+}
+
+/* Лента чипов-фильтров: горизонтальная прокрутка до краёв экрана,
+   выбран максимум один, повторный тап снимает */
+function FilterChips({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: string[];
+  value: string | null;
+  onChange: (v: string | null) => void;
+}) {
+  return (
+    <div
+      className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      role="group"
+      aria-label={label}
+    >
+      <div className="flex w-max gap-1.5 pb-0.5">
+        {options.map((opt) => {
+          const on = value === opt;
+          return (
+            <button
+              key={opt}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onChange(on ? null : opt)}
+              className={
+                'shrink-0 rounded-full border px-3 py-1.5 text-sm ' +
+                (on
+                  ? 'border-accent bg-accent-soft font-semibold text-accent'
+                  : 'border-border bg-card font-medium text-muted')
+              }
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -379,10 +464,24 @@ function occurrenceSummary(it: WorkoutItem): string {
 function ExerciseDetails({ e }: { e: Exercise }) {
   const { exerciseHistory, navigate, showExerciseProgress } = useApp();
   const tags = e.tags ?? [];
+  const muscles = e.muscles ?? [];
+  const equipment = e.equipment ?? [];
   const recent = useMemo(() => exerciseHistory(e.id).slice(-5).reverse(), [exerciseHistory, e.id]);
 
   return (
     <div className="space-y-3">
+      {(muscles.length > 0 || equipment.length > 0) && (
+        <div className="flex flex-wrap gap-1.5">
+          {muscles.map((m) => (
+            <Chip key={'m-' + m}>{m}</Chip>
+          ))}
+          {equipment.map((q) => (
+            <Chip key={'q-' + q} muted>
+              {q}
+            </Chip>
+          ))}
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         {e.videoUrl && (
           <a
@@ -461,10 +560,22 @@ function ExerciseEditPanel({ e, used }: { e: Exercise; used: boolean }) {
         placeholder="https://…"
         onCommit={(v) => saveExercise({ ...e, videoUrl: v.trim() || null })}
       />
+      <ChipPicker
+        label="Группы мышц"
+        options={MUSCLE_GROUPS}
+        value={e.muscles ?? []}
+        onChange={(muscles) => saveExercise({ ...e, muscles })}
+      />
+      <ChipPicker
+        label="Инвентарь"
+        options={EQUIPMENT}
+        value={e.equipment ?? []}
+        onChange={(equipment) => saveExercise({ ...e, equipment })}
+      />
       <TextField
         label="Метки (через запятую)"
         value={(e.tags ?? []).join(', ')}
-        placeholder="напр. спина, тренажёр"
+        placeholder="что-то ещё, напр. реабилитация"
         onCommit={(v) => saveExercise({ ...e, tags: splitTags(v) })}
       />
       <div className="flex flex-wrap items-center gap-2 pt-1">

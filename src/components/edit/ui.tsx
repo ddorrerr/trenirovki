@@ -121,6 +121,48 @@ export function SelectField({ label, value, options, onCommit }: SelectFieldProp
   );
 }
 
+/** Ряд чипов-переключателей для мультивыбора (группы мышц, инвентарь).
+    Значения не из options (свои) тоже показываем — их можно снять. */
+export function ChipPicker({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: string[];
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const all = [...options, ...value.filter((v) => !options.includes(v))];
+  return (
+    <div>
+      <span className="mb-1 block text-sm text-muted">{label}</span>
+      <div className="flex flex-wrap gap-1.5">
+        {all.map((opt) => {
+          const on = value.includes(opt);
+          return (
+            <button
+              key={opt}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onChange(on ? value.filter((v) => v !== opt) : [...value, opt])}
+              className={
+                'rounded-lg border px-2.5 py-1.5 text-sm ' +
+                (on
+                  ? 'border-accent bg-accent-soft font-semibold text-accent'
+                  : 'border-border bg-card font-medium text-muted')
+              }
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /** Чип параметра; muted — нейтральный вариант для второстепенного */
 export function Chip({ children, muted = false }: { children: ReactNode; muted?: boolean }) {
   return (

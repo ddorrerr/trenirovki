@@ -7,6 +7,8 @@ export interface Exercise {
   aliases: string[]; // варианты написания из таблицы (без нумерации)
   videoUrl: string | null; // ссылка на видео техники (Drive/Yandex/YouTube)
   tags: string[]; // свободные метки
+  muscles?: string[]; // группы мышц (можно несколько), см. lib/catalog.ts
+  equipment?: string[]; // инвентарь (можно несколько), см. lib/catalog.ts
   archived: boolean;
 }
 
