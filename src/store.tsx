@@ -29,7 +29,7 @@ import {
   type SyncState,
 } from './storage/github';
 
-export type Tab = 'home' | 'train' | 'history' | 'library' | 'progress' | 'menu';
+export type Tab = 'home' | 'train' | 'history' | 'library' | 'progress' | 'menu' | 'comments';
 
 /** Тема оформления: как в системе / всегда светлая / всегда тёмная */
 export type Theme = 'system' | 'light' | 'dark';

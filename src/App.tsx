@@ -3,6 +3,7 @@ import { useApp, type SyncInfo, type Tab } from './store';
 import { fmtDateShort, fmtWeekday } from './lib/dates';
 import { useWakeLock } from './hooks/useWakeLock';
 import HomeScreen from './screens/HomeScreen';
+import CommentsScreen from './screens/CommentsScreen';
 import TrainingScreen from './screens/TrainingScreen';
 import HistoryScreen from './screens/HistoryScreen';
 import LibraryScreen from './screens/LibraryScreen';
@@ -66,7 +67,9 @@ export default function App() {
         ? 'Тренировки'
         : tab === 'menu'
           ? 'Настройки'
-          : (TABS.find((t) => t.id === tab)?.label ?? 'Тренировка');
+          : tab === 'comments'
+            ? 'Комментарии'
+            : (TABS.find((t) => t.id === tab)?.label ?? 'Тренировка');
 
   // Экран «въезжает» со стороны, куда шагнула навигация (по порядку вкладок)
   const prevTabRef = useRef(tab);
@@ -158,6 +161,7 @@ export default function App() {
       <main className="mx-auto max-w-3xl overflow-x-clip px-4 pb-28 pt-4 md:pb-10">
         <div key={tab} className={slideDirRef.current === 'right' ? 'anim-screen-right' : 'anim-screen-left'}>
           {tab === 'home' && <HomeScreen />}
+          {tab === 'comments' && <CommentsScreen />}
           {tab === 'train' && <TrainingScreen />}
           {tab === 'history' && <HistoryScreen />}
           {tab === 'library' && <LibraryScreen />}
