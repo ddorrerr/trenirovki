@@ -2,6 +2,7 @@
 // Тап/наведение на ближайшую точку показывает карточку-подсказку.
 
 import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useT } from '../../i18n';
 import { fmtDate } from '../../lib/dates';
 import { clamp, dateTicks, fmtNum, niceScale, type DateTick } from './chart';
 import { useMeasuredWidth } from './useMeasuredWidth';
@@ -27,6 +28,7 @@ const TIP_W = 184;
 const HALF_DAY = 43_200_000;
 
 export default function WeightChart({ points }: { points: WeightPoint[] }) {
+  const { t, lang } = useT();
   const [wrapRef, width] = useMeasuredWidth<HTMLDivElement>();
   const [active, setActive] = useState<number | null>(null);
 
@@ -62,7 +64,8 @@ export default function WeightChart({ points }: { points: WeightPoint[] }) {
     const ny = niceScale(Math.min(...ys), Math.max(...ys));
     const nX = Math.max(3, Math.min(6, Math.floor(innerW / 85)));
     return { t0, t1, lo: ny.lo, hi: ny.hi, yTicks: ny.ticks, xTicks: dateTicks(t0, t1, nX) };
-  }, [points, innerW]);
+    // lang в зависимостях: подписи дат должны пересобраться при смене языка
+  }, [points, innerW, lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (points.length < 2) return null;
 
@@ -104,22 +107,29 @@ export default function WeightChart({ points }: { points: WeightPoint[] }) {
           preserveAspectRatio="none"
           className="block"
           role="img"
-          aria-label="График веса по датам"
+          aria-label={t.prog.chartAria}
         >
           {/* сетка и подписи оси Y (на верхнем делении — единица «кг») */}
-          {scale.yTicks.map((t, i) => (
-            <g key={t}>
-              <line x1={ML} x2={w - MR} y1={y(t)} y2={y(t)} stroke="var(--border)" strokeWidth={1} />
+          {scale.yTicks.map((tick, i) => (
+            <g key={tick}>
+              <line
+                x1={ML}
+                x2={w - MR}
+                y1={y(tick)}
+                y2={y(tick)}
+                stroke="var(--border)"
+                strokeWidth={1}
+              />
               <text
                 x={ML - 8}
-                y={y(t)}
+                y={y(tick)}
                 dy="0.32em"
                 textAnchor="end"
                 fontSize={11}
                 fill="var(--muted)"
                 style={{ fontVariantNumeric: 'tabular-nums' }}
               >
-                {i === scale.yTicks.length - 1 ? `${fmtNum(t)} кг` : fmtNum(t)}
+                {i === scale.yTicks.length - 1 ? `${fmtNum(tick)} ${t.kg}` : fmtNum(tick)}
               </text>
             </g>
           ))}
@@ -216,7 +226,9 @@ export default function WeightChart({ points }: { points: WeightPoint[] }) {
           }}
         >
           <div className="text-sm font-semibold">{fmtDate(a.date)}</div>
-          <div className="mt-0.5 text-base font-semibold">{fmtNum(a.y)} кг</div>
+          <div className="mt-0.5 text-base font-semibold">
+            {fmtNum(a.y)} {t.kg}
+          </div>
           {a.reps && <div className="text-sm text-muted">{a.reps}</div>}
           {a.comment && (
             <div className="mt-1 line-clamp-2 break-words text-xs text-muted">{a.comment}</div>

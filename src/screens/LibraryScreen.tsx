@@ -5,18 +5,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Exercise, WorkoutItem } from '../types';
 import { useApp } from '../store';
+import { useT, type Dict } from '../i18n';
 import { fmtDate, fmtDateShort } from '../lib/dates';
 import { nextExerciseId } from '../lib/ids';
 import { EQUIPMENT, MUSCLE_GROUPS } from '../lib/catalog';
 import { splitTags } from '../components/edit/parse';
-import {
-  Chip,
-  ChipPicker,
-  IconPlus,
-  TextField,
-  inputCls,
-  plural,
-} from '../components/edit/ui';
+import { Chip, ChipPicker, IconPlus, TextField, inputCls } from '../components/edit/ui';
 import { VideoIcon } from '../components/train/icons';
 import { equipIcon, muscleIcon } from '../components/catalogIcons';
 
@@ -36,6 +30,7 @@ const paneMemory: {
 
 export default function LibraryScreen() {
   const { exercises, exerciseHistory, editMode, saveExercise } = useApp();
+  const { t } = useT();
   const [query, setQuery] = useState('');
   const [showArchive, setShowArchive] = useState(false);
   const [expandedId, setExpandedIdState] = useState<string | null>(paneMemory.expandedId);
@@ -123,7 +118,7 @@ export default function LibraryScreen() {
   const addExercise = () => {
     const ex: Exercise = {
       id: nextExerciseId(exercises.map((e) => e.id)),
-      name: 'Новое упражнение',
+      name: t.lib.newExercise,
       aliases: [],
       videoUrl: null,
       tags: [],
@@ -150,39 +145,41 @@ export default function LibraryScreen() {
           onClick={addExercise}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 font-semibold text-accent-fg"
         >
-          <IconPlus size={16} /> Новое упражнение
+          <IconPlus size={16} /> {t.lib.newExercise}
         </button>
       )}
 
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Поиск упражнения…"
-        aria-label="Поиск упражнения"
+        placeholder={t.lib.searchPlaceholder}
+        aria-label={t.lib.searchAria}
         className={inputCls}
       />
 
       <FilterChips
-        label="Группа мышц"
+        label={t.lib.muscleGroup}
         options={muscleChips}
         value={fMuscle}
         onChange={setFMuscle}
         tone="muscle"
         icon={muscleIcon}
+        display={t.catalog.muscle}
       />
       <FilterChips
-        label="Инвентарь"
+        label={t.lib.equipment}
         options={equipChips}
         value={fEquip}
         onChange={setFEquip}
         tone="equip"
         icon={equipIcon}
+        display={t.catalog.equip}
       />
 
       {exercises.length === 0 && (
         <div className="rounded-2xl border border-border bg-card p-6 text-center text-muted">
-          Библиотека пока пустая.
-          {editMode ? ' Добавь первое упражнение кнопкой выше.' : ''}
+          {t.lib.empty}
+          {editMode ? t.lib.emptyEdit : ''}
         </div>
       )}
 
@@ -203,7 +200,7 @@ export default function LibraryScreen() {
       </ul>
 
       {list.length === 0 && exercises.length > 0 && (
-        <p className="py-4 text-center text-muted">Ничего не нашлось.</p>
+        <p className="py-4 text-center text-muted">{t.lib.nothingFound}</p>
       )}
 
       {archivedCount > 0 && (
@@ -212,7 +209,7 @@ export default function LibraryScreen() {
           onClick={() => setShowArchive((v) => !v)}
           className="mx-auto block px-3 py-2 text-sm text-muted underline underline-offset-2"
         >
-          {showArchive ? 'скрыть архив' : `показать архив (${archivedCount})`}
+          {showArchive ? t.lib.hideArchive : t.lib.showArchive(archivedCount)}
         </button>
       )}
     </div>
@@ -229,6 +226,7 @@ function FilterChips({
   onChange,
   tone,
   icon,
+  display,
 }: {
   label: string;
   options: string[];
@@ -236,6 +234,8 @@ function FilterChips({
   onChange: (v: string | null) => void;
   tone: 'muscle' | 'equip';
   icon: (name: string, size?: number) => React.ReactNode;
+  /** как показать значение из данных на текущем языке */
+  display: (name: string) => string;
 }) {
   const onCls =
     tone === 'muscle'
@@ -264,7 +264,7 @@ function FilterChips({
               }
             >
               {ic && <span className={on ? '' : iconTint}>{ic}</span>}
-              {opt}
+              {display(opt)}
             </button>
           );
         })}
@@ -283,6 +283,7 @@ interface ExerciseRowProps {
 
 function ExerciseRow({ e, count, lastDate, expanded, onToggle }: ExerciseRowProps) {
   const { editMode } = useApp();
+  const { t } = useT();
 
   return (
     <li className="rounded-2xl border border-border bg-card">
@@ -292,18 +293,16 @@ function ExerciseRow({ e, count, lastDate, expanded, onToggle }: ExerciseRowProp
             <span className="break-words text-lg font-semibold leading-snug">{e.name}</span>
             {e.archived && (
               <span className="rounded-lg border border-border bg-bg px-2 py-0.5 text-xs font-medium text-muted">
-                архив
+                {t.lib.archiveChip}
               </span>
             )}
           </div>
           <div className="mt-0.5 text-sm text-muted">
-            {count > 0 && lastDate
-              ? `${plural(count, 'раз', 'раза', 'раз')} · последний: ${fmtDate(lastDate)}`
-              : 'ещё не использовалось'}
+            {count > 0 && lastDate ? t.lib.usedTimes(count, fmtDate(lastDate)) : t.lib.neverUsed}
           </div>
         </div>
         {e.videoUrl && (
-          <span className="shrink-0 text-accent" title="Есть видео">
+          <span className="shrink-0 text-accent" title={t.lib.hasVideo}>
             <VideoIcon size={18} />
           </span>
         )}
@@ -319,22 +318,23 @@ function ExerciseRow({ e, count, lastDate, expanded, onToggle }: ExerciseRowProp
 }
 
 /** Короткая сводка «что делала» по позиции: факт, иначе план */
-function occurrenceSummary(it: WorkoutItem): string {
+function occurrenceSummary(it: WorkoutItem, dict: Dict): string {
   if (it.actual) {
     const parts: string[] = [];
-    if (it.actual.weight != null) parts.push(`${it.actual.weight} кг`);
+    if (it.actual.weight != null) parts.push(`${it.actual.weight} ${dict.kg}`);
     if (it.actual.sets != null && it.actual.reps != null)
       parts.push(`${it.actual.sets}×${it.actual.reps}`);
     if (parts.length) return parts.join(' · ');
   }
   const parts: string[] = [];
   if (it.setsReps?.raw) parts.push(it.setsReps.raw);
-  if (it.weight?.raw) parts.push(`вес ${it.weight.raw}`);
+  if (it.weight?.raw) parts.push(`${dict.item.weightPrefix} ${it.weight.raw}`);
   return parts.join(' · ') || '—';
 }
 
 function ExerciseDetails({ e }: { e: Exercise }) {
   const { exerciseHistory, navigate, showExerciseProgress } = useApp();
+  const { t } = useT();
   const tags = e.tags ?? [];
   const muscles = e.muscles ?? [];
   const equipment = e.equipment ?? [];
@@ -348,7 +348,7 @@ function ExerciseDetails({ e }: { e: Exercise }) {
             <Chip key={'m-' + m}>
               <span className="inline-flex items-center gap-1.5">
                 {muscleIcon(m, 13) && <span className="text-accent">{muscleIcon(m, 13)}</span>}
-                {m}
+                {t.catalog.muscle(m)}
               </span>
             </Chip>
           ))}
@@ -356,7 +356,7 @@ function ExerciseDetails({ e }: { e: Exercise }) {
             <Chip key={'q-' + q} muted>
               <span className="inline-flex items-center gap-1.5">
                 {equipIcon(q, 13) && <span className="text-warn-text">{equipIcon(q, 13)}</span>}
-                {q}
+                {t.catalog.equip(q)}
               </span>
             </Chip>
           ))}
@@ -370,7 +370,7 @@ function ExerciseDetails({ e }: { e: Exercise }) {
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 font-medium text-accent"
           >
-            <VideoIcon size={16} /> Видео техники
+            <VideoIcon size={16} /> {t.item.techVideo}
           </a>
         )}
         {recent.length > 0 && (
@@ -379,14 +379,14 @@ function ExerciseDetails({ e }: { e: Exercise }) {
             onClick={() => showExerciseProgress(e.id)}
             className="inline-flex items-center gap-1.5 font-medium text-accent"
           >
-            График веса →
+            {t.lib.weightChart}
           </button>
         )}
       </div>
 
       {recent.length > 0 && (
         <div>
-          <div className="mb-1 text-sm text-muted">Последние разы</div>
+          <div className="mb-1 text-sm text-muted">{t.lib.recent}</div>
           <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
             {recent.map(({ workout, item }) => (
               <li key={item.id}>
@@ -397,7 +397,7 @@ function ExerciseDetails({ e }: { e: Exercise }) {
                 >
                   <span className="shrink-0 font-medium">{fmtDateShort(workout.date)}</span>
                   <span className="min-w-0 flex-1 truncate text-muted">
-                    {occurrenceSummary(item)}
+                    {occurrenceSummary(item, t)}
                   </span>
                 </button>
               </li>
@@ -414,7 +414,7 @@ function ExerciseDetails({ e }: { e: Exercise }) {
         </div>
       )}
       {recent.length === 0 && !e.videoUrl && tags.length === 0 && (
-        <p className="text-sm text-muted">Пока не встречалось в тренировках.</p>
+        <p className="text-sm text-muted">{t.lib.notInWorkouts}</p>
       )}
     </div>
   );
@@ -422,11 +422,12 @@ function ExerciseDetails({ e }: { e: Exercise }) {
 
 function ExerciseEditPanel({ e, used }: { e: Exercise; used: boolean }) {
   const { saveExercise, deleteExercise } = useApp();
+  const { t } = useT();
 
   return (
     <div className="space-y-3">
       <TextField
-        label="Название"
+        label={t.lib.name}
         value={e.name}
         onCommit={(v) => {
           const name = v.trim();
@@ -434,30 +435,32 @@ function ExerciseEditPanel({ e, used }: { e: Exercise; used: boolean }) {
         }}
       />
       <TextField
-        label="Видео (ссылка)"
+        label={t.lib.videoLink}
         type="url"
         value={e.videoUrl ?? ''}
         placeholder="https://…"
         onCommit={(v) => saveExercise({ ...e, videoUrl: v.trim() || null })}
       />
       <ChipPicker
-        label="Группы мышц"
+        label={t.lib.muscles}
         options={MUSCLE_GROUPS}
         value={e.muscles ?? []}
         onChange={(muscles) => saveExercise({ ...e, muscles })}
         icon={muscleIcon}
+        display={t.catalog.muscle}
       />
       <ChipPicker
-        label="Инвентарь"
+        label={t.lib.equipment}
         options={EQUIPMENT}
         value={e.equipment ?? []}
         onChange={(equipment) => saveExercise({ ...e, equipment })}
         icon={equipIcon}
+        display={t.catalog.equip}
       />
       <TextField
-        label="Метки (через запятую)"
+        label={t.lib.tags}
         value={(e.tags ?? []).join(', ')}
-        placeholder="что-то ещё, напр. реабилитация"
+        placeholder={t.lib.tagsPlaceholder}
         onCommit={(v) => saveExercise({ ...e, tags: splitTags(v) })}
       />
       <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -466,21 +469,21 @@ function ExerciseEditPanel({ e, used }: { e: Exercise; used: boolean }) {
           onClick={() => saveExercise({ ...e, archived: !e.archived })}
           className="flex-1 rounded-xl border border-border bg-card px-4 py-2.5 font-medium"
         >
-          {e.archived ? 'Вернуть из архива' : 'Архивировать'}
+          {e.archived ? t.lib.unarchive : t.lib.archive}
         </button>
         <button
           type="button"
           disabled={used}
-          title={used ? 'Используется в тренировках' : 'Удалить упражнение'}
+          title={used ? t.lib.usedInWorkouts : t.lib.deleteExercise}
           onClick={() => {
-            if (window.confirm(`Удалить упражнение «${e.name}»?`)) deleteExercise(e.id);
+            if (window.confirm(t.lib.deleteConfirm(e.name))) deleteExercise(e.id);
           }}
           className={
             'rounded-xl border border-border bg-card px-4 py-2.5 font-medium text-danger ' +
             (used ? 'opacity-40' : '')
           }
         >
-          Удалить
+          {t.lib.delete}
         </button>
       </div>
     </div>

@@ -4,9 +4,11 @@
 
 import { useState } from 'react';
 import { useApp } from '../store';
+import { useT } from '../i18n';
 
 export default function KeyScreen() {
   const { submitAccessKey, authError } = useApp();
+  const { t } = useT();
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -27,19 +29,16 @@ export default function KeyScreen() {
             </svg>
           </span>
           <div>
-            <h1 className="text-lg font-bold leading-tight">Тренировки</h1>
-            <p className="text-sm text-muted">нужен ключ доступа</p>
+            <h1 className="text-lg font-bold leading-tight">{t.appTitle}</h1>
+            <p className="text-sm text-muted">{t.key.subtitle}</p>
           </div>
         </div>
 
-        <p className="mt-4 text-sm leading-relaxed text-muted">
-          Ключ открывает данные тренировок в приватном хранилище и запоминается
-          на этом устройстве. Получить его можно у владельца приложения.
-        </p>
+        <p className="mt-4 text-sm leading-relaxed text-muted">{t.key.body}</p>
 
         <label className="mt-4 block">
           <span className="text-xs font-semibold uppercase tracking-wide text-muted">
-            Ключ доступа
+            {t.key.label}
           </span>
           <input
             type="password"
@@ -61,7 +60,7 @@ export default function KeyScreen() {
           disabled={busy}
           className="mt-4 w-full rounded-xl bg-accent px-4 py-2.5 font-semibold text-accent-fg disabled:opacity-60"
         >
-          {busy ? 'Проверяю…' : 'Открыть'}
+          {busy ? t.key.checking : t.key.submit}
         </button>
       </div>
     </div>

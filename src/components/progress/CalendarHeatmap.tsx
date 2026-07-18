@@ -5,8 +5,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../../store';
 import type { Workout } from '../../types';
+import { locale, useT } from '../../i18n';
 import { fmtDate, fmtWeekday, monthKey, todayISO } from '../../lib/dates';
-import { plural } from '../edit/ui';
 
 const CELL = 13;
 const GAP = 3;
@@ -24,10 +24,10 @@ function mondayIndex(iso: string): number {
   return (new Date(iso + 'T00:00:00Z').getUTCDay() + 6) % 7;
 }
 
-/** "июн" — короткое имя месяца без точки */
-function monthShortRU(iso: string): string {
+/** "июн" / "Jun" — короткое имя месяца без точки */
+function monthShort(iso: string): string {
   return new Date(iso + 'T00:00:00Z')
-    .toLocaleDateString('ru-RU', { timeZone: 'UTC', month: 'short' })
+    .toLocaleDateString(locale(), { timeZone: 'UTC', month: 'short' })
     .replace(/\./g, '');
 }
 
@@ -41,6 +41,7 @@ interface Preview {
 
 export default function CalendarHeatmap() {
   const { workouts, navigate } = useApp();
+  const { t, lang } = useT();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const sectionRef = useRef<HTMLElement | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -68,12 +69,13 @@ export default function CalendarHeatmap() {
       const cur = days[i * 7];
       const prev = days[(i - 1) * 7];
       if (cur && prev && monthKey(cur) !== monthKey(prev)) {
-        labels.push({ x: i * PITCH, text: monthShortRU(cur) });
+        labels.push({ x: i * PITCH, text: monthShort(cur) });
       }
     }
 
     return { days, weekCount, labels, byDate };
-  }, [workouts]);
+    // lang в зависимостях: подписи месяцев должны пересобраться при смене языка
+  }, [workouts, lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // по умолчанию прокручиваем к самым свежим неделям (справа)
   useEffect(() => {
@@ -120,14 +122,16 @@ export default function CalendarHeatmap() {
   return (
     <section ref={sectionRef} className="relative rounded-2xl border border-border bg-card p-4">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted">Календарь</h2>
+        <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted">
+          {t.cal.heatTitle}
+        </h2>
         {/* листание ленты: вся история, минимум год */}
         <div className="-my-1 flex gap-1">
           <button
             type="button"
             onClick={() => scrollByWeeks(-8)}
-            aria-label="Раньше"
-            title="Раньше"
+            aria-label={t.cal.earlier}
+            title={t.cal.earlier}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-bg text-muted"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -137,8 +141,8 @@ export default function CalendarHeatmap() {
           <button
             type="button"
             onClick={() => scrollByWeeks(8)}
-            aria-label="Позже"
-            title="Позже"
+            aria-label={t.cal.later}
+            title={t.cal.later}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-bg text-muted"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -185,7 +189,7 @@ export default function CalendarHeatmap() {
                     // переход — исключительно кнопкой «Открыть» в карточке
                     showPreview(workout, e.currentTarget);
                   }}
-                  aria-label={'Тренировка ' + fmtDate(d)}
+                  aria-label={t.cal.workoutAria(fmtDate(d))}
                   aria-expanded={preview?.w.id === workout.id}
                   className={
                     'relative rounded-[3px] after:absolute after:-inset-0.5 after:content-[""] ' +
@@ -204,7 +208,7 @@ export default function CalendarHeatmap() {
 
       <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
         <span className="inline-block h-2.5 w-2.5 rounded-[3px] bg-ok" aria-hidden="true" />
-        вся история по неделям — лента листается, тап покажет превью
+        {t.cal.legend}
       </p>
 
       {/* Карточка-превью тренировки */}
@@ -225,18 +229,18 @@ export default function CalendarHeatmap() {
             {fmtDate(preview.w.date)}, {fmtWeekday(preview.w.date)}
           </div>
           <div className="mt-0.5 text-sm text-muted">
-            {preview.w.status === 'done' ? 'выполнена' : 'запланирована'}
-            {preview.w.type ? ` · ${preview.w.type}` : ''}
+            {preview.w.status === 'done' ? t.status.done : t.status.planned}
+            {preview.w.type ? ` · ${t.catalog.workoutType(preview.w.type)}` : ''}
             {' · '}
-            {plural(preview.w.items.length, 'упражнение', 'упражнения', 'упражнений')}
-            {preview.w.fatigue != null ? ` · усталость ${preview.w.fatigue}/10` : ''}
+            {t.counted.exercises(preview.w.items.length)}
+            {preview.w.fatigue != null ? ` · ${t.fatigueN10(preview.w.fatigue)}` : ''}
           </div>
           <button
             type="button"
             onClick={() => open(preview.w.id)}
             className="mt-2.5 w-full rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-accent-fg"
           >
-            Открыть
+            {t.open}
           </button>
         </div>
       )}

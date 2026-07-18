@@ -129,6 +129,7 @@ export function ChipPicker({
   value,
   onChange,
   icon,
+  display,
 }: {
   label: string;
   options: string[];
@@ -136,6 +137,8 @@ export function ChipPicker({
   onChange: (next: string[]) => void;
   /** необязательная иконка значения (например, из catalogIcons) */
   icon?: (name: string, size?: number) => ReactNode;
+  /** как показать значение на текущем языке (в данных значения по-русски) */
+  display?: (name: string) => string;
 }) {
   const all = [...options, ...value.filter((v) => !options.includes(v))];
   return (
@@ -159,7 +162,7 @@ export function ChipPicker({
               }
             >
               {ic}
-              {opt}
+              {display ? display(opt) : opt}
             </button>
           );
         })}
@@ -210,14 +213,8 @@ export function IconBtn({ onClick, label, disabled = false, danger = false, chil
   );
 }
 
-/** «5 упражнений», «2 раза», … */
-export function plural(n: number, one: string, few: string, many: string): string {
-  const m10 = n % 10;
-  const m100 = n % 100;
-  const word =
-    m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many;
-  return `${n} ${word}`;
-}
+/* Счётные формы («5 упражнений» / "5 exercises") живут в словарях i18n —
+   см. t.counted.* — здесь их больше нет. */
 
 /* --- Иконки: инлайновые SVG, наследуют currentColor -------------------- */
 

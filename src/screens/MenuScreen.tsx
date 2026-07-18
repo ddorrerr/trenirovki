@@ -1,20 +1,11 @@
-// Экран «Меню»: режим редактирования, настройки, данные, о приложении.
+// Экран «Меню»: режим редактирования, настройки (тема, язык), данные, о приложении.
 
 import { useId, useState, type ReactNode } from 'react';
 import { useApp, type Theme } from '../store';
+import { useT, type Dict, type Lang } from '../i18n';
 import { wakeLockSupported } from '../hooks/useWakeLock';
 import { downloadBackup } from '../lib/backup';
 import { fmtDate } from '../lib/dates';
-import { plural } from '../components/edit/ui';
-
-const SYNC_LABEL: Record<string, string> = {
-  saved: 'Всё сохранено',
-  saving: 'Сохраняю…',
-  pending: 'Есть несохранённые правки',
-  offline: 'Офлайн — сохраню, когда появится сеть',
-  error: 'Ошибка сохранения — попробуй обновить',
-  auth: 'Нет доступа — проверь ключ',
-};
 
 export default function MenuScreen() {
   const {
@@ -28,6 +19,7 @@ export default function MenuScreen() {
     syncNow,
     changeAccessKey,
   } = useApp();
+  const { t } = useT();
   const supported = wakeLockSupported();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -39,42 +31,43 @@ export default function MenuScreen() {
   };
 
   const workoutsLine = workouts.length
-    ? `${plural(workouts.length, 'тренировка', 'тренировки', 'тренировок')} с ${fmtDate(workouts[0].date)}`
-    : 'Пока нет тренировок';
-  const exercisesLine = plural(exercises.length, 'упражнение', 'упражнения', 'упражнений');
+    ? t.menu.aboutWorkouts(workouts.length, fmtDate(workouts[0].date))
+    : t.menu.aboutNoWorkouts;
+  const exercisesLine = t.counted.exercises(exercises.length);
 
   return (
     <div className="space-y-6">
-      <Section title="Режим">
+      <Section title={t.menu.sectionMode}>
         <ToggleRow
-          title="Редактирование"
-          subtitle="Добавление и правка тренировок — для тебя и тренера"
+          title={t.menu.editing}
+          subtitle={t.menu.editingSub}
           checked={editMode}
           onChange={setEditMode}
         />
       </Section>
 
-      <Section title="Настройки">
+      <Section title={t.menu.sectionSettings}>
         <ToggleRow
-          title="Не гасить экран"
-          subtitle="Экран не заснёт, пока открыто приложение"
-          note={supported ? undefined : 'Не поддерживается этим браузером'}
+          title={t.menu.keepAwake}
+          subtitle={t.menu.keepAwakeSub}
+          note={supported ? undefined : t.menu.unsupported}
           checked={settings.keepAwake}
           disabled={!supported}
           onChange={(v) => setSettings({ keepAwake: v })}
         />
-        <ThemeRow value={settings.theme} onChange={(theme) => setSettings({ theme })} />
+        <ThemeRow t={t} value={settings.theme} onChange={(theme) => setSettings({ theme })} />
+        <LangRow t={t} value={settings.lang} onChange={(lang) => setSettings({ lang })} />
       </Section>
 
-      <Section title="Данные">
+      <Section title={t.menu.sectionData}>
         <button
           type="button"
           onClick={() => downloadBackup({ exercises, workouts })}
           className="flex min-h-14 w-full items-center gap-4 px-4 py-3.5 text-left transition-colors active:bg-bg"
         >
           <span className="min-w-0 flex-1">
-            <span className="block font-medium">Скачать резервную копию</span>
-            <span className="mt-0.5 block text-sm text-muted">JSON-файл со всеми данными</span>
+            <span className="block font-medium">{t.menu.backup}</span>
+            <span className="mt-0.5 block text-sm text-muted">{t.menu.backupSub}</span>
           </span>
           <span className="shrink-0 text-muted" aria-hidden="true">
             <IconDownload />
@@ -83,14 +76,11 @@ export default function MenuScreen() {
       </Section>
 
       {sync.mode === 'github' && (
-        <Section title="Синхронизация">
+        <Section title={t.menu.sectionSync}>
           <div className="px-4 py-3.5">
-            <p className="text-sm text-muted">{SYNC_LABEL[sync.state] ?? sync.state}</p>
+            <p className="text-sm text-muted">{t.menu.syncStatus[sync.state] ?? sync.state}</p>
             {sync.conflicts > 0 && (
-              <p className="mt-1 text-sm text-muted">
-                Перезаписано параллельных правок: {sync.conflicts}. Кто-то менял те же записи
-                с другого устройства — осталась более поздняя версия.
-              </p>
+              <p className="mt-1 text-sm text-muted">{t.menu.conflicts(sync.conflicts)}</p>
             )}
           </div>
           <button
@@ -101,30 +91,28 @@ export default function MenuScreen() {
           >
             <span className="min-w-0 flex-1">
               <span className="block font-medium">
-                {refreshing ? 'Обновляю…' : 'Синхронизировать сейчас'}
+                {refreshing ? t.menu.syncing : t.menu.syncNow}
               </span>
-              <span className="mt-0.5 block text-sm text-muted">
-                Досохранить правки и забрать свежие данные
-              </span>
+              <span className="mt-0.5 block text-sm text-muted">{t.menu.syncNowSub}</span>
             </span>
           </button>
           <button
             type="button"
             onClick={() => {
-              if (window.confirm('Забыть ключ доступа на этом устройстве?')) changeAccessKey();
+              if (window.confirm(t.menu.forgetKeyConfirm)) changeAccessKey();
             }}
             className="flex min-h-14 w-full items-center gap-4 px-4 py-3.5 text-left transition-colors active:bg-bg"
           >
-            <span className="min-w-0 flex-1 font-medium">Сменить ключ доступа</span>
+            <span className="min-w-0 flex-1 font-medium">{t.menu.changeKey}</span>
           </button>
         </Section>
       )}
 
-      <Section title="О приложении">
+      <Section title={t.menu.sectionAbout}>
         <div className="space-y-1 px-4 py-3.5 text-sm text-muted">
           <p>{workoutsLine}</p>
           <p>{exercisesLine}</p>
-          <p>Версия 0.23.0</p>
+          <p>{t.menu.version} 0.24.0</p>
         </div>
       </Section>
     </div>
@@ -133,22 +121,54 @@ export default function MenuScreen() {
 
 /* --- Тема оформления ---------------------------------------------------- */
 
-const THEME_OPTIONS: { value: Theme; label: string }[] = [
-  { value: 'system', label: 'Как в системе' },
-  { value: 'light', label: 'Светлая' },
-  { value: 'dark', label: 'Тёмная' },
-];
+function ThemeRow({ t, value, onChange }: { t: Dict; value: Theme; onChange: (v: Theme) => void }) {
+  const options: { value: Theme; label: string }[] = [
+    { value: 'system', label: t.menu.themeSystem },
+    { value: 'light', label: t.menu.themeLight },
+    { value: 'dark', label: t.menu.themeDark },
+  ];
+  return (
+    <SegmentedRow label={t.menu.theme} options={options} value={value} onChange={onChange} />
+  );
+}
 
-function ThemeRow({ value, onChange }: { value: Theme; onChange: (t: Theme) => void }) {
+/* --- Язык интерфейса ---------------------------------------------------- */
+/* Каждый язык подписан сам собой — так его найдёт и тот, кто не читает второй */
+
+function LangRow({ t, value, onChange }: { t: Dict; value: Lang; onChange: (v: Lang) => void }) {
+  const options: { value: Lang; label: string }[] = [
+    { value: 'ru', label: 'Русский' },
+    { value: 'en', label: 'English' },
+  ];
+  return (
+    <SegmentedRow label={t.menu.language} options={options} value={value} onChange={onChange} />
+  );
+}
+
+/* --- Строительные блоки ------------------------------------------------ */
+
+/** Ряд «подпись + сегментный переключатель» — общий для темы и языка */
+function SegmentedRow<V extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: { value: V; label: string }[];
+  value: V;
+  onChange: (v: V) => void;
+}) {
   return (
     <div className="px-4 py-3.5">
-      <span className="block font-medium">Тема</span>
+      <span className="block font-medium">{label}</span>
       <div
         role="radiogroup"
-        aria-label="Тема оформления"
-        className="mt-2.5 grid grid-cols-3 gap-1 rounded-xl bg-bg p-1"
+        aria-label={label}
+        className="mt-2.5 grid gap-1 rounded-xl bg-bg p-1"
+        style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
       >
-        {THEME_OPTIONS.map((o) => (
+        {options.map((o) => (
           <button
             key={o.value}
             type="button"
@@ -167,8 +187,6 @@ function ThemeRow({ value, onChange }: { value: Theme; onChange: (t: Theme) => v
     </div>
   );
 }
-
-/* --- Строительные блоки ------------------------------------------------ */
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -256,4 +274,3 @@ function IconDownload() {
     </svg>
   );
 }
-

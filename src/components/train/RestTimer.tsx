@@ -3,6 +3,7 @@
 // поэтому отсчёт не сбрасывается ни прокруткой, ни закрытием шторки.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useT } from '../../i18n';
 import { ClockIcon, XIcon } from './icons';
 
 /** Запрос открытия таймера: каждый тап по чипу «отдых» — новый nonce. */
@@ -74,6 +75,7 @@ const PRESETS: { label: string; seconds: number }[] = [
 ];
 
 export default function RestTimer({ request }: { request: RestRequest | null }) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const [running, setRunning] = useState(false);
   const [duration, setDuration] = useState(FALLBACK_SECONDS);
@@ -232,7 +234,7 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
       {!open && (running || flash) && (
         <button
           onClick={() => setOpen(true)}
-          aria-label="Открыть таймер отдыха"
+          aria-label={t.timer.openAria}
           className={
             'fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-30 flex items-center gap-2 rounded-full bg-accent px-4 py-3 font-semibold tabular-nums text-accent-fg shadow-lg md:bottom-8 ' +
             (flash ? 'animate-pulse' : '')
@@ -246,7 +248,7 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
       {open && (
         <div className="fixed inset-0 z-40">
           <button
-            aria-label="Закрыть таймер"
+            aria-label={t.timer.closeAria}
             onClick={closeSheet}
             className={
               'anim-fade ' +
@@ -270,11 +272,11 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
           >
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold uppercase tracking-wide text-muted">
-                Отдых
+                {t.timer.title}
               </span>
               <button
                 onClick={closeSheet}
-                aria-label="Закрыть"
+                aria-label={t.close}
                 className="-mr-2 -mt-2 flex h-11 w-11 items-center justify-center rounded-xl text-muted"
               >
                 <XIcon />
@@ -310,7 +312,7 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
                 onClick={plus15}
                 className="min-h-11 rounded-xl border border-border bg-bg px-4 py-2 font-medium"
               >
-                +15 сек
+                {t.timer.plus15}
               </button>
             </div>
 
@@ -320,21 +322,21 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
                   onClick={pause}
                   className="min-h-12 flex-1 rounded-xl border border-border bg-card px-4 py-2.5 text-lg font-semibold"
                 >
-                  Пауза
+                  {t.timer.pause}
                 </button>
               ) : (
                 <button
                   onClick={start}
                   className="min-h-12 flex-1 rounded-xl bg-accent px-4 py-2.5 text-lg font-semibold text-accent-fg"
                 >
-                  Старт
+                  {t.timer.start}
                 </button>
               )}
               <button
                 onClick={reset}
                 className="min-h-12 rounded-xl border border-border bg-card px-5 py-2.5 font-medium text-muted"
               >
-                Сброс
+                {t.timer.reset}
               </button>
             </div>
           </div>

@@ -6,8 +6,8 @@
 import { useMemo } from 'react';
 import { useApp } from '../store';
 import type { Workout } from '../types';
+import { locale, useT, type EquivForms } from '../i18n';
 import { daysBetween, fmtDate, fmtDateShort, fmtWeekday, todayISO } from '../lib/dates';
-import { plural } from '../components/edit/ui';
 import NewWorkoutForm from '../components/edit/NewWorkoutForm';
 import { BarbellIcon, CommentIcon, FlameIcon, SkullIcon } from '../components/train/icons';
 /* Свои рисованные иконки гонконгских эквивалентов (нарезаны из одного спрайта) */
@@ -18,8 +18,6 @@ import unitMinibus from '../assets/units/minibus.png';
 import unitBus from '../assets/units/bus.png';
 import unitTram from '../assets/units/tram.png';
 import { muscleIcon } from '../components/catalogIcons';
-
-const WEEKDAYS = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
 
 /** Понедельник недели данной даты (UTC), ISO-строкой */
 function mondayISO(iso: string): string {
@@ -34,20 +32,10 @@ function addDaysISO(iso: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function dayWord(n: number): string {
-  const m10 = n % 10;
-  const m100 = n % 100;
-  return m10 === 1 && m100 !== 11
-    ? 'день'
-    : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)
-      ? 'дня'
-      : 'дней';
-}
-
-/** «Суббота, 19 июля» — день недели с большой буквы, без года */
+/** «Суббота, 19 июля» / "Saturday, 19 July" — день недели с большой буквы, без года */
 function fmtDayTitle(iso: string): string {
   const wd = fmtWeekday(iso);
-  const date = new Date(iso + 'T00:00:00Z').toLocaleDateString('ru-RU', {
+  const date = new Date(iso + 'T00:00:00Z').toLocaleDateString(locale(), {
     timeZone: 'UTC',
     day: 'numeric',
     month: 'long',
@@ -62,13 +50,102 @@ function median(nums: number[]): number {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-/** «1 100 кг» — всегда в килограммах, с разбивкой тысяч */
-function fmtKg(kg: number): string {
-  return `${kg.toLocaleString('ru-RU')} кг`;
-}
+/* Гонконгский каталог эквивалентов поднятого: кабаны, панды, танцующие львы,
+   дикие коровы, красные такси, кабинки Ngong Ping 360, минибасы, слоны,
+   автобусы, трамваи. У льва и транспорта — свои рисованные иконки, у зверей —
+   эмодзи. Названия — в обоих языках; «red cab» — согласованный перевод. */
+const UNITS: ({ kg: number; emoji: string; img?: string } & EquivForms)[] = [
+  {
+    kg: 100,
+    emoji: '🐗',
+    ru: { one: 'кабан', few: 'кабана', many: 'кабанов', gen: 'кабана' },
+    en: { one: 'wild boar', many: 'wild boars' },
+  },
+  {
+    kg: 110,
+    emoji: '🐼',
+    ru: { one: 'панда', few: 'панды', many: 'панд', gen: 'панды' },
+    en: { one: 'panda', many: 'pandas' },
+  },
+  {
+    kg: 160,
+    emoji: '🦁',
+    img: unitLion,
+    ru: {
+      one: 'танцующий лев',
+      few: 'танцующих льва',
+      many: 'танцующих львов',
+      gen: 'танцующих льва',
+    },
+    en: { one: 'dancing lion', many: 'dancing lions' },
+  },
+  {
+    kg: 500,
+    emoji: '🐂',
+    ru: { one: 'дикая корова', few: 'дикие коровы', many: 'диких коров', gen: 'диких коровы' },
+    en: { one: 'wild cow', many: 'wild cows' },
+  },
+  {
+    kg: 1500,
+    emoji: '🚗',
+    img: unitTaxi,
+    ru: { one: 'красное такси', few: 'красных такси', many: 'красных такси', gen: 'красных такси' },
+    en: { one: 'red cab', many: 'red cabs' },
+  },
+  {
+    kg: 2500,
+    emoji: '🚠',
+    img: unitCablecar,
+    ru: {
+      one: 'кабинка Ngong Ping 360',
+      few: 'кабинки Ngong Ping 360',
+      many: 'кабинок Ngong Ping 360',
+      gen: 'кабинки Ngong Ping 360',
+    },
+    en: { one: 'Ngong Ping 360 cabin', many: 'Ngong Ping 360 cabins' },
+  },
+  {
+    kg: 3600,
+    emoji: '🚐',
+    img: unitMinibus,
+    ru: {
+      one: 'гонконгский минибас',
+      few: 'гонконгских минибаса',
+      many: 'гонконгских минибасов',
+      gen: 'гонконгских минибаса',
+    },
+    en: { one: 'Hong Kong minibus', many: 'Hong Kong minibuses' },
+  },
+  {
+    kg: 4000,
+    emoji: '🐘',
+    ru: { one: 'слон', few: 'слона', many: 'слонов', gen: 'слона' },
+    en: { one: 'elephant', many: 'elephants' },
+  },
+  {
+    kg: 12000,
+    emoji: '🚌',
+    img: unitBus,
+    ru: {
+      one: 'двухэтажный автобус',
+      few: 'двухэтажных автобуса',
+      many: 'двухэтажных автобусов',
+      gen: 'двухэтажных автобуса',
+    },
+    en: { one: 'double-decker bus', many: 'double-decker buses' },
+  },
+  {
+    kg: 12000,
+    emoji: '🚋',
+    img: unitTram,
+    ru: { one: 'трамвай', few: 'трамвая', many: 'трамваев', gen: 'трамвая' },
+    en: { one: 'tram', many: 'trams' },
+  },
+];
 
 export default function HomeScreen() {
   const { workouts, navigate, editMode, exerciseById, showExerciseProgress } = useApp();
+  const { t } = useT();
   const today = todayISO();
 
   /* Только реально выполненные: запланированная (даже на сегодня) не должна
@@ -144,7 +221,7 @@ export default function HomeScreen() {
 
   const weekDays = useMemo(() => {
     const mon = mondayISO(today);
-    return WEEKDAYS.map((wd, i) => ({ wd, iso: addDaysISO(mon, i) }));
+    return Array.from({ length: 7 }, (_, i) => addDaysISO(mon, i));
   }, [today]);
 
   /* Тренировки по неделям, 8 последних (текущая — последняя) */
@@ -181,79 +258,10 @@ export default function HomeScreen() {
 
   /* Во что «переводится» поднятый объём — весёлый эквивалент; единица
      выбирается из подходящих по величине и меняется от тренировки к
-     тренировке (детерминированно по id, чтобы не мигало) */
+     тренировке (детерминированно по id, чтобы не мигало). Здесь только
+     числа — текст собирается при рендере на текущем языке. */
   const equivalent = useMemo(() => {
     if (tonnage <= 0 || !lastDone) return null;
-    /* Гонконгский каталог: кабаны, панды, танцующие львы, дикие коровы,
-       красные такси, кабинки Ngong Ping 360, минибасы, слоны, автобусы,
-       трамваи. У льва и транспорта — свои рисованные иконки, у зверей — эмодзи */
-    const UNITS: {
-      kg: number;
-      emoji: string;
-      img?: string;
-      one: string;
-      few: string;
-      many: string;
-      gen: string;
-    }[] = [
-      { kg: 100, emoji: '🐗', one: 'кабан', few: 'кабана', many: 'кабанов', gen: 'кабана' },
-      { kg: 110, emoji: '🐼', one: 'панда', few: 'панды', many: 'панд', gen: 'панды' },
-      {
-        kg: 160,
-        emoji: '🦁',
-        img: unitLion,
-        one: 'танцующий лев',
-        few: 'танцующих льва',
-        many: 'танцующих львов',
-        gen: 'танцующих льва',
-      },
-      {
-        kg: 500,
-        emoji: '🐂',
-        one: 'дикая корова',
-        few: 'дикие коровы',
-        many: 'диких коров',
-        gen: 'диких коровы',
-      },
-      {
-        kg: 1500,
-        emoji: '🚗',
-        img: unitTaxi,
-        one: 'красное такси',
-        few: 'красных такси',
-        many: 'красных такси',
-        gen: 'красных такси',
-      },
-      {
-        kg: 2500,
-        emoji: '🚠',
-        img: unitCablecar,
-        one: 'кабинка Ngong Ping 360',
-        few: 'кабинки Ngong Ping 360',
-        many: 'кабинок Ngong Ping 360',
-        gen: 'кабинки Ngong Ping 360',
-      },
-      {
-        kg: 3600,
-        emoji: '🚐',
-        img: unitMinibus,
-        one: 'гонконгский минибас',
-        few: 'гонконгских минибаса',
-        many: 'гонконгских минибасов',
-        gen: 'гонконгских минибаса',
-      },
-      { kg: 4000, emoji: '🐘', one: 'слон', few: 'слона', many: 'слонов', gen: 'слона' },
-      {
-        kg: 12000,
-        emoji: '🚌',
-        img: unitBus,
-        one: 'двухэтажный автобус',
-        few: 'двухэтажных автобуса',
-        many: 'двухэтажных автобусов',
-        gen: 'двухэтажных автобуса',
-      },
-      { kg: 12000, emoji: '🚋', img: unitTram, one: 'трамвай', few: 'трамвая', many: 'трамваев', gen: 'трамвая' },
-    ];
     /* Красиво читается один знак: берём юниты, где выходит от 1 до ~10 штук;
        если вес огромный — самый крупный юнит, если крошечный — панды с дробью */
     const inRange = UNITS.filter((u) => {
@@ -265,19 +273,18 @@ export default function HomeScreen() {
       : UNITS.filter((u) => tonnage / u.kg >= 0.95).slice(-1);
     let seed = 0;
     for (const ch of lastDone.id) seed = (seed + ch.charCodeAt(0)) % 997;
-    const u = fitting.length ? fitting[seed % fitting.length] : UNITS[0];
-    const count = tonnage / u.kg;
+    const unit = fitting.length ? fitting[seed % fitting.length] : UNITS[0];
+    const count = tonnage / unit.kg;
     const rounded = Math.round(count);
     const isInt = Math.abs(count - rounded) < 0.05 && rounded >= 1;
-    const text = isInt
-      ? `≈ ${plural(rounded, u.one, u.few, u.many)}`
-      : `≈ ${count.toLocaleString('ru-RU', {
-          minimumFractionDigits: 1,
-          maximumFractionDigits: 1,
-        })} ${u.gen}`;
     const iconCount = Math.min(5, Math.max(1, rounded));
-    return { text, icons: u.emoji.repeat(iconCount), img: u.img, count: iconCount };
+    return { unit, count, rounded, isInt, iconCount };
   }, [tonnage, lastDone]);
+  const equivText = equivalent
+    ? equivalent.isInt
+      ? t.home.equivInt(equivalent.unit, equivalent.rounded)
+      : t.home.equivFrac(equivalent.unit, equivalent.count)
+    : null;
 
   /* Какие группы мышц были в работе за последние 7 дней */
   const groups7 = useMemo(() => {
@@ -344,7 +351,7 @@ export default function HomeScreen() {
         {lastWithComments && (
           <section className="rounded-2xl border border-border bg-card p-4">
             <p className="text-[12px] font-bold uppercase tracking-wider text-muted">
-              Фидбэк Лизы · {fmtDateShort(lastWithComments.date)}
+              {t.home.feedback(fmtDateShort(lastWithComments.date))}
             </p>
             <ul className="mt-2 space-y-2.5">
               {feedbackItems.map((f) => (
@@ -368,7 +375,7 @@ export default function HomeScreen() {
                 onClick={() => navigate('comments')}
                 className="text-sm font-semibold text-accent"
               >
-                Все комментарии →
+                {t.home.allComments}
               </button>
             </div>
           </section>
@@ -377,15 +384,13 @@ export default function HomeScreen() {
         {frequent.length > 0 && (
           <section className="rounded-2xl border border-border bg-card p-4">
             <p className="text-[12px] font-bold uppercase tracking-wider text-muted">
-              Часто в комментариях · месяц
+              {t.home.oftenMonth}
             </p>
             <ul className="mt-2 space-y-1 text-sm">
               {frequent.map((f) => (
                 <li key={f.id} className="flex items-baseline justify-between gap-2">
                   <span className="min-w-0 flex-1 truncate font-medium">{f.name}</span>
-                  <span className="shrink-0 text-muted">
-                    {plural(f.n, 'запись', 'записи', 'записей')}
-                  </span>
+                  <span className="shrink-0 text-muted">{t.counted.entries(f.n)}</span>
                 </li>
               ))}
             </ul>
@@ -402,8 +407,7 @@ export default function HomeScreen() {
   if (workouts.length === 0) {
     return (
       <div className="rounded-2xl border border-border bg-card p-6 text-center text-muted">
-        Пока нет ни одной тренировки — включи режим редактирования (карандаш сверху)
-        и добавь первую.
+        {t.home.empty}
       </div>
     );
   }
@@ -414,18 +418,16 @@ export default function HomeScreen() {
       <div className="px-1 pt-1">
         <p className="text-[32px] font-extrabold leading-tight tracking-tight">
           {daysSince == null ? (
-            'Начнём?'
+            t.home.heroStart
           ) : daysSince === 0 ? (
             <>
-              Сегодня{' '}
-              <span className="text-[15px] font-semibold text-muted">была тренировка</span>
+              {t.home.heroToday}{' '}
+              <span className="text-[15px] font-semibold text-muted">{t.home.heroTodaySub}</span>
             </>
           ) : (
             <>
-              {daysSince} {dayWord(daysSince)}{' '}
-              <span className="text-[15px] font-semibold text-muted">
-                с последней тренировки
-              </span>
+              {daysSince} {t.home.dayWord(daysSince)}{' '}
+              <span className="text-[15px] font-semibold text-muted">{t.home.sinceLast}</span>
             </>
           )}
         </p>
@@ -435,14 +437,14 @@ export default function HomeScreen() {
               <span className="text-muted">
                 <FlameIcon size={14} />
               </span>
-              {plural(streak, 'неделя', 'недели', 'недель')} подряд
+              {t.home.weekStreak(streak)}
             </span>
           )}
           <span className="inline-flex items-center gap-1.5 rounded-lg bg-chip px-2.5 py-1 text-xs font-semibold tabular-nums">
             <span className="text-muted">
               <BarbellIcon size={14} />
             </span>
-            {past.length} всего
+            {t.home.total(past.length)}
           </span>
         </div>
       </div>
@@ -451,18 +453,20 @@ export default function HomeScreen() {
           На широком экране дни не расползаются — сетка ограничена по ширине */}
       <div className="rounded-2xl border border-border bg-card p-3">
         <div className="mx-auto grid max-w-sm grid-cols-7">
-          {weekDays.map((d) => {
-            const w = byDate.get(d.iso);
-            const isToday = d.iso === today;
-            const day = Number(d.iso.slice(8));
+          {weekDays.map((iso, i) => {
+            const w = byDate.get(iso);
+            const isToday = iso === today;
+            const day = Number(iso.slice(8));
             return (
-              <div key={d.iso} className="flex flex-col items-center gap-1">
-                <span className="text-[10px] font-semibold uppercase text-muted">{d.wd}</span>
+              <div key={iso} className="flex flex-col items-center gap-1">
+                <span className="text-[10px] font-semibold uppercase text-muted">
+                  {t.weekdaysShort[i]}
+                </span>
                 {w ? (
                   <button
                     type="button"
                     onClick={() => navigate('train', w.id)}
-                    aria-label={`Открыть тренировку ${d.iso}`}
+                    aria-label={t.home.openWorkoutAria(iso)}
                     className={
                       'flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold tabular-nums ' +
                       (w.status === 'done'
@@ -493,51 +497,55 @@ export default function HomeScreen() {
           На широком экране — в один ряд, чтобы карточки не пустели */}
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <div className="rounded-2xl border border-border bg-card p-3.5">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-muted">Эта неделя</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-muted">
+            {t.home.thisWeek}
+          </p>
           <div className="mt-2 flex items-center gap-3">
             <Ring pct={thisWeek / usual} label={String(thisWeek)} />
             <p className="text-xs font-semibold leading-snug text-muted">
-              из {usual}
-              <span className="block font-medium">привычных</span>
+              {t.home.ofN(usual)}
+              <span className="block font-medium">{t.home.usual}</span>
             </p>
           </div>
         </div>
         {tonnage > 0 && (
           <div className="rounded-2xl border border-border bg-card p-3.5">
             <p className="text-[11px] font-bold uppercase tracking-wider text-muted">
-              Поднято за прошлую
+              {t.home.lifted}
             </p>
-            <p className="mt-2 text-xl font-extrabold tabular-nums">{fmtKg(tonnage)}</p>
+            <p className="mt-2 text-xl font-extrabold tabular-nums">{t.home.kgAmount(tonnage)}</p>
             {equivalent && (
               <p className="mt-1 text-xs font-medium text-muted">
-                {equivalent.img ? (
+                {equivalent.unit.img ? (
                   <span aria-hidden="true" className="mb-1 flex flex-wrap items-center gap-1">
-                    {Array.from({ length: equivalent.count }, (_, i) => (
-                      <img key={i} src={equivalent.img} alt="" className="h-6 w-auto" />
+                    {Array.from({ length: equivalent.iconCount }, (_, i) => (
+                      <img key={i} src={equivalent.unit.img} alt="" className="h-6 w-auto" />
                     ))}
                   </span>
                 ) : (
                   <span aria-hidden="true" className="mr-1 text-sm leading-none">
-                    {equivalent.icons}
+                    {equivalent.unit.emoji.repeat(equivalent.iconCount)}
                   </span>
                 )}
-                {equivalent.text}
+                {equivText}
               </p>
             )}
           </div>
         )}
         <div className="rounded-2xl border border-border bg-card p-3.5">
           <p className="text-[11px] font-bold uppercase tracking-wider text-muted">
-            По неделям
+            {t.home.byWeeks}
           </p>
           <div className="mt-2.5">
             <WeekBars counts={weekCounts} />
           </div>
-          <p className="mt-1.5 text-xs font-medium text-muted">тренировок в неделю</p>
+          <p className="mt-1.5 text-xs font-medium text-muted">{t.home.perWeek}</p>
         </div>
         {groups7.length > 0 && (
           <div className="rounded-2xl border border-border bg-card p-3.5">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-muted">За 7 дней</p>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-muted">
+              {t.home.last7}
+            </p>
             <div className="mt-2 flex flex-wrap gap-1">
               {groups7.slice(0, 4).map((m) => {
                 const ic = muscleIcon(m, 12);
@@ -547,7 +555,7 @@ export default function HomeScreen() {
                     className="inline-flex items-center gap-1 rounded-lg bg-chip px-1.5 py-0.5 text-[11px] font-bold"
                   >
                     {ic && <span className="text-accent">{ic}</span>}
-                    {m}
+                    {t.catalog.muscle(m)}
                   </span>
                 );
               })}
@@ -569,12 +577,16 @@ export default function HomeScreen() {
           className="w-full rounded-2xl bg-accent-soft p-4 text-left"
         >
           <p className="text-[12px] font-bold uppercase tracking-wider text-accent">
-            {next.date === today ? 'Сегодня' : 'Следующая'}
+            {next.date === today ? t.home.today : t.home.next}
           </p>
           <div className="mt-1 flex items-center gap-2">
             <span className="min-w-0 flex-1 text-base font-bold">
               {fmtDayTitle(next.date)}
-              {next.title ? ` · ${next.title}` : next.type ? ` · ${next.type}` : ''}
+              {next.title
+                ? ` · ${next.title}`
+                : next.type
+                  ? ` · ${t.catalog.workoutType(next.type)}`
+                  : ''}
             </span>
             <svg
               width="17"
@@ -611,10 +623,10 @@ export default function HomeScreen() {
                 className="h-full w-full rounded-2xl bg-ok-soft p-4 text-left"
               >
                 <p className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-ok-text">
-                  <TrophyIcon /> Новый максимум
+                  <TrophyIcon /> {t.home.newPR}
                 </p>
                 <p className="mt-1 text-base font-bold text-ok-text">
-                  {recordName} — {record.weight} кг{' '}
+                  {recordName} — {record.weight} {t.kg}{' '}
                   <span className="text-xs font-semibold opacity-80">{fmtDate(record.date)}</span>
                 </p>
               </button>
@@ -676,24 +688,25 @@ function WeekBars({ counts }: { counts: number[] }) {
 
 /* Карточка «Прошлая» — общая для обычного режима и режима тренера */
 function LastCard({ w, comments, onOpen }: { w: Workout; comments: number; onOpen: () => void }) {
+  const { t } = useT();
   return (
     <button
       type="button"
       onClick={onOpen}
       className="h-full w-full rounded-2xl border border-border bg-card p-4 text-left"
     >
-      <p className="text-[12px] font-bold uppercase tracking-wider text-muted">Прошлая</p>
+      <p className="text-[12px] font-bold uppercase tracking-wider text-muted">{t.home.last}</p>
       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-base font-bold">{fmtDayTitle(w.date)}</span>
         {w.status === 'done' && (
           <span className="rounded-full bg-ok-soft px-2.5 py-0.5 text-xs font-bold text-ok-text">
-            выполнена
+            {t.status.done}
           </span>
         )}
       </div>
       {(w.fatigue != null || comments > 0) && (
         <p className="mt-1.5 flex items-center gap-2.5 text-xs text-muted">
-          {w.fatigue != null && <span>усталость {w.fatigue}/10</span>}
+          {w.fatigue != null && <span>{t.fatigueN10(w.fatigue)}</span>}
           {comments > 0 && (
             <span className="inline-flex items-center gap-1">
               <CommentIcon size={13} /> {comments}

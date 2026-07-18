@@ -1,6 +1,7 @@
 // Компактная ссылка на видео (Drive / Яндекс.Диск) — всегда обычная ссылка
 // в новой вкладке, никаких встраиваний.
 
+import { useT } from '../../i18n';
 import { VideoIcon } from './icons';
 
 export default function VideoLink({
@@ -12,13 +13,14 @@ export default function VideoLink({
   label?: string;
   className?: string;
 }) {
+  const { t } = useT();
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
       onClick={(e) => e.stopPropagation()}
-      aria-label={label ? undefined : 'Видео'}
+      aria-label={label ? undefined : t.video}
       className={
         'inline-flex items-center gap-1 rounded-lg px-1.5 py-1.5 -mx-1 -my-1.5 text-sm font-medium text-accent ' +
         (className ?? '')

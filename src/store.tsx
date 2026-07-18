@@ -18,6 +18,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { AppData, Exercise, StorageAdapter, Workout, WorkoutItem } from './types';
+import { setLang, tr, type Lang } from './i18n';
 import { DATA_REPO } from './config';
 import { LocalAdapter } from './storage/local';
 import {
@@ -37,6 +38,8 @@ export type Theme = 'system' | 'light' | 'dark';
 export interface Settings {
   keepAwake: boolean;
   theme: Theme;
+  /** Язык интерфейса; хранится на устройстве, как и тема */
+  lang: Lang;
 }
 
 export interface Occurrence {
@@ -59,13 +62,16 @@ interface UiPersist {
   editMode: boolean;
   keepAwake: boolean;
   theme: Theme;
+  lang: Lang;
 }
 
 function readUi(): UiPersist {
-  const fallback: UiPersist = { editMode: false, keepAwake: false, theme: 'system' };
+  const fallback: UiPersist = { editMode: false, keepAwake: false, theme: 'system', lang: 'ru' };
   try {
     const raw = localStorage.getItem(UI_KEY);
-    return raw ? { ...fallback, ...(JSON.parse(raw) as Partial<UiPersist>) } : fallback;
+    const ui = raw ? { ...fallback, ...(JSON.parse(raw) as Partial<UiPersist>) } : fallback;
+    if (ui.lang !== 'ru' && ui.lang !== 'en') ui.lang = 'ru';
+    return ui;
   } catch {
     return fallback;
   }
@@ -173,7 +179,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [tab, setTab] = useState<Tab>('home');
   const [openWorkoutId, setOpenWorkoutId] = useState<string | null>(null);
   const [openExerciseId, setOpenExerciseId] = useState<string | null>(null);
-  const [ui, setUi] = useState<UiPersist>(() => readUi());
+  const [ui, setUi] = useState<UiPersist>(() => {
+    const u = readUi();
+    setLang(u.lang); // язык применяем до первого рендера экранов
+    return u;
+  });
 
   const dirtyGuardRef = useRef<(() => boolean) | null>(null);
   const setDirtyGuard = useCallback((fn: (() => boolean) | null) => {
@@ -217,13 +227,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         gh.dispose();
         if (e instanceof AuthError) {
-          setAuthError(
-            source === 'stored'
-              ? 'Сохранённый ключ больше не действует (мог истечь срок). Попроси новый у владельца приложения.'
-              : 'Ключ не подошёл: нет доступа к данным. Проверь, что он скопирован целиком.',
-          );
+          setAuthError(source === 'stored' ? tr().key.errStored : tr().key.errPasted);
         } else {
-          setAuthError('Не получилось связаться с GitHub. Проверь интернет и попробуй ещё раз.');
+          setAuthError(tr().key.errNetwork);
         }
         return false;
       }
@@ -308,7 +314,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async (token: string): Promise<boolean> => {
       const trimmed = token.trim();
       if (!trimmed) {
-        setAuthError('Вставь ключ доступа.');
+        setAuthError(tr().key.errEmpty);
         return false;
       }
       setLoading(true);
@@ -426,6 +432,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       writeUi(next);
       return next;
     });
+    // setLang — вне апдейтера: он будит подписчиков useT(), а будить их
+    // посреди рендера нельзя (React ругается setState-in-render)
+    if (patch.lang) setLang(patch.lang);
   }, []);
 
   const saveWorkout = useCallback((w: Workout) => {
@@ -531,7 +540,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDirtyGuard,
     openExerciseId,
     showExerciseProgress,
-    settings: { keepAwake: ui.keepAwake, theme: ui.theme },
+    settings: { keepAwake: ui.keepAwake, theme: ui.theme, lang: ui.lang },
     setSettings,
     exerciseById,
     workoutById,

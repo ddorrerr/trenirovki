@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import type { Actual, Exercise, WorkoutItem } from '../../types';
 import type { Occurrence } from '../../store';
+import { useT, type Dict } from '../../i18n';
 import { fmtDateShort } from '../../lib/dates';
 import VideoLink from './VideoLink';
 import {
@@ -39,28 +40,28 @@ function stripNumbering(raw: string): string {
   return s || raw.trim();
 }
 
-/** Для чипа: «1.5» → «1.5 мин», а «2 мин» / свободный текст — как есть */
-function restLabel(rest: string): string {
+/** Для чипа: «1.5» → «1.5 мин» / "1.5 min", а «2 мин» / свободный текст — как есть */
+function restLabel(rest: string, dict: Dict): string {
   const t = rest.trim();
-  return /^[\d.,\s\-–—+]+$/.test(t) ? `${t} мин` : t;
+  return /^[\d.,\s\-–—+]+$/.test(t) ? `${t} ${dict.min}` : t;
 }
 
-/** Для чипа: «27.5» → «27.5 кг», а «12+12 кг» / свободный текст — как есть */
-function weightLabel(weight: string): string {
+/** Для чипа: «27.5» → «27.5 кг» / "27.5 kg", а «12+12 кг» / свободный текст — как есть */
+function weightLabel(weight: string, dict: Dict): string {
   const t = weight.trim();
-  return /^[\d.,\s\-–—+]+$/.test(t) ? `${t} кг` : t;
+  return /^[\d.,\s\-–—+]+$/.test(t) ? `${t} ${dict.kg}` : t;
 }
 
 /** Короткая строка «что было в прошлый раз» */
-function lastSummary(it: WorkoutItem): string {
+function lastSummary(it: WorkoutItem, dict: Dict): string {
   let core = '';
   if (it.actual) {
     const parts: string[] = [];
-    if (it.actual.weight != null) parts.push(`${it.actual.weight} кг`);
+    if (it.actual.weight != null) parts.push(`${it.actual.weight} ${dict.kg}`);
     if (it.actual.sets != null && it.actual.reps != null)
       parts.push(`${it.actual.sets}×${it.actual.reps}`);
-    else if (it.actual.sets != null) parts.push(`${it.actual.sets} подх.`);
-    else if (it.actual.reps != null) parts.push(`${it.actual.reps} повт.`);
+    else if (it.actual.sets != null) parts.push(dict.item.setsShort(it.actual.sets));
+    else if (it.actual.reps != null) parts.push(dict.item.repsShort(it.actual.reps));
     core = parts.join(' × ');
     const txt = (it.actual.text ?? '').trim();
     if (txt) core = core ? `${core}, ${txt}` : txt;
@@ -68,12 +69,12 @@ function lastSummary(it: WorkoutItem): string {
   if (!core) {
     const parts: string[] = [];
     if (it.setsReps?.raw) parts.push(it.setsReps.raw);
-    if (it.weight?.raw) parts.push(`вес ${it.weight.raw}`);
+    if (it.weight?.raw) parts.push(`${dict.item.weightPrefix} ${it.weight.raw}`);
     core = parts.join(', ');
   }
   const comment = (it.myComment ?? '').trim().replace(/\s+/g, ' ');
   if (comment) core = core ? `${core} · ${comment}` : comment;
-  return core || 'без записи';
+  return core || dict.item.noRecord;
 }
 
 export default function ItemCard({
@@ -85,6 +86,7 @@ export default function ItemCard({
   onChange,
   onRest,
 }: ItemCardProps) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   // «чпок» галочки только на живой тап, не при монтировании карточки
   const [checkPop, setCheckPop] = useState(false);
@@ -102,9 +104,9 @@ export default function ItemCard({
     factSets != null && factReps != null ? `${factSets}х${factReps}` : (item.setsReps?.raw ?? '');
   const weightText =
     item.actual?.weight != null
-      ? weightLabel(String(item.actual.weight))
+      ? weightLabel(String(item.actual.weight), t)
       : item.weight?.raw
-        ? weightLabel(item.weight.raw)
+        ? weightLabel(item.weight.raw, t)
         : '';
 
   /* Свёрнутая карточка показывает только главное — повторы, вес и отдых;
@@ -114,22 +116,22 @@ export default function ItemCard({
   if (setsRepsText)
     mainChips.push({
       icon: <RepeatIcon />,
-      name: 'подходы × повторы',
+      name: t.item.chipSetsReps,
       text: setsRepsText,
       bold: true,
     });
   if (weightText)
-    mainChips.push({ icon: <BarbellIcon />, name: 'вес', text: weightText, bold: true });
+    mainChips.push({ icon: <BarbellIcon />, name: t.item.chipWeight, text: weightText, bold: true });
   const detailChips: typeof mainChips = [];
   if (item.pvr)
     detailChips.push({
       icon: <SkullIcon />,
-      name: 'ПВР — повторы в резерве',
-      text: `ПВР ${item.pvr}`,
+      name: t.item.chipPvrName,
+      text: t.item.pvr(item.pvr),
       bold: true,
     });
   if (item.tempo)
-    detailChips.push({ icon: <TempoIcon />, name: 'темп', text: item.tempo, bold: false });
+    detailChips.push({ icon: <TempoIcon />, name: t.item.chipTempo, text: item.tempo, bold: false });
 
   // Тап по карточке раскрывает её, но не когда попали в ссылку/кнопку/поле
   const handleCardClick = (e: MouseEvent<HTMLDivElement>) => {
@@ -161,7 +163,7 @@ export default function ItemCard({
           }
         >
           <span className="sr-only">{num}. </span>
-          {name || 'Упражнение'}
+          {name || t.item.fallbackName}
         </h3>
         {videoUrl && (
           <a
@@ -169,8 +171,8 @@ export default function ItemCard({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            aria-label="Видео техники"
-            title="Видео техники"
+            aria-label={t.item.techVideo}
+            title={t.item.techVideo}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"
           >
             <VideoIcon />
@@ -185,8 +187,8 @@ export default function ItemCard({
           onAnimationEnd={() => setCheckPop(false)}
           disabled={locked}
           aria-pressed={item.done}
-          aria-label={item.done ? 'Снять отметку «выполнено»' : 'Отметить выполненным'}
-          title={locked ? 'Тренировка завершена — отметки закрыты (замок внизу)' : undefined}
+          aria-label={item.done ? t.item.unmarkDone : t.item.markDone}
+          title={locked ? t.train.lockedHint : undefined}
           className={
             'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors ' +
             (item.done
@@ -202,11 +204,11 @@ export default function ItemCard({
       <div className={item.done ? 'opacity-70' : ''}>
         {/* Разминка упражнения — первой: с неё начинают и её читают первой */}
         {item.warmupSets && (
-          <p title="разминка" className="mt-2.5 flex items-start gap-1.5 text-xs">
+          <p title={t.item.warmupSr} className="mt-2.5 flex items-start gap-1.5 text-xs">
             <span className="mt-0.5 shrink-0 text-muted">
               <FlameIcon size={14} />
             </span>
-            <span className="sr-only">разминка: </span>
+            <span className="sr-only">{t.item.warmupSr}: </span>
             <span className="min-w-0 whitespace-pre-line break-words text-muted">
               {item.warmupSets}
             </span>
@@ -233,31 +235,31 @@ export default function ItemCard({
           {item.rest && (
             <button
               onClick={() => onRest(item)}
-              aria-label="Запустить таймер отдыха"
-              title="отдых"
+              aria-label={t.item.startRest}
+              title={t.item.rest}
               className="relative inline-flex max-w-full items-center gap-1 rounded-lg bg-accent-soft px-2 py-1 text-left text-sm font-bold text-accent underline decoration-dotted underline-offset-2 after:absolute after:-inset-1.5 after:content-['']"
             >
-              <span className="sr-only">отдых: </span>
-              <span className="min-w-0 break-words">{restLabel(item.rest)}</span>
+              <span className="sr-only">{t.item.rest}: </span>
+              <span className="min-w-0 break-words">{restLabel(item.rest, t)}</span>
             </button>
           )}
           <span className="ml-auto flex items-center gap-1 text-muted">
             {myComment && (
-              <span title="есть твой комментарий" className="flex h-8 w-6 items-center justify-center">
+              <span title={t.item.hasMyComment} className="flex h-8 w-6 items-center justify-center">
                 <CommentIcon />
-                <span className="sr-only">есть твой комментарий</span>
+                <span className="sr-only">{t.item.hasMyComment}</span>
               </span>
             )}
             {(item.ptNote || item.ptRequest) && (
-              <span title="есть заметка тренера" className="flex h-8 w-6 items-center justify-center">
+              <span title={t.item.hasPtNote} className="flex h-8 w-6 items-center justify-center">
                 <PinIcon />
-                <span className="sr-only">есть заметка тренера</span>
+                <span className="sr-only">{t.item.hasPtNote}</span>
               </span>
             )}
             <button
               onClick={() => setOpen((v) => !v)}
               aria-expanded={open}
-              aria-label={open ? 'Свернуть' : 'Развернуть'}
+              aria-label={open ? t.item.collapse : t.item.expand}
               className="relative -my-1 flex h-9 w-9 items-center justify-center rounded-lg after:absolute after:-inset-1 after:content-['']"
             >
               <ChevronIcon open={open} />
@@ -333,13 +335,13 @@ export default function ItemCard({
 
             {/* Прошлый раз — над полями «Факт», чтобы сверяться при записи */}
             {last && (
-              <p title="прошлый раз" className="mt-2.5 flex items-start gap-1.5 text-xs text-muted">
+              <p title={t.item.lastTime} className="mt-2.5 flex items-start gap-1.5 text-xs text-muted">
                 <span className="mt-0.5 shrink-0" aria-hidden="true">
                   <HistoryIcon />
                 </span>
-                <span className="sr-only">прошлый раз, </span>
+                <span className="sr-only">{t.item.lastTime}, </span>
                 <span className="min-w-0 flex-1">
-                  {fmtDateShort(last.workout.date)}: {lastSummary(last.item)}
+                  {fmtDateShort(last.workout.date)}: {lastSummary(last.item, t)}
                 </span>
               </p>
             )}
@@ -381,6 +383,7 @@ function ItemEditor({
   open: boolean;
   onChange: (patch: Partial<WorkoutItem>) => void;
 }) {
+  const { t } = useT();
   const [comment, setComment] = useState(item.myComment ?? '');
   const [wStr, setWStr] = useState(numToStr(item.actual?.weight ?? item.weight?.value));
   const [sStr, setSStr] = useState(numToStr(item.actual?.sets ?? item.setsReps?.sets));
@@ -444,21 +447,23 @@ function ItemEditor({
     <div className="anim-rise mt-4 border-t border-border pt-4" onClick={(e) => e.stopPropagation()}>
       <label className="block">
         <span className="text-[12px] font-bold uppercase tracking-wider text-muted">
-          Твой комментарий
+          {t.item.yourComment}
         </span>
         <textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           onBlur={commitComment}
           rows={2}
-          placeholder="Как прошло?"
+          placeholder={t.item.howWasIt}
           className={fieldCls + ' resize-y'}
         />
       </label>
 
       <div className="mt-3">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-[12px] font-bold uppercase tracking-wider text-muted">Факт</span>
+          <span className="text-[12px] font-bold uppercase tracking-wider text-muted">
+            {t.item.fact}
+          </span>
           <span
             aria-live="polite"
             className={
@@ -466,13 +471,13 @@ function ItemEditor({
               (saved ? 'opacity-100' : 'opacity-0')
             }
           >
-            сохранено
+            {t.item.savedFlash}
           </span>
         </div>
 
         <div className="mt-1 grid grid-cols-3 gap-2">
           <label className="block">
-            <span className="text-xs text-muted">Вес, кг</span>
+            <span className="text-xs text-muted">{t.item.weightKg}</span>
             <input
               type="number"
               step={0.5}
@@ -487,7 +492,7 @@ function ItemEditor({
             />
           </label>
           <label className="block">
-            <span className="text-xs text-muted">Подходы</span>
+            <span className="text-xs text-muted">{t.item.sets}</span>
             <input
               type="number"
               step={1}
@@ -503,7 +508,7 @@ function ItemEditor({
             />
           </label>
           <label className="block">
-            <span className="text-xs text-muted">Повторы</span>
+            <span className="text-xs text-muted">{t.item.reps}</span>
             <input
               type="number"
               step={1}
@@ -521,9 +526,7 @@ function ItemEditor({
         </div>
 
         {(item.actual?.text ?? '').trim() !== '' && (
-          <p className="mt-2 text-xs text-muted">
-            Заметка к факту (старая запись): {item.actual?.text}
-          </p>
+          <p className="mt-2 text-xs text-muted">{t.item.oldFactNote(item.actual?.text ?? '')}</p>
         )}
       </div>
     </div>

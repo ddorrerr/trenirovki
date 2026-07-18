@@ -2,6 +2,7 @@
 // Опции отсортированы по числу появлений в тренировках (число показано справа).
 
 import { useEffect, useRef, useState } from 'react';
+import { useT } from '../../i18n';
 
 export interface ExerciseOption {
   id: string;
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export default function ExercisePicker({ options, selectedId, onSelect }: Props) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -46,7 +48,7 @@ export default function ExercisePicker({ options, selectedId, onSelect }: Props)
         className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-left"
       >
         <span className="min-w-0 flex-1 truncate font-medium">
-          {selected ? selected.name : 'Выбрать упражнение…'}
+          {selected ? selected.name : t.combo.pick}
         </span>
         <svg
           width="16"
@@ -75,11 +77,11 @@ export default function ExercisePicker({ options, selectedId, onSelect }: Props)
               onKeyDown={(e) => {
                 if (e.key === 'Escape') close();
               }}
-              placeholder="Поиск упражнения…"
-              aria-label="Поиск упражнения"
+              placeholder={t.lib.searchPlaceholder}
+              aria-label={t.lib.searchAria}
               className="mb-2 w-full rounded-lg border border-border bg-bg px-3 py-2.5 text-base outline-none focus:border-accent"
             />
-            <ul role="listbox" aria-label="Упражнения" className="max-h-72 overflow-y-auto">
+            <ul role="listbox" aria-label={t.prog.pickerListAria} className="max-h-72 overflow-y-auto">
               {filtered.map((o) => (
                 <li key={o.id}>
                   <button
@@ -101,7 +103,7 @@ export default function ExercisePicker({ options, selectedId, onSelect }: Props)
                 </li>
               ))}
               {filtered.length === 0 && (
-                <li className="px-3 py-6 text-center text-sm text-muted">Ничего не нашлось.</li>
+                <li className="px-3 py-6 text-center text-sm text-muted">{t.lib.nothingFound}</li>
               )}
             </ul>
           </div>

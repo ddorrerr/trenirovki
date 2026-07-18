@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../store';
+import { useT } from '../i18n';
 import { fmtDate, fmtWeekday } from '../lib/dates';
 import type { Workout, WorkoutItem } from '../types';
 import WorkoutEditor from '../components/edit/WorkoutEditor';
@@ -39,6 +40,7 @@ export default function TrainingScreen() {
     lastResultBefore,
     saveWorkout,
   } = useApp();
+  const { t } = useT();
 
   // В режиме редактирования «последняя тренировка» фиксируется по id:
   // иначе правка даты пересортировала бы список и подменила бы редактируемую.
@@ -161,7 +163,7 @@ export default function TrainingScreen() {
                       (w.warmupDone ? 'text-muted' : '')
                     }
                   >
-                    Разминка
+                    {t.train.warmup}
                   </span>
                   {w.warmup.length > 0 && (
                     <span className="text-sm text-muted">{w.warmup.length}</span>
@@ -175,8 +177,8 @@ export default function TrainingScreen() {
                     href={w.warmupVideoUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-label="Видео разминки"
-                    title="Видео разминки"
+                    aria-label={t.train.warmupVideo}
+                    title={t.train.warmupVideo}
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"
                   >
                     <VideoIcon />
@@ -191,12 +193,8 @@ export default function TrainingScreen() {
                   onAnimationEnd={() => setWarmupPop(false)}
                   disabled={workoutLocked}
                   aria-pressed={w.warmupDone ?? false}
-                  aria-label={
-                    w.warmupDone ? 'Снять отметку «разминка выполнена»' : 'Разминка выполнена'
-                  }
-                  title={
-                    workoutLocked ? 'Тренировка завершена — отметки закрыты (замок внизу)' : undefined
-                  }
+                  aria-label={w.warmupDone ? t.train.warmupUndo : t.train.warmupDone}
+                  title={workoutLocked ? t.train.lockedHint : undefined}
                   className={
                     'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors ' +
                     (w.warmupDone
@@ -232,11 +230,11 @@ export default function TrainingScreen() {
           {/* Упражнения */}
           <section className="space-y-3">
             <h2 className="px-1 text-sm font-semibold uppercase tracking-wide text-muted">
-              Упражнения
+              {t.train.exercises}
             </h2>
             {sortedItems.length === 0 && (
               <p className="rounded-2xl border border-border bg-card p-4 text-muted">
-                В этой тренировке пока нет упражнений.
+                {t.train.noItems}
               </p>
             )}
             {sortedItems.map((it, i) => (
@@ -279,7 +277,7 @@ export default function TrainingScreen() {
                   }}
                   className="w-full rounded-xl bg-accent px-4 py-2.5 text-lg font-bold text-accent-fg"
                 >
-                  Завершить тренировку
+                  {t.train.finish}
                 </button>
               ) : (
                 /* Общий замок: «Завершить» закрывает отметки всей тренировки */
@@ -294,9 +292,7 @@ export default function TrainingScreen() {
                   }
                 >
                   <LockIcon open={!workoutLocked} />
-                  {workoutLocked
-                    ? 'Тренировка завершена — отметки закрыты'
-                    : 'Отметки открыты — нажми, чтобы закрыть'}
+                  {workoutLocked ? t.train.locked : t.train.unlocked}
                 </button>
               )}
             </div>
@@ -308,7 +304,7 @@ export default function TrainingScreen() {
               onClick={() => saveWorkout({ ...w, status: 'planned' })}
               className="anim-rise w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted"
             >
-              Вернуть в запланированные
+              {t.train.backToPlanned}
             </button>
           )}
 
@@ -321,7 +317,7 @@ export default function TrainingScreen() {
                 className="flex min-h-11 w-full items-center justify-between gap-2 text-left"
               >
                 <span className="text-sm font-semibold uppercase tracking-wide text-muted">
-                  Заметки тренера
+                  {t.train.trainerNotes}
                 </span>
                 <span className="text-muted">
                   <ChevronIcon open={notesOpen} size={18} />
@@ -358,6 +354,7 @@ function TopBlock({
   next: Workout | null;
   onOpen: (id: string | null) => void;
 }) {
+  const { t } = useT();
   return (
     <div className="flex items-center gap-2">
       <NavButton
@@ -373,16 +370,16 @@ function TopBlock({
         <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
           {w.status === 'done' ? (
             <span className="rounded-full bg-ok-soft px-2.5 py-1 text-xs font-bold text-ok-text">
-              выполнена
+              {t.status.done}
             </span>
           ) : (
             <span className="rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent">
-              запланирована
+              {t.status.planned}
             </span>
           )}
           {w.type && (
             <span className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted">
-              {w.type}
+              {t.catalog.workoutType(w.type)}
             </span>
           )}
         </div>
@@ -393,7 +390,7 @@ function TopBlock({
             onClick={() => onOpen(null)}
             className="anim-rise mx-auto mt-2 flex items-center gap-1 rounded-full bg-accent-soft px-3 py-1 text-xs font-bold text-accent"
           >
-            к последней тренировке
+            {t.train.toLatest}
             <svg
               width="13"
               height="13"
@@ -428,11 +425,12 @@ function NavButton({
   disabled: boolean;
   onClick: () => void;
 }) {
+  const { t } = useT();
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      aria-label={dir === 'prev' ? 'Предыдущая тренировка' : 'Следующая тренировка'}
+      aria-label={dir === 'prev' ? t.train.prevWorkout : t.train.nextWorkout}
       className={
         'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-card ' +
         (disabled ? 'opacity-35' : 'active:bg-accent-soft')
@@ -567,6 +565,7 @@ function FatigueBlock({
   workoutLocked: boolean;
   onSave: (fatigue: number | null) => void;
 }) {
+  const { t } = useT();
   const saved = w.fatigue;
   const [draft, setDraft] = useState<number | null>(null);
 
@@ -589,7 +588,7 @@ function FatigueBlock({
     <>
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
-          Усталость после тренировки
+          {t.train.fatigueTitle}
           {marked && (
             <>
               {' — '}
@@ -625,7 +624,7 @@ function FatigueBlock({
           step={1}
           value={value}
           disabled={locked}
-          aria-label="Усталость после тренировки, от 1 до 10"
+          aria-label={t.train.fatigueAria}
           onChange={(e) => setDraft(Number(e.target.value))}
           onPointerUp={commit}
           onKeyUp={commit}
@@ -641,13 +640,13 @@ function FatigueBlock({
           }
         />
         <div className="flex justify-between text-xs text-muted">
-          <span>1 — легко</span>
-          <span>10 — умираю</span>
+          <span>{t.train.fatigueLo}</span>
+          <span>{t.train.fatigueHi}</span>
         </div>
       </div>
 
       {!marked && !locked && (
-        <p className="mt-2 text-sm text-muted">Сдвинь ползунок, чтобы отметить усталость.</p>
+        <p className="mt-2 text-sm text-muted">{t.train.fatigueHint}</p>
       )}
       {marked && !locked && saved != null && (
         <button
@@ -658,7 +657,7 @@ function FatigueBlock({
           }}
           className="mt-2 text-sm text-muted underline decoration-dotted underline-offset-2"
         >
-          убрать отметку
+          {t.train.fatigueClear}
         </button>
       )}
     </>
@@ -668,6 +667,7 @@ function FatigueBlock({
 /* --- Пустое состояние ------------------------------------------------------ */
 
 function EmptyState({ onEdit, onMenu }: { onEdit: () => void; onMenu: () => void }) {
+  const { t } = useT();
   return (
     <div className="flex flex-col items-center gap-5 rounded-2xl border border-border bg-card px-6 py-14 text-center">
       <svg
@@ -684,24 +684,21 @@ function EmptyState({ onEdit, onMenu }: { onEdit: () => void; onMenu: () => void
         <path d="M7 8v8M4.5 9.5v5M17 8v8M19.5 9.5v5M7 12h10" />
       </svg>
       <div>
-        <p className="text-lg font-semibold">Пока нет ни одной тренировки</p>
-        <p className="mx-auto mt-1.5 max-w-sm text-muted">
-          Включи режим редактирования — кнопка-карандаш сверху — и добавь свою первую
-          тренировку. Настройки найдёшь в «Меню».
-        </p>
+        <p className="text-lg font-semibold">{t.train.emptyTitle}</p>
+        <p className="mx-auto mt-1.5 max-w-sm text-muted">{t.train.emptyBody}</p>
       </div>
       <div className="flex flex-wrap justify-center gap-2">
         <button
           onClick={onEdit}
           className="rounded-xl bg-accent px-4 py-2.5 font-semibold text-accent-fg"
         >
-          Включить редактирование
+          {t.train.emptyEnable}
         </button>
         <button
           onClick={onMenu}
           className="rounded-xl border border-border bg-card px-4 py-2.5 font-medium"
         >
-          Открыть меню
+          {t.train.emptyMenu}
         </button>
       </div>
     </div>

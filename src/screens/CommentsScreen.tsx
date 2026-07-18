@@ -4,6 +4,7 @@
 
 import { useMemo } from 'react';
 import { useApp } from '../store';
+import { useT } from '../i18n';
 import { fmtDate, fmtWeekday } from '../lib/dates';
 import { SkullIcon } from '../components/train/icons';
 
@@ -16,6 +17,7 @@ interface Entry {
 
 export default function CommentsScreen() {
   const { workouts, navigate, exerciseById } = useApp();
+  const { t } = useT();
 
   const groups = useMemo(() => {
     const out: { workoutId: string; date: string; entries: Entry[] }[] = [];
@@ -42,7 +44,7 @@ export default function CommentsScreen() {
   if (groups.length === 0) {
     return (
       <div className="rounded-2xl border border-border bg-card p-6 text-center text-muted">
-        Пока нет ни одного комментария.
+        {t.comments.empty}
       </div>
     );
   }

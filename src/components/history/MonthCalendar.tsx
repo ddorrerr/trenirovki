@@ -5,9 +5,8 @@
 import { useMemo, useState } from 'react';
 import { useApp } from '../../store';
 import type { Workout } from '../../types';
+import { locale, useT } from '../../i18n';
 import { todayISO } from '../../lib/dates';
-
-const WEEKDAYS = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
 
 /** «2026-07» текущего дня */
 function ymOf(iso: string): string {
@@ -22,7 +21,7 @@ function ymAdd(ym: string, delta: number): string {
 
 function ymLabel(ym: string): string {
   const [y, m] = ym.split('-').map(Number);
-  const name = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('ru-RU', {
+  const name = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString(locale(), {
     timeZone: 'UTC',
     month: 'long',
   });
@@ -41,6 +40,7 @@ function daysInMonth(ym: string): number {
 
 export default function MonthCalendar() {
   const { workouts, navigate } = useApp();
+  const { t } = useT();
   const today = todayISO();
   const [ym, setYm] = useState(() => ymOf(today));
 
@@ -72,7 +72,7 @@ export default function MonthCalendar() {
           <button
             type="button"
             onClick={() => setYm((v) => ymAdd(v, -1))}
-            aria-label="Предыдущий месяц"
+            aria-label={t.cal.prevMonth}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-bg text-muted"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -82,7 +82,7 @@ export default function MonthCalendar() {
           <button
             type="button"
             onClick={() => setYm((v) => ymAdd(v, 1))}
-            aria-label="Следующий месяц"
+            aria-label={t.cal.nextMonth}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-bg text-muted"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -93,7 +93,7 @@ export default function MonthCalendar() {
       </div>
 
       <div className="mt-2 grid grid-cols-7 text-center text-[11px] font-semibold text-muted">
-        {WEEKDAYS.map((d) => (
+        {t.weekdaysShort.map((d) => (
           <span key={d} className="py-1">
             {d}
           </span>
@@ -123,7 +123,7 @@ export default function MonthCalendar() {
               key={i}
               type="button"
               onClick={() => navigate('train', w.id)}
-              aria-label={`Открыть тренировку ${iso}`}
+              aria-label={t.cal.openWorkout(iso)}
               className="flex h-10 items-center justify-center"
             >
               <span

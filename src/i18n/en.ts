@@ -1,0 +1,396 @@
+// Английский словарь. Структура обязана совпадать с ru.ts (тип Dict) —
+// пропущенный ключ ловится на typecheck. Тон — тот же дружеский, что и
+// в русском («ты»-форма → простые прямые фразы).
+
+import type { EquivForms } from './lang';
+import type { ru } from './ru';
+
+/** "5 exercises", "1 time", … */
+function pl(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+/** "1.8" — exactly one decimal */
+const fmt1 = (x: number) =>
+  x.toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+/** Русские значения из ДАННЫХ (группы мышц, инвентарь, тип тренировки) —
+    показываем по-английски; незнакомое значение оставляем как есть. */
+const MUSCLE_LABELS: Record<string, string> = {
+  Ноги: 'Legs',
+  Ягодицы: 'Glutes',
+  Спина: 'Back',
+  Грудь: 'Chest',
+  Плечи: 'Shoulders',
+  Руки: 'Arms',
+  Пресс: 'Abs',
+  Шея: 'Neck',
+};
+
+const EQUIP_LABELS: Record<string, string> = {
+  Штанга: 'Barbell',
+  Гантели: 'Dumbbells',
+  Гиря: 'Kettlebell',
+  Блин: 'Plate',
+  Тренажёр: 'Machine',
+  Трос: 'Cable',
+  Резинка: 'Band',
+  'Свой вес': 'Bodyweight',
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  'с тренером': 'with trainer',
+  сама: 'solo',
+};
+
+export const en: typeof ru = {
+  appTitle: 'Workouts',
+  loading: 'Loading…',
+  back: 'Back',
+  open: 'Open',
+  close: 'Close',
+  cancel: 'Cancel',
+  create: 'Create',
+  save: 'Save',
+  kg: 'kg',
+  min: 'min',
+
+  weekdaysShort: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+
+  nav: {
+    home: 'Home',
+    train: 'Workout',
+    history: 'History',
+    library: 'Library',
+    progress: 'Progress',
+    menu: 'Settings',
+    comments: 'Comments',
+  },
+
+  status: { done: 'done', planned: 'planned' },
+
+  counted: {
+    workouts: (n) => pl(n, 'workout', 'workouts'),
+    exercises: (n) => pl(n, 'exercise', 'exercises'),
+    entries: (n) => pl(n, 'note', 'notes'),
+    times: (n) => pl(n, 'time', 'times'),
+  },
+
+  fatigueN: (n) => `fatigue ${n}`,
+  fatigueN10: (n) => `fatigue ${n}/10`,
+
+  catalog: {
+    muscle: (v) => MUSCLE_LABELS[v] ?? v,
+    equip: (v) => EQUIP_LABELS[v] ?? v,
+    workoutType: (v) => TYPE_LABELS[v] ?? v,
+  },
+
+  sync: {
+    dot: {
+      saved: 'saved',
+      saving: 'saving…',
+      pending: 'saving…',
+      offline: 'offline',
+      error: 'not saved',
+      auth: 'no access',
+    },
+    aria: (s) => `Sync: ${s}`,
+    keyExpired: 'The key no longer works — tap to enter a new one',
+    tapRetry: (s) => `${s} — tap to retry saving`,
+  },
+
+  editMode: {
+    turnOn: 'Turn on editing mode',
+    turnOff: 'Turn off editing mode',
+    titleOn: 'Edit',
+    titleOff: 'Turn off editing',
+  },
+
+  key: {
+    subtitle: 'access key required',
+    body:
+      'The key unlocks the workout data in its private storage and stays ' +
+      'remembered on this device. You can get it from the app owner.',
+    label: 'Access key',
+    checking: 'Checking…',
+    submit: 'Open',
+    errEmpty: 'Paste the access key.',
+    errStored:
+      'The saved key no longer works (it may have expired). Ask the app owner for a new one.',
+    errPasted: "The key didn't work: no access to the data. Check that you copied all of it.",
+    errNetwork: "Couldn't reach GitHub. Check your connection and try again.",
+  },
+
+  menu: {
+    sectionMode: 'Mode',
+    sectionSettings: 'Settings',
+    sectionData: 'Data',
+    sectionSync: 'Sync',
+    sectionAbout: 'About',
+    editing: 'Editing',
+    editingSub: 'Add and edit workouts — for you and your trainer',
+    keepAwake: 'Keep screen awake',
+    keepAwakeSub: "The screen won't sleep while the app is open",
+    unsupported: 'Not supported in this browser',
+    theme: 'Theme',
+    themeSystem: 'System',
+    themeLight: 'Light',
+    themeDark: 'Dark',
+    language: 'Language',
+    backup: 'Download backup',
+    backupSub: 'A JSON file with all your data',
+    syncStatus: {
+      saved: 'All saved',
+      saving: 'Saving…',
+      pending: 'Unsaved changes pending',
+      offline: "Offline — I'll save once you're back online",
+      error: 'Save failed — try syncing again',
+      auth: 'No access — check the key',
+    },
+    conflicts: (n) =>
+      `Parallel edits overwritten: ${n}. Someone changed the same records ` +
+      'from another device — the newer version won.',
+    syncNow: 'Sync now',
+    syncing: 'Syncing…',
+    syncNowSub: 'Push pending edits and pull the latest data',
+    changeKey: 'Change access key',
+    forgetKeyConfirm: 'Forget the access key on this device?',
+    aboutWorkouts: (n, since) => `${pl(n, 'workout', 'workouts')} since ${since}`,
+    aboutNoWorkouts: 'No workouts yet',
+    version: 'Version',
+  },
+
+  home: {
+    heroStart: 'Shall we start?',
+    heroToday: 'Today',
+    heroTodaySub: 'you trained',
+    dayWord: (n) => (n === 1 ? 'day' : 'days'),
+    sinceLast: 'since your last workout',
+    weekStreak: (n) => `${pl(n, 'week', 'weeks')} in a row`,
+    total: (n) => `${n} total`,
+    thisWeek: 'This week',
+    ofN: (n) => `of ${n}`,
+    usual: 'usual',
+    lifted: 'Lifted last workout',
+    kgAmount: (kg) => `${kg.toLocaleString('en-GB')} kg`,
+    equivInt: (f: EquivForms, n) => `≈ ${n} ${n === 1 ? f.en.one : f.en.many}`,
+    equivFrac: (f: EquivForms, x) => `≈ ${fmt1(x)} ${f.en.many}`,
+    byWeeks: 'By week',
+    perWeek: 'workouts per week',
+    last7: 'Last 7 days',
+    today: 'Today',
+    next: 'Next',
+    last: 'Last one',
+    newPR: 'New record',
+    openWorkoutAria: (date) => `Open workout ${date}`,
+    feedback: (date) => `Liza's feedback · ${date}`,
+    allComments: 'All comments →',
+    oftenMonth: 'Often in comments · month',
+    empty: 'No workouts yet — turn on editing mode (the pencil up top) and add your first one.',
+  },
+
+  train: {
+    warmup: 'Warm-up',
+    warmupVideo: 'Warm-up video',
+    warmupDone: 'Warm-up done',
+    warmupUndo: 'Unmark "warm-up done"',
+    lockedHint: 'Workout finished — check-offs are locked (lock at the bottom)',
+    exercises: 'Exercises',
+    noItems: 'No exercises in this workout yet.',
+    finish: 'Finish workout',
+    locked: 'Workout finished — check-offs locked',
+    unlocked: 'Check-offs unlocked — tap to lock',
+    backToPlanned: 'Move back to planned',
+    trainerNotes: "Trainer's notes",
+    toLatest: 'to the latest workout',
+    prevWorkout: 'Previous workout',
+    nextWorkout: 'Next workout',
+    fatigueTitle: 'Fatigue after workout',
+    fatigueAria: 'Fatigue after workout, from 1 to 10',
+    fatigueLo: '1 — easy',
+    fatigueHi: '10 — dying',
+    fatigueHint: 'Slide to log how tired you are.',
+    fatigueClear: 'remove mark',
+    emptyTitle: 'No workouts yet',
+    emptyBody:
+      'Turn on editing mode — the pencil button up top — and add your first workout. ' +
+      'Settings live behind the gear.',
+    emptyEnable: 'Turn on editing',
+    emptyMenu: 'Open menu',
+  },
+
+  item: {
+    fallbackName: 'Exercise',
+    techVideo: 'Technique video',
+    markDone: 'Mark as done',
+    unmarkDone: 'Unmark "done"',
+    warmupSr: 'warm-up',
+    chipSetsReps: 'sets × reps',
+    chipWeight: 'weight',
+    chipPvrName: 'RIR — reps in reserve',
+    pvr: (v) => `RIR ${v}`,
+    chipTempo: 'tempo',
+    rest: 'rest',
+    startRest: 'Start rest timer',
+    hasMyComment: 'has your comment',
+    hasPtNote: "has a trainer's note",
+    collapse: 'Collapse',
+    expand: 'Expand',
+    lastTime: 'last time',
+    setsShort: (n) => `${n} sets`,
+    repsShort: (n) => `${n} reps`,
+    weightPrefix: 'weight',
+    noRecord: 'no record',
+    yourComment: 'Your comment',
+    howWasIt: 'How did it go?',
+    fact: 'Actual',
+    savedFlash: 'saved',
+    weightKg: 'Weight, kg',
+    sets: 'Sets',
+    reps: 'Reps',
+    oldFactNote: (text) => `Note (old record): ${text}`,
+  },
+
+  timer: {
+    title: 'Rest',
+    openAria: 'Open rest timer',
+    closeAria: 'Close timer',
+    plus15: '+15 sec',
+    pause: 'Pause',
+    start: 'Start',
+    reset: 'Reset',
+  },
+
+  hist: {
+    emptyTitle: 'No workouts yet.',
+    emptyEdit: 'Create the first one with the button above.',
+    emptyNoEdit: 'Turn on editing mode (the pencil up top) to add the first one.',
+    doneTitle: 'Done',
+    hasComments: 'Has your comments',
+    deleteWorkout: 'Delete workout',
+    deleteConfirm: (date) => `Delete the workout from ${date}? This cannot be undone.`,
+  },
+
+  cal: {
+    prevMonth: 'Previous month',
+    nextMonth: 'Next month',
+    openWorkout: (date) => `Open workout ${date}`,
+    heatTitle: 'Calendar',
+    earlier: 'Earlier',
+    later: 'Later',
+    workoutAria: (date) => `Workout ${date}`,
+    legend: 'full history week by week — the strip scrolls, tap a cell for a preview',
+  },
+
+  lib: {
+    newExercise: 'New exercise',
+    searchPlaceholder: 'Search exercises…',
+    searchAria: 'Search exercises',
+    muscleGroup: 'Muscle group',
+    equipment: 'Equipment',
+    empty: 'The library is empty so far.',
+    emptyEdit: ' Add the first exercise with the button above.',
+    nothingFound: 'Nothing found.',
+    hideArchive: 'hide archive',
+    showArchive: (n) => `show archive (${n})`,
+    archiveChip: 'archived',
+    usedTimes: (n, date) => `${pl(n, 'time', 'times')} · last: ${date}`,
+    neverUsed: 'not used yet',
+    hasVideo: 'Has video',
+    weightChart: 'Weight chart →',
+    recent: 'Recent sessions',
+    notInWorkouts: 'Not in any workouts yet.',
+    name: 'Name',
+    videoLink: 'Video (link)',
+    muscles: 'Muscle groups',
+    tags: 'Tags (comma-separated)',
+    tagsPlaceholder: 'anything else, e.g. rehab',
+    unarchive: 'Restore from archive',
+    archive: 'Archive',
+    delete: 'Delete',
+    usedInWorkouts: 'Used in workouts',
+    deleteExercise: 'Delete exercise',
+    deleteConfirm: (name) => `Delete exercise "${name}"?`,
+  },
+
+  combo: {
+    pick: 'Pick an exercise…',
+    createNamed: (name) => `Create "${name}"`,
+    createNew: 'Create a new exercise',
+  },
+
+  form: {
+    newWorkout: 'New workout',
+    date: 'Date',
+    fillWith: 'Start from',
+    empty: 'Blank',
+    copyLast: 'Copy of the last one',
+    copyPicked: 'Copy of a chosen one',
+    willCopy: (date, count) => `We'll copy the workout from ${date} (${count}).`,
+    nothingToCopy: 'Nothing to copy yet.',
+  },
+
+  editor: {
+    unsavedLeave: 'You have unsaved changes. Leave without saving?',
+    discardConfirm: 'Discard unsaved changes?',
+    noChanges: 'No changes',
+    workoutSection: 'Workout',
+    type: 'Type',
+    statusLabel: 'Status',
+    notesPlaceholder: 'general notes for this workout',
+    warmupVideoLink: 'Warm-up video (link)',
+    stepN: (n) => `Step ${n}`,
+    warmupPlaceholder: '- hip rotations…',
+    removeStep: 'Remove step',
+    noWarmup: 'No warm-up yet.',
+    addWarmupStep: 'Warm-up step',
+    noItemsYet: 'No exercises yet — add the first one.',
+    addExercise: 'Exercise',
+    insertHere: 'Insert an exercise here',
+    up: 'Up',
+    down: 'Down',
+    removeItem: 'Remove exercise',
+    untitled: 'untitled',
+    removeItemConfirm: (name) => `Remove "${name}" from this workout?`,
+    warmupFieldPlaceholder: 'e.g. 1x10 no weight',
+    setsPlaceholder: '3',
+    repsPlaceholder: '12 or 12-10',
+    weightPlaceholder: '27.5 or 12+12',
+    pvrLabel: 'RIR',
+    pvrPlaceholder: 'e.g. 2-3',
+    restMin: 'Rest, min',
+    restPlaceholder: '1.5',
+    tempo: 'Tempo',
+    tempoPlaceholder: 'e.g. 2-3 sec down',
+    technique: 'Technique (one point per line)',
+    techniquePlaceholder: '- feet stay engaged',
+    ptNote: "Trainer's note",
+    ptNotePlaceholder: 'other notes, e.g. film from the side',
+  },
+
+  prog: {
+    noData: 'No data yet',
+    noDataSub: 'Finish your first workout — charts and stats will show up here.',
+    tileWorkouts: 'Workouts',
+    tileWeeks: 'Weeks since start',
+    tileAvg: 'Per week on average',
+    tileDaysSince: 'Days since last',
+    weightSection: 'Weight by exercise',
+    noHistory: 'No exercises with history yet — all ahead of you.',
+    maxWord: 'Best',
+    lastWord: 'Last time',
+    fewData: 'Not enough data for this exercise yet.',
+    pickerListAria: 'Exercises',
+    chartAria: 'Weight over time',
+    fatigue: 'Fatigue',
+    noFatigue: 'No fatigue marks after workouts yet.',
+    fatigueWord: 'fatigue',
+    fatigueChartAria: 'Fatigue over time, scale from 1 to 10',
+  },
+
+  comments: {
+    empty: 'No comments yet.',
+  },
+
+  video: 'Video',
+};

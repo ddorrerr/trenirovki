@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useApp } from '../../store';
+import { useT } from '../../i18n';
 import { fmtDate, fmtDateShort } from '../../lib/dates';
 import { clamp, dateTicks, parseTime, type DateTick } from './chart';
 import { useMeasuredWidth } from './useMeasuredWidth';
@@ -25,6 +26,7 @@ const HALF_DAY = 43_200_000;
 
 export default function FatigueSection() {
   const { workouts } = useApp();
+  const { t } = useT();
 
   const entries = useMemo<FatiguePoint[]>(
     () =>
@@ -38,10 +40,12 @@ export default function FatigueSection() {
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4">
-      <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted">Усталость</h2>
+      <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted">
+        {t.prog.fatigue}
+      </h2>
 
       {entries.length === 0 ? (
-        <p className="py-8 text-center text-muted">Пока нет отметок усталости после тренировок.</p>
+        <p className="py-8 text-center text-muted">{t.prog.noFatigue}</p>
       ) : entries.length < 3 ? (
         <ul className="mt-3 space-y-1.5 text-muted">
           {entries.map((e) => (
@@ -58,6 +62,7 @@ export default function FatigueSection() {
 }
 
 function FatigueChart({ entries }: { entries: FatiguePoint[] }) {
+  const { t, lang } = useT();
   const [wrapRef, width] = useMeasuredWidth<HTMLDivElement>();
   const [active, setActive] = useState<number | null>(null);
 
@@ -88,7 +93,8 @@ function FatigueChart({ entries }: { entries: FatiguePoint[] }) {
     t1 += pad;
     const n = Math.max(3, Math.min(5, Math.floor(innerW / 85)));
     return { t0, t1, xTicks: dateTicks(t0, t1, n) };
-  }, [entries, innerW]);
+    // lang в зависимостях: подписи дат должны пересобраться при смене языка
+  }, [entries, innerW, lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const x = (t: number) => ML + ((t - scale.t0) / (scale.t1 - scale.t0)) * innerW;
   const y = (v: number) => MT + (1 - (v - 1) / 9) * INNER_H;
@@ -122,7 +128,7 @@ function FatigueChart({ entries }: { entries: FatiguePoint[] }) {
           preserveAspectRatio="none"
           className="block"
           role="img"
-          aria-label="Усталость по датам, шкала от 1 до 10"
+          aria-label={t.prog.fatigueChartAria}
         >
           {[1, 5, 10].map((v) => (
             <g key={v}>
@@ -219,7 +225,7 @@ function FatigueChart({ entries }: { entries: FatiguePoint[] }) {
         >
           <div className="text-sm font-semibold">{fmtDateShort(a.date)}</div>
           <div className="mt-0.5 text-base font-semibold">
-            {a.value}/10 <span className="font-normal text-muted">усталость</span>
+            {a.value}/10 <span className="font-normal text-muted">{t.prog.fatigueWord}</span>
           </div>
         </div>
       )}

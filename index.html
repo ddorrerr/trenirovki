@@ -19,10 +19,14 @@
       html[data-theme="dark"] { background: #0d1110; }
     </style>
     <script>
-      // Тема из настроек — до загрузки приложения, чтобы не мигало
+      // Тема и язык из настроек — до загрузки приложения, чтобы не мигало
       try {
-        var t = JSON.parse(localStorage.getItem('trenirovki:ui:v1') || '{}').theme;
-        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+        var ui = JSON.parse(localStorage.getItem('trenirovki:ui:v1') || '{}');
+        if (ui.theme === 'light' || ui.theme === 'dark') document.documentElement.dataset.theme = ui.theme;
+        if (ui.lang === 'en') {
+          document.documentElement.lang = 'en';
+          document.title = 'Workouts';
+        }
       } catch (e) {}
     </script>
   </head>

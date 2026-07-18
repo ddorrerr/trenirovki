@@ -5,16 +5,18 @@
 import { useEffect, useMemo } from 'react';
 import type { Workout } from '../types';
 import { useApp } from '../store';
+import { useT } from '../i18n';
 import { fmtDate, fmtDateShort, fmtMonthYear, fmtWeekday, monthKey } from '../lib/dates';
 import NewWorkoutForm from '../components/edit/NewWorkoutForm';
 import MonthCalendar from '../components/history/MonthCalendar';
-import { Chip, IconCheck, IconComment, IconX, plural } from '../components/edit/ui';
+import { Chip, IconCheck, IconComment, IconX } from '../components/edit/ui';
 
 /* Экран запоминает прокрутку, чтобы стрелка «назад» возвращала туда же */
 const paneMemory = { scroll: 0 };
 
 export default function HistoryScreen() {
   const { workouts, editMode } = useApp();
+  const { t } = useT();
 
   // вернулись на экран: восстанавливаем прокрутку (после первого рендера)
   useEffect(() => {
@@ -48,11 +50,9 @@ export default function HistoryScreen() {
 
       {workouts.length === 0 && (
         <div className="rounded-2xl border border-border bg-card p-6 text-center text-muted">
-          Пока нет ни одной тренировки.
+          {t.hist.emptyTitle}
           <br />
-          {editMode
-            ? 'Создай первую кнопкой выше.'
-            : 'Включи режим редактирования (карандаш сверху), чтобы добавить первую.'}
+          {editMode ? t.hist.emptyEdit : t.hist.emptyNoEdit}
         </div>
       )}
 
@@ -74,6 +74,7 @@ export default function HistoryScreen() {
 
 function WorkoutRow({ w }: { w: Workout }) {
   const { editMode, navigate, deleteWorkout } = useApp();
+  const { t } = useT();
   const hasComment = w.items.some((it) => it.myComment && it.myComment.trim() !== '');
 
   return (
@@ -87,31 +88,30 @@ function WorkoutRow({ w }: { w: Workout }) {
           <span className="text-lg font-bold leading-tight">{fmtDateShort(w.date)}</span>
           <span className="text-muted">{fmtWeekday(w.date)}</span>
           {w.status === 'done' && (
-            <span className="text-ok" title="Выполнена">
+            <span className="text-ok" title={t.hist.doneTitle}>
               <IconCheck size={16} />
             </span>
           )}
           {hasComment && (
-            <span className="text-muted" title="Есть твои комментарии">
+            <span className="text-muted" title={t.hist.hasComments}>
               <IconComment size={15} />
             </span>
           )}
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {w.type && <Chip>{w.type}</Chip>}
-          <Chip muted>{plural(w.items.length, 'упражнение', 'упражнения', 'упражнений')}</Chip>
-          {w.fatigue != null && <Chip muted>усталость {w.fatigue}</Chip>}
+          {w.type && <Chip>{t.catalog.workoutType(w.type)}</Chip>}
+          <Chip muted>{t.counted.exercises(w.items.length)}</Chip>
+          {w.fatigue != null && <Chip muted>{t.fatigueN(w.fatigue)}</Chip>}
         </div>
       </button>
       {editMode && (
         <button
           type="button"
           onClick={() => {
-            if (window.confirm(`Удалить тренировку от ${fmtDate(w.date)}? Это действие нельзя отменить.`))
-              deleteWorkout(w.id);
+            if (window.confirm(t.hist.deleteConfirm(fmtDate(w.date)))) deleteWorkout(w.id);
           }}
-          aria-label="Удалить тренировку"
-          title="Удалить тренировку"
+          aria-label={t.hist.deleteWorkout}
+          title={t.hist.deleteWorkout}
           className="flex w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-card text-danger"
         >
           <IconX />

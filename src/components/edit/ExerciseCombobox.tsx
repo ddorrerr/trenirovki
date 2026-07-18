@@ -4,6 +4,7 @@
 
 import { useMemo, useState } from 'react';
 import type { Exercise } from '../../types';
+import { useT } from '../../i18n';
 import { IconCheck, IconPlus } from './ui';
 
 interface Props {
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export default function ExerciseCombobox({ exercises, value, onSelect, onCreate }: Props) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const current = exercises.find((e) => e.id === value) ?? null;
@@ -48,7 +50,7 @@ export default function ExerciseCombobox({ exercises, value, onSelect, onCreate 
         {current ? (
           <span className="block break-words text-lg font-semibold leading-snug">{current.name}</span>
         ) : (
-          <span className="text-muted">Выбрать упражнение…</span>
+          <span className="text-muted">{t.combo.pick}</span>
         )}
       </button>
 
@@ -59,8 +61,8 @@ export default function ExerciseCombobox({ exercises, value, onSelect, onCreate 
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Поиск упражнения…"
-              aria-label="Поиск упражнения"
+              placeholder={t.lib.searchPlaceholder}
+              aria-label={t.lib.searchAria}
               className="w-full rounded-lg border border-border bg-card px-3 py-2"
             />
           </div>
@@ -99,20 +101,20 @@ export default function ExerciseCombobox({ exercises, value, onSelect, onCreate 
               );
             })}
             {options.length === 0 && (
-              <li className="px-3 py-3 text-sm text-muted">Ничего не нашлось.</li>
+              <li className="px-3 py-3 text-sm text-muted">{t.lib.nothingFound}</li>
             )}
           </ul>
           <button
             type="button"
             onClick={() => {
-              onCreate(query.trim() || 'Новое упражнение');
+              onCreate(query.trim() || t.lib.newExercise);
               close();
             }}
             className="flex w-full items-center gap-2 border-t border-border px-3 py-2.5 text-left font-medium text-accent"
           >
             <IconPlus size={16} />
             <span className="min-w-0 break-words">
-              {query.trim() ? `Создать «${query.trim()}»` : 'Создать новое упражнение'}
+              {query.trim() ? t.combo.createNamed(query.trim()) : t.combo.createNew}
             </span>
           </button>
         </div>

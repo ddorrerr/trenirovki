@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useApp } from '../../store';
+import { locale, useT } from '../../i18n';
 import { daysBetween, todayISO } from '../../lib/dates';
 import { fmtNum1 } from './chart';
 
@@ -41,6 +42,7 @@ function Tile({ label, value, fmt }: { label: string; value: number | null; fmt:
 
 export default function StatTiles() {
   const { workouts } = useApp();
+  const { t } = useT();
   const today = todayISO();
   // Вся сводка — по уже прошедшим датам: запланированные на будущее
   // тренировки не должны увеличивать счётчик и среднее.
@@ -52,15 +54,15 @@ export default function StatTiles() {
   const weeks = first ? Math.max(0, Math.round(daysBetween(first.date, today) / 7)) : 0;
   const avg = total / Math.max(1, weeks);
 
-  const round = (v: number) => Math.round(v).toLocaleString('ru-RU');
+  const round = (v: number) => Math.round(v).toLocaleString(locale());
 
   return (
     <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-      <Tile label="Тренировок" value={total} fmt={round} />
-      <Tile label="Недель с начала" value={weeks} fmt={round} />
-      <Tile label="В неделю в среднем" value={avg} fmt={fmtNum1} />
+      <Tile label={t.prog.tileWorkouts} value={total} fmt={round} />
+      <Tile label={t.prog.tileWeeks} value={weeks} fmt={round} />
+      <Tile label={t.prog.tileAvg} value={avg} fmt={fmtNum1} />
       <Tile
-        label="Дней с последней"
+        label={t.prog.tileDaysSince}
         value={last ? Math.max(0, daysBetween(last.date, today)) : null}
         fmt={round}
       />

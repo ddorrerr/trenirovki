@@ -4,9 +4,10 @@
 import { useMemo, useState } from 'react';
 import type { Workout } from '../../types';
 import { useApp } from '../../store';
+import { useT } from '../../i18n';
 import { fmtDate, fmtDateShort, fmtWeekday, todayISO } from '../../lib/dates';
 import { itemId, workoutIdForDate } from '../../lib/ids';
-import { IconPlus, inputCls, plural } from './ui';
+import { IconPlus, inputCls } from './ui';
 
 type FillMode = 'empty' | 'last' | 'pick';
 
@@ -31,14 +32,9 @@ function typeForDate(iso: string): string | null {
   return null;
 }
 
-const FILL_OPTIONS: { id: FillMode; label: string }[] = [
-  { id: 'empty', label: 'Пустая' },
-  { id: 'last', label: 'Копия последней' },
-  { id: 'pick', label: 'Копия выбранной' },
-];
-
 export default function NewWorkoutForm() {
   const { workouts, saveWorkout, navigate } = useApp();
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(todayISO());
   const [mode, setMode] = useState<FillMode>('empty');
@@ -57,10 +53,16 @@ export default function NewWorkoutForm() {
         }}
         className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 font-semibold text-accent-fg"
       >
-        <IconPlus size={16} /> Новая тренировка
+        <IconPlus size={16} /> {t.form.newWorkout}
       </button>
     );
   }
+
+  const fillOptions: { id: FillMode; label: string }[] = [
+    { id: 'empty', label: t.form.empty },
+    { id: 'last', label: t.form.copyLast },
+    { id: 'pick', label: t.form.copyPicked },
+  ];
 
   const source: Workout | null =
     mode === 'empty'
@@ -115,12 +117,12 @@ export default function NewWorkoutForm() {
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
-        Новая тренировка
+        {t.form.newWorkout}
       </h2>
 
       <div className="mt-3">
         <label className="block">
-          <span className="mb-1 block text-sm text-muted">Дата</span>
+          <span className="mb-1 block text-sm text-muted">{t.form.date}</span>
           <input
             type="date"
             value={date}
@@ -131,9 +133,9 @@ export default function NewWorkoutForm() {
       </div>
 
       <div className="mt-3">
-        <span className="mb-1 block text-sm text-muted">Чем наполнить</span>
+        <span className="mb-1 block text-sm text-muted">{t.form.fillWith}</span>
         <div className="space-y-1.5">
-          {FILL_OPTIONS.map((o) => (
+          {fillOptions.map((o) => (
             <button
               key={o.id}
               type="button"
@@ -160,11 +162,10 @@ export default function NewWorkoutForm() {
       {mode === 'last' &&
         (lastWorkout ? (
           <p className="mt-2 text-sm text-muted">
-            Скопируем тренировку от {fmtDate(lastWorkout.date)} (
-            {plural(lastWorkout.items.length, 'упражнение', 'упражнения', 'упражнений')}).
+            {t.form.willCopy(fmtDate(lastWorkout.date), t.counted.exercises(lastWorkout.items.length))}
           </p>
         ) : (
-          <p className="mt-2 text-sm text-muted">Копировать пока нечего.</p>
+          <p className="mt-2 text-sm text-muted">{t.form.nothingToCopy}</p>
         ))}
 
       {mode === 'pick' && (
@@ -181,15 +182,14 @@ export default function NewWorkoutForm() {
               >
                 <span className="font-medium">{fmtDateShort(w.date)}</span>{' '}
                 <span className="text-sm text-muted">
-                  {fmtWeekday(w.date)} ·{' '}
-                  {plural(w.items.length, 'упражнение', 'упражнения', 'упражнений')}
-                  {w.type ? ` · ${w.type}` : ''}
+                  {fmtWeekday(w.date)} · {t.counted.exercises(w.items.length)}
+                  {w.type ? ` · ${t.catalog.workoutType(w.type)}` : ''}
                 </span>
               </button>
             </li>
           ))}
           {last10.length === 0 && (
-            <li className="px-1 py-2 text-sm text-muted">Копировать пока нечего.</li>
+            <li className="px-1 py-2 text-sm text-muted">{t.form.nothingToCopy}</li>
           )}
         </ul>
       )}
@@ -204,14 +204,14 @@ export default function NewWorkoutForm() {
             (canCreate ? '' : 'opacity-50')
           }
         >
-          Создать
+          {t.create}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
           className="rounded-xl border border-border bg-card px-4 py-2.5"
         >
-          Отмена
+          {t.cancel}
         </button>
       </div>
     </div>

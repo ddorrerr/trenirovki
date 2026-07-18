@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApp, type Occurrence } from '../../store';
 import type { WorkoutItem } from '../../types';
+import { useT } from '../../i18n';
 import { fmtDateShort, todayISO } from '../../lib/dates';
 import { fmtNum, parseTime } from './chart';
 import ExercisePicker, { type ExerciseOption } from './ExercisePicker';
@@ -37,6 +38,7 @@ function buildPoints(history: Occurrence[]): WeightPoint[] {
 
 export default function WeightSection() {
   const { exercises, workouts, exerciseHistory } = useApp();
+  const { t } = useT();
 
   // сколько раз каждое упражнение встречается и сколько из них с весом
   const counts = useMemo(() => {
@@ -111,13 +113,11 @@ export default function WeightSection() {
   return (
     <section className="rounded-2xl border border-border bg-card p-4">
       <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted">
-        Вес по упражнению
+        {t.prog.weightSection}
       </h2>
 
       {options.length === 0 ? (
-        <p className="py-8 text-center text-muted">
-          Пока нет упражнений с историей — всё впереди.
-        </p>
+        <p className="py-8 text-center text-muted">{t.prog.noHistory}</p>
       ) : (
         <>
           <div className="mt-3">
@@ -132,14 +132,18 @@ export default function WeightSection() {
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-muted">
                 {maxPoint && (
                   <span>
-                    Максимум: {fmtNum(maxPoint.y)} кг · {fmtDateShort(maxPoint.date)}
+                    {t.prog.maxWord}: {fmtNum(maxPoint.y)} {t.kg} · {fmtDateShort(maxPoint.date)}
                   </span>
                 )}
-                {lastPoint && <span>Последний раз: {fmtDateShort(lastPoint.date)}</span>}
+                {lastPoint && (
+                  <span>
+                    {t.prog.lastWord}: {fmtDateShort(lastPoint.date)}
+                  </span>
+                )}
               </div>
             </>
           ) : (
-            <p className="py-8 text-center text-muted">Пока мало данных по этому упражнению.</p>
+            <p className="py-8 text-center text-muted">{t.prog.fewData}</p>
           )}
         </>
       )}

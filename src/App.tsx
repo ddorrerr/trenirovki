@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp, type SyncInfo, type Tab } from './store';
+import { useT } from './i18n';
 import { fmtDateShort, fmtWeekday } from './lib/dates';
 import { useWakeLock } from './hooks/useWakeLock';
 import HomeScreen from './screens/HomeScreen';
@@ -11,13 +12,14 @@ import ProgressScreen from './screens/ProgressScreen';
 import MenuScreen from './screens/MenuScreen';
 import KeyScreen from './screens/KeyScreen';
 
-/* «Настройки» больше не вкладка — шестерёнка в шапке Главной */
-const TABS: { id: Tab; label: string; icon: (active: boolean) => React.ReactNode }[] = [
-  { id: 'home', label: 'Главная', icon: (a) => <IconHome active={a} /> },
-  { id: 'train', label: 'Тренировка', icon: (a) => <IconDumbbell active={a} /> },
-  { id: 'history', label: 'История', icon: (a) => <IconHistory active={a} /> },
-  { id: 'library', label: 'Библиотека', icon: (a) => <IconLibrary active={a} /> },
-  { id: 'progress', label: 'Прогресс', icon: (a) => <IconChart active={a} /> },
+/* «Настройки» больше не вкладка — шестерёнка в шапке Главной.
+   Подписи вкладок берутся из словаря по id (t.nav[id]) при рендере. */
+const TABS: { id: Tab; icon: (active: boolean) => React.ReactNode }[] = [
+  { id: 'home', icon: (a) => <IconHome active={a} /> },
+  { id: 'train', icon: (a) => <IconDumbbell active={a} /> },
+  { id: 'history', icon: (a) => <IconHistory active={a} /> },
+  { id: 'library', icon: (a) => <IconLibrary active={a} /> },
+  { id: 'progress', icon: (a) => <IconChart active={a} /> },
 ];
 
 export default function App() {
@@ -36,7 +38,14 @@ export default function App() {
     settings,
     currentWorkout,
   } = useApp();
+  const { t, lang } = useT();
   useWakeLock(settings.keepAwake);
+
+  // Язык — на <html> и в заголовок вкладки (индексный скрипт делает то же до загрузки)
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    document.title = t.appTitle;
+  }, [lang, t]);
 
   // Тема из настроек: атрибут на <html> включает CSS-переопределение,
   // meta theme-color подгоняем, чтобы системная плашка совпадала с фоном.
@@ -64,12 +73,8 @@ export default function App() {
     tab === 'train' && scrolled && currentWorkout
       ? `${fmtDateShort(currentWorkout.date)}, ${fmtWeekday(currentWorkout.date)}`
       : tab === 'home'
-        ? 'Тренировки'
-        : tab === 'menu'
-          ? 'Настройки'
-          : tab === 'comments'
-            ? 'Комментарии'
-            : (TABS.find((t) => t.id === tab)?.label ?? 'Тренировка');
+        ? t.appTitle
+        : t.nav[tab];
 
   // Экран «въезжает» со стороны, куда шагнула навигация (по порядку вкладок)
   const prevTabRef = useRef(tab);
@@ -92,7 +97,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex min-h-dvh items-center justify-center text-muted">Загрузка…</div>
+      <div className="flex min-h-dvh items-center justify-center text-muted">{t.loading}</div>
     );
   }
 
@@ -103,8 +108,8 @@ export default function App() {
           {canGoBack && (
             <button
               onClick={goBack}
-              aria-label="Назад"
-              title="Назад"
+              aria-label={t.back}
+              title={t.back}
               className="-ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:text-fg"
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -121,18 +126,18 @@ export default function App() {
           </span>
           {/* Навигация для больших экранов */}
           <nav className="ml-6 hidden gap-1 md:flex">
-            {TABS.map((t) => (
+            {TABS.map((tb) => (
               <button
-                key={t.id}
-                onClick={() => navigate(t.id)}
+                key={tb.id}
+                onClick={() => navigate(tb.id)}
                 className={
                   'rounded-lg px-3 py-1.5 text-sm ' +
-                  (tab === t.id
+                  (tab === tb.id
                     ? 'font-bold text-accent'
                     : 'font-medium text-muted hover:text-fg')
                 }
               >
-                {t.label}
+                {t.nav[tb.id]}
               </button>
             ))}
           </nav>
@@ -141,8 +146,8 @@ export default function App() {
             {tab === 'home' && (
               <button
                 onClick={() => navigate('menu')}
-                aria-label="Настройки"
-                title="Настройки"
+                aria-label={t.nav.menu}
+                title={t.nav.menu}
                 className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:text-fg"
               >
                 <IconCog active={false} size={22} />
@@ -150,8 +155,8 @@ export default function App() {
             )}
             <button
               onClick={() => setEditMode(!editMode)}
-              aria-label={editMode ? 'Выключить режим редактирования' : 'Включить режим редактирования'}
-              title={editMode ? 'Выключить редактирование' : 'Редактировать'}
+              aria-label={editMode ? t.editMode.turnOff : t.editMode.turnOn}
+              title={editMode ? t.editMode.titleOff : t.editMode.titleOn}
               className={
                 'flex h-9 w-9 items-center justify-center rounded-lg border ' +
                 (editMode
@@ -180,20 +185,20 @@ export default function App() {
       {/* Нижняя навигация для телефона: только иконки */}
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 backdrop-blur md:hidden">
         <div className="grid grid-cols-5 pb-[env(safe-area-inset-bottom)]">
-          {TABS.map((t) => (
+          {TABS.map((tb) => (
             <button
-              key={t.id}
-              onClick={() => navigate(t.id)}
-              aria-label={t.label}
-              title={t.label}
-              aria-current={tab === t.id ? 'page' : undefined}
+              key={tb.id}
+              onClick={() => navigate(tb.id)}
+              aria-label={t.nav[tb.id]}
+              title={t.nav[tb.id]}
+              aria-current={tab === tb.id ? 'page' : undefined}
               className={
                 'relative flex items-center justify-center py-3 ' +
-                (tab === t.id ? 'text-accent' : 'text-muted')
+                (tab === tb.id ? 'text-accent' : 'text-muted')
               }
             >
-              {t.icon(tab === t.id)}
-              {tab === t.id && (
+              {tb.icon(tab === tb.id)}
+              {tab === tb.id && (
                 <span
                   aria-hidden="true"
                   className="absolute bottom-1 h-1 w-1 rounded-full bg-accent"
@@ -218,19 +223,14 @@ function SyncBadge({
   onRetry: () => void;
   onAuth: () => void;
 }) {
+  const { t } = useT();
   if (sync.mode !== 'github') return null;
 
   /* Компактный вариант: в норме — только огонёк (зелёный «всё сохранено»,
      пульсирующий «сохраняю»); слово появляется лишь когда что-то не так. */
-  const view: Record<string, { text: string; ok: boolean }> = {
-    saved: { text: 'сохранено', ok: true },
-    saving: { text: 'сохраняю…', ok: true },
-    pending: { text: 'сохраняю…', ok: true },
-    offline: { text: 'офлайн', ok: false },
-    error: { text: 'не сохранено', ok: false },
-    auth: { text: 'нет доступа', ok: false },
-  };
-  const v = view[sync.state] ?? view.saved;
+  const text = t.sync.dot[sync.state] ?? t.sync.dot.saved;
+  const ok = sync.state === 'saved' || sync.state === 'saving' || sync.state === 'pending';
+  const v = { text, ok };
   const retryable = sync.state === 'offline' || sync.state === 'error';
   const needsKey = sync.state === 'auth';
 
@@ -238,14 +238,8 @@ function SyncBadge({
     <button
       onClick={needsKey ? onAuth : retryable ? onRetry : undefined}
       disabled={!retryable && !needsKey}
-      aria-label={`Синхронизация: ${v.text}`}
-      title={
-        needsKey
-          ? 'Ключ больше не действует — нажми, чтобы ввести новый'
-          : retryable
-            ? `${v.text} — нажми, чтобы повторить сохранение`
-            : v.text
-      }
+      aria-label={t.sync.aria(v.text)}
+      title={needsKey ? t.sync.keyExpired : retryable ? t.sync.tapRetry(v.text) : v.text}
       className={
         'flex min-h-9 items-center gap-1.5 rounded-lg px-1.5 py-1 text-xs font-medium ' +
         (v.ok ? 'text-muted' : 'text-danger')

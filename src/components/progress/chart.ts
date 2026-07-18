@@ -1,6 +1,7 @@
 // Утилиты для самодельных SVG-графиков экрана «Прогресс».
 
 import { fmtDateShort } from '../../lib/dates';
+import { getLang, locale } from '../../i18n/lang';
 
 /** ISO-дата -> метка времени (UTC-полночь), согласовано с lib/dates */
 export function parseTime(iso: string): number {
@@ -12,14 +13,14 @@ export function isoAtTime(t: number): string {
   return new Date(t).toISOString().slice(0, 10);
 }
 
-/** "12,5" — число по-русски, без лишних нулей */
+/** "12,5" / "12.5" — число в текущей локали, без лишних нулей */
 export function fmtNum(v: number): string {
-  return v.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+  return v.toLocaleString(locale(), { maximumFractionDigits: 2 });
 }
 
-/** "1,8" — ровно один знак после запятой */
+/** "1,8" / "1.8" — ровно один знак после разделителя */
 export function fmtNum1(v: number): string {
-  return v.toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return v.toLocaleString(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
 export function clamp(v: number, lo: number, hi: number): number {
@@ -80,10 +81,11 @@ export interface DateTick {
   label: string;
 }
 
-/** "13 июня" при коротком свежем диапазоне, иначе "13.06.25" */
+/** "13 июня" / "13 June" при коротком свежем диапазоне, иначе "13.06.25" / "13/06/25" */
 function tickLabel(iso: string, withYear: boolean): string {
   if (!withYear) return fmtDateShort(iso);
-  return `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(2, 4)}`;
+  const sep = getLang() === 'ru' ? '.' : '/';
+  return `${iso.slice(8, 10)}${sep}${iso.slice(5, 7)}${sep}${iso.slice(2, 4)}`;
 }
 
 /**
