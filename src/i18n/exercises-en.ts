@@ -65,6 +65,7 @@ const NAMES: [ru: string, en: string][] = [
   ['Шраги', 'Shrugs'],
   ['Подъёмы на носки', 'Calf raises'],
   ['Эллипс/дорожка', 'Elliptical / treadmill'],
+  ['Суставная разминка', 'Joint warm-up'],
 ];
 
 function norm(s: string): string {

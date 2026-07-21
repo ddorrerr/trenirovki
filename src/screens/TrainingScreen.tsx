@@ -37,6 +37,7 @@ export default function TrainingScreen() {
     editMode,
     setEditMode,
     exerciseById,
+    itemKind,
     lastResultBefore,
     saveWorkout,
   } = useApp();
@@ -119,6 +120,13 @@ export default function TrainingScreen() {
   const sortedItems = [...w.items].sort(
     (a, b) => (a.order ?? 0) - (b.order ?? 0),
   );
+  /* Разминочные упражнения собираются в общую карточку «Разминка»,
+     остальные (обычные и кардио) — отдельными карточками с нумерацией */
+  const warmupItems = sortedItems.filter((it) => itemKind(it) === 'warmup');
+  const mainItems = sortedItems.filter((it) => itemKind(it) !== 'warmup');
+
+  const hasWarmup = w.warmup.length > 0 || warmupItems.length > 0 || !!w.warmupVideoUrl;
+  const warmupCount = w.warmup.length + warmupItems.length;
 
   const warmupOpen = warmupOpenMap[w.id] ?? (w.status === 'planned' && !w.warmupDone);
   const notesOpen = notesOpenMap[w.id] ?? false;
@@ -147,7 +155,7 @@ export default function TrainingScreen() {
       ) : (
         <>
           {/* Разминка: шапка как у карточки упражнения — видео и «выполнено» */}
-          {(w.warmup.length > 0 || w.warmupVideoUrl) && (
+          {hasWarmup && (
             <section className="rounded-2xl border border-border bg-card p-4">
               <div className="flex items-start gap-3">
                 <button
@@ -165,8 +173,8 @@ export default function TrainingScreen() {
                   >
                     {t.train.warmup}
                   </span>
-                  {w.warmup.length > 0 && (
-                    <span className="text-sm text-muted">{w.warmup.length}</span>
+                  {warmupCount > 0 && (
+                    <span className="text-sm text-muted">{warmupCount}</span>
                   )}
                   <span className="text-muted">
                     <ChevronIcon open={warmupOpen} size={18} />
@@ -206,7 +214,7 @@ export default function TrainingScreen() {
                   <CheckIcon />
                 </button>
               </div>
-              {warmupOpen && w.warmup.length > 0 && (
+              {warmupOpen && warmupCount > 0 && (
                 <ul className={'anim-rise mt-2 space-y-2.5 ' + (w.warmupDone ? 'opacity-70' : '')}>
                   {w.warmup.map((wu, i) => {
                     const line = parseWarmupLine(wu.text, i + 1);
@@ -222,6 +230,30 @@ export default function TrainingScreen() {
                       </li>
                     );
                   })}
+                  {/* Разминочные упражнения из библиотеки — в той же ленте */}
+                  {warmupItems.map((it, i) => {
+                    const ex = it.exerciseId ? exerciseById(it.exerciseId) : undefined;
+                    const name = t.catalog.exercise(ex?.name ?? it.nameRaw) || t.item.fallbackName;
+                    const video = it.videoUrl ?? ex?.videoUrl ?? null;
+                    return (
+                      <li key={it.id} className="flex items-start gap-2 text-[15px] leading-snug">
+                        <span className="mt-0.5 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-chip px-1 text-[11px] font-semibold tabular-nums text-muted">
+                          {w.warmup.length + i + 1}
+                        </span>
+                        <span className="min-w-0 break-words">
+                          {name}
+                          {it.setsReps?.raw && <> — {it.setsReps.raw}</>}
+                          {video && <VideoLink href={video} className="ml-1.5" />}
+                          {(it.subNotes ?? []).map((sn, j) => (
+                            <span key={j} className="mt-0.5 block text-[13px] leading-snug text-muted">
+                              {sn.text}
+                              {sn.videoUrl && <VideoLink href={sn.videoUrl} className="ml-1.5" />}
+                            </span>
+                          ))}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </section>
@@ -232,12 +264,12 @@ export default function TrainingScreen() {
             <h2 className="px-1 text-sm font-semibold uppercase tracking-wide text-muted">
               {t.train.exercises}
             </h2>
-            {sortedItems.length === 0 && (
+            {mainItems.length === 0 && (
               <p className="rounded-2xl border border-border bg-card p-4 text-muted">
                 {t.train.noItems}
               </p>
             )}
-            {sortedItems.map((it, i) => (
+            {mainItems.map((it, i) => (
               <ItemCard
                 key={it.id}
                 item={it}

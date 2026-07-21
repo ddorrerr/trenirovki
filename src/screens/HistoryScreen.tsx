@@ -73,9 +73,11 @@ export default function HistoryScreen() {
 }
 
 function WorkoutRow({ w }: { w: Workout }) {
-  const { editMode, navigate, deleteWorkout } = useApp();
+  const { editMode, navigate, deleteWorkout, itemKind } = useApp();
   const { t } = useT();
   const hasComment = w.items.some((it) => it.myComment && it.myComment.trim() !== '');
+  // разминочные позиции не считаем упражнениями
+  const exerciseCount = w.items.filter((it) => itemKind(it) !== 'warmup').length;
 
   return (
     <li className="flex items-stretch gap-2">
@@ -100,7 +102,7 @@ function WorkoutRow({ w }: { w: Workout }) {
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {w.type && <Chip>{t.catalog.workoutType(w.type)}</Chip>}
-          <Chip muted>{t.counted.exercises(w.items.length)}</Chip>
+          <Chip muted>{t.counted.exercises(exerciseCount)}</Chip>
           {w.fatigue != null && <Chip muted>{t.fatigueN(w.fatigue)}</Chip>}
         </div>
       </button>

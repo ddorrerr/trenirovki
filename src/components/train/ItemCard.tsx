@@ -2,7 +2,7 @@
 // «прошлый раз», отметка «выполнено» и лёгкий редактор (комментарий + факт).
 
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
-import type { Actual, Exercise, WorkoutItem } from '../../types';
+import { exerciseKind, type Actual, type Exercise, type WorkoutItem } from '../../types';
 import type { Occurrence } from '../../store';
 import { useT, type Dict } from '../../i18n';
 import { fmtDateShort } from '../../lib/dates';
@@ -11,8 +11,10 @@ import {
   BarbellIcon,
   CheckIcon,
   ChevronIcon,
+  ClockIcon,
   CommentIcon,
   FlameIcon,
+  HeartPulseIcon,
   HistoryIcon,
   PinIcon,
   RepeatIcon,
@@ -68,6 +70,7 @@ function lastSummary(it: WorkoutItem, dict: Dict): string {
   }
   if (!core) {
     const parts: string[] = [];
+    if (it.duration) parts.push(restLabel(it.duration, dict)); // кардио
     if (it.setsReps?.raw) parts.push(it.setsReps.raw);
     if (it.weight?.raw) parts.push(`${dict.item.weightPrefix} ${it.weight.raw}`);
     core = parts.join(', ');
@@ -91,6 +94,7 @@ export default function ItemCard({
   // «чпок» галочки только на живой тап, не при монтировании карточки
   const [checkPop, setCheckPop] = useState(false);
 
+  const kind = exerciseKind(exercise);
   const name = t.catalog.exercise(exercise?.name ?? stripNumbering(item.nameRaw ?? ''));
   const videoUrl = item.videoUrl ?? exercise?.videoUrl ?? null;
   const myComment = (item.myComment ?? '').trim();
@@ -110,9 +114,26 @@ export default function ItemCard({
         : '';
 
   /* Свёрнутая карточка показывает только главное — повторы, вес и отдых;
-     ПВР и темп уезжают в раскрытую часть. bold — жирные цифры-факты */
+     ПВР и темп уезжают в раскрытую часть. bold — жирные цифры-факты.
+     У кардио свои чипы: длительность и пульсовая зона. */
   const mainChips: { icon: ReactNode | null; name: string | null; text: string; bold: boolean }[] =
     [];
+  if (kind === 'cardio') {
+    if (item.duration)
+      mainChips.push({
+        icon: <ClockIcon size={16} />,
+        name: t.item.chipDuration,
+        text: restLabel(item.duration, t),
+        bold: true,
+      });
+    if (item.pulseZone)
+      mainChips.push({
+        icon: <HeartPulseIcon />,
+        name: t.item.chipPulse,
+        text: item.pulseZone,
+        bold: true,
+      });
+  }
   if (setsRepsText)
     mainChips.push({
       icon: <RepeatIcon />,
@@ -346,7 +367,7 @@ export default function ItemCard({
               </p>
             )}
           </div>
-          <ItemEditor item={item} open={open} onChange={onChange} />
+          <ItemEditor item={item} open={open} cardio={kind === 'cardio'} onChange={onChange} />
         </div>
       </div>
     </div>
@@ -376,11 +397,14 @@ function parseIntOrNull(s: string): number | null {
 function ItemEditor({
   item,
   open,
+  cardio,
   onChange,
 }: {
   item: WorkoutItem;
   /** Карточка раскрыта: редактор постоянно смонтирован ради анимации высоты */
   open: boolean;
+  /** Кардио: только комментарий-фидбэк, без факта вес×подходы×повторы */
+  cardio: boolean;
   onChange: (patch: Partial<WorkoutItem>) => void;
 }) {
   const { t } = useT();
@@ -459,6 +483,7 @@ function ItemEditor({
         />
       </label>
 
+      {!cardio && (
       <div className="mt-3">
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-[12px] font-bold uppercase tracking-wider text-muted">
@@ -529,6 +554,20 @@ function ItemEditor({
           <p className="mt-2 text-xs text-muted">{t.item.oldFactNote(item.actual?.text ?? '')}</p>
         )}
       </div>
+      )}
+
+      {/* Кардио: «сохранено» живёт у комментария, отдельного факта нет */}
+      {cardio && (
+        <p
+          aria-live="polite"
+          className={
+            'mt-2 text-right text-xs font-medium text-ok-text transition-opacity duration-300 ' +
+            (saved ? 'opacity-100' : 'opacity-0')
+          }
+        >
+          {t.item.savedFlash}
+        </p>
+      )}
     </div>
   );
 }

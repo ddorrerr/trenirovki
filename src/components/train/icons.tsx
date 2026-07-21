@@ -94,6 +94,26 @@ export function FlameIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+/** Пульсовая зона кардио — сердце с линией пульса */
+export function HeartPulseIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 20.2S3 14.8 3 8.9C3 6 5.2 3.9 7.8 3.9c1.8 0 3.3 1 4.2 2.4.9-1.4 2.4-2.4 4.2-2.4C18.8 3.9 21 6 21 8.9c0 5.9-9 11.3-9 11.3z" />
+      <path d="M6.5 11.5h3l1.5-3 2 5 1.5-2h3" />
+    </svg>
+  );
+}
+
 /** Подходы×повторы */
 export function RepeatIcon({ size = 16 }: { size?: number }) {
   return (

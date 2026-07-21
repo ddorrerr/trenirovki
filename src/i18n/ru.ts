@@ -4,6 +4,7 @@
 // Значения данных (названия упражнений, «Ноги», «с тренером») тут не живут:
 // они хранятся по-русски в данных, а для показа переводятся в catalog.*.
 
+import type { ExerciseKind } from '../types';
 import type { EquivForms } from './lang';
 
 /** «5 упражнений», «2 раза», … — русские формы множественного числа */
@@ -227,6 +228,8 @@ export const ru = {
     chipPvrName: 'ПВР — повторы в резерве',
     pvr: (v: string) => `ПВР ${v}`,
     chipTempo: 'темп',
+    chipDuration: 'длительность',
+    chipPulse: 'пульсовая зона',
     rest: 'отдых',
     startRest: 'Запустить таймер отдыха',
     hasMyComment: 'есть твой комментарий',
@@ -284,6 +287,19 @@ export const ru = {
     newExercise: 'Новое упражнение',
     searchPlaceholder: 'Поиск упражнения…',
     searchAria: 'Поиск упражнения',
+    typeLabel: 'Тип упражнения',
+    /** Чипы фильтра по типу (единый список с бейджем в строке) */
+    kindFilter: { main: 'Основные', warmup: 'Разминка', cardio: 'Кардио' } as Record<
+      ExerciseKind,
+      string
+    >,
+    /** Бейдж типа в списке; у обычных бейджа нет */
+    kindChip: { warmup: 'разминка', cardio: 'кардио' } as Partial<Record<ExerciseKind, string>>,
+    /** Варианты в селекте типа в редакторе упражнения */
+    kindOption: { main: 'Обычное', warmup: 'Разминка', cardio: 'Кардио' } as Record<
+      ExerciseKind,
+      string
+    >,
     muscleGroup: 'Группа мышц',
     equipment: 'Инвентарь',
     empty: 'Библиотека пока пустая.',
@@ -343,6 +359,8 @@ export const ru = {
     removeStep: 'Убрать пункт',
     noWarmup: 'Разминки пока нет.',
     addWarmupStep: 'Пункт разминки',
+    addWarmupExercise: 'Упражнение из библиотеки',
+    warmupRepsPlaceholder: 'напр. 1х10 или 40 секунд',
     noItemsYet: 'Упражнений пока нет — добавь первое.',
     addExercise: 'Упражнение',
     insertHere: 'Вставить упражнение сюда',
@@ -359,6 +377,10 @@ export const ru = {
     pvrPlaceholder: 'напр. 2-3',
     restMin: 'Отдых, мин',
     restPlaceholder: '1.5',
+    durationMin: 'Длительность, мин',
+    durationPlaceholder: '30',
+    pulseZone: 'Пульсовая зона',
+    pulseZonePlaceholder: 'напр. 120–140',
     tempo: 'Темп',
     tempoPlaceholder: 'напр. спуск 2-3 сек',
     technique: 'Техника (пункты с новой строки)',

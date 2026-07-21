@@ -3,27 +3,39 @@
 // Переехал из «Истории» (фаза 1 новой структуры вкладок, v0.13).
 
 import { useEffect, useMemo, useState } from 'react';
-import type { Exercise, WorkoutItem } from '../types';
+import { exerciseKind, type Exercise, type ExerciseKind, type WorkoutItem } from '../types';
 import { useApp } from '../store';
 import { useT, type Dict } from '../i18n';
 import { fmtDate, fmtDateShort } from '../lib/dates';
 import { nextExerciseId } from '../lib/ids';
 import { EQUIPMENT, MUSCLE_GROUPS } from '../lib/catalog';
 import { splitTags } from '../components/edit/parse';
-import { Chip, ChipPicker, IconPlus, TextField, inputCls } from '../components/edit/ui';
-import { VideoIcon } from '../components/train/icons';
+import { Chip, ChipPicker, IconPlus, SelectField, TextField, inputCls } from '../components/edit/ui';
+import { BarbellIcon, FlameIcon, HeartPulseIcon, VideoIcon } from '../components/train/icons';
 import { equipIcon, muscleIcon } from '../components/catalogIcons';
+
+const KIND_VALUES: ExerciseKind[] = ['main', 'warmup', 'cardio'];
+
+/** Иконки чипов фильтра по типу — в одном стиле с группами мышц/инвентарём */
+function kindIcon(kind: string, size = 15): React.ReactNode {
+  if (kind === 'main') return <BarbellIcon size={size} />;
+  if (kind === 'warmup') return <FlameIcon size={size} />;
+  if (kind === 'cardio') return <HeartPulseIcon size={size} />;
+  return null;
+}
 
 /* Экран запоминает, где ты была (раскрытое упражнение, фильтры, прокрутка),
    чтобы стрелка «назад» возвращала ровно туда же. */
 const paneMemory: {
   expandedId: string | null;
   scroll: number;
+  fKind: string | null;
   fMuscle: string | null;
   fEquip: string | null;
 } = {
   expandedId: null,
   scroll: 0,
+  fKind: null,
   fMuscle: null,
   fEquip: null,
 };
@@ -55,9 +67,14 @@ export default function LibraryScreen() {
     };
   }, []);
 
-  /* Фильтры: одна группа мышц + один инвентарь (тап по чипу второй раз — сброс) */
+  /* Фильтры: тип + одна группа мышц + один инвентарь (тап второй раз — сброс) */
+  const [fKind, setFKindState] = useState<string | null>(paneMemory.fKind);
   const [fMuscle, setFMuscleState] = useState<string | null>(paneMemory.fMuscle);
   const [fEquip, setFEquipState] = useState<string | null>(paneMemory.fEquip);
+  const setFKind = (v: string | null) => {
+    paneMemory.fKind = v;
+    setFKindState(v);
+  };
   const setFMuscle = (v: string | null) => {
     paneMemory.fMuscle = v;
     setFMuscleState(v);
@@ -99,6 +116,7 @@ export default function LibraryScreen() {
     const q = query.trim().toLowerCase();
     return exercises
       .filter((e) => showArchive || !e.archived)
+      .filter((e) => !fKind || exerciseKind(e) === fKind)
       .filter((e) => !fMuscle || (e.muscles ?? []).includes(fMuscle))
       .filter((e) => !fEquip || (e.equipment ?? []).includes(fEquip))
       .filter(
@@ -115,7 +133,7 @@ export default function LibraryScreen() {
         const d = (stats.get(b.id)?.count ?? 0) - (stats.get(a.id)?.count ?? 0);
         return d !== 0 ? d : a.name.localeCompare(b.name, 'ru');
       });
-  }, [exercises, query, showArchive, stats, pinnedId, fMuscle, fEquip, t]);
+  }, [exercises, query, showArchive, stats, pinnedId, fKind, fMuscle, fEquip, t]);
 
   const addExercise = () => {
     const ex: Exercise = {
@@ -159,6 +177,15 @@ export default function LibraryScreen() {
         className={inputCls}
       />
 
+      <FilterChips
+        label={t.lib.typeLabel}
+        options={KIND_VALUES}
+        value={fKind}
+        onChange={setFKind}
+        tone="kind"
+        icon={kindIcon}
+        display={(k) => t.lib.kindFilter[k as ExerciseKind]}
+      />
       <FilterChips
         label={t.lib.muscleGroup}
         options={muscleChips}
@@ -234,16 +261,16 @@ function FilterChips({
   options: string[];
   value: string | null;
   onChange: (v: string | null) => void;
-  tone: 'muscle' | 'equip';
+  tone: 'kind' | 'muscle' | 'equip';
   icon: (name: string, size?: number) => React.ReactNode;
   /** как показать значение из данных на текущем языке */
   display: (name: string) => string;
 }) {
   const onCls =
-    tone === 'muscle'
-      ? 'border-accent bg-accent-soft font-semibold text-accent'
-      : 'border-warn bg-warn-soft font-semibold text-warn-text';
-  const iconTint = tone === 'muscle' ? 'text-accent' : 'text-warn-text';
+    tone === 'equip'
+      ? 'border-warn bg-warn-soft font-semibold text-warn-text'
+      : 'border-accent bg-accent-soft font-semibold text-accent';
+  const iconTint = tone === 'equip' ? 'text-warn-text' : 'text-accent';
   return (
     <div
       className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -295,6 +322,12 @@ function ExerciseRow({ e, count, lastDate, expanded, onToggle }: ExerciseRowProp
             <span className="break-words text-lg font-semibold leading-snug">
               {t.catalog.exercise(e.name)}
             </span>
+            {t.lib.kindChip[exerciseKind(e)] && (
+              <span className="inline-flex items-center gap-1 rounded-lg bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent">
+                {kindIcon(exerciseKind(e), 12)}
+                {t.lib.kindChip[exerciseKind(e)]}
+              </span>
+            )}
             {e.archived && (
               <span className="rounded-lg border border-border bg-bg px-2 py-0.5 text-xs font-medium text-muted">
                 {t.lib.archiveChip}
@@ -331,6 +364,8 @@ function occurrenceSummary(it: WorkoutItem, dict: Dict): string {
     if (parts.length) return parts.join(' · ');
   }
   const parts: string[] = [];
+  if (it.duration) parts.push(it.duration); // кардио: длительность вместо веса
+  if (it.pulseZone) parts.push(it.pulseZone);
   if (it.setsReps?.raw) parts.push(it.setsReps.raw);
   if (it.weight?.raw) parts.push(`${dict.item.weightPrefix} ${it.weight.raw}`);
   return parts.join(' · ') || '—';
@@ -377,7 +412,8 @@ function ExerciseDetails({ e }: { e: Exercise }) {
             <VideoIcon size={16} /> {t.item.techVideo}
           </a>
         )}
-        {recent.length > 0 && (
+        {/* у разминки и кардио веса нет — график не предлагаем */}
+        {recent.length > 0 && exerciseKind(e) === 'main' && (
           <button
             type="button"
             onClick={() => showExerciseProgress(e.id)}
@@ -437,6 +473,15 @@ function ExerciseEditPanel({ e, used }: { e: Exercise; used: boolean }) {
           const name = v.trim();
           if (name) saveExercise({ ...e, name });
         }}
+      />
+      <SelectField
+        label={t.lib.typeLabel}
+        value={exerciseKind(e)}
+        options={KIND_VALUES.map((k) => ({ value: k, label: t.lib.kindOption[k] }))}
+        onCommit={(v) =>
+          // у обычных упражнений поле kind не храним (как в старых данных)
+          saveExercise({ ...e, kind: v === 'main' ? undefined : (v as ExerciseKind) })
+        }
       />
       <TextField
         label={t.lib.videoLink}

@@ -17,7 +17,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { AppData, Exercise, StorageAdapter, Workout, WorkoutItem } from './types';
+import { exerciseKind, type AppData, type Exercise, type ExerciseKind, type StorageAdapter, type Workout, type WorkoutItem } from './types';
 import { setLang, tr, type Lang } from './i18n';
 import { DATA_REPO } from './config';
 import { LocalAdapter } from './storage/local';
@@ -140,6 +140,8 @@ export interface AppContextValue {
   setSettings: (patch: Partial<Settings>) => void;
 
   exerciseById: (id: string) => Exercise | undefined;
+  /** Тип позиции тренировки — по её упражнению из библиотеки */
+  itemKind: (item: WorkoutItem) => ExerciseKind;
   workoutById: (id: string) => Workout | undefined;
   /** Тренировка для экрана «Тренировка»: открытая или последняя по дате */
   currentWorkout: Workout | null;
@@ -477,6 +479,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [data.exercises],
   );
 
+  const itemKind = useCallback(
+    (item: WorkoutItem): ExerciseKind =>
+      exerciseKind(item.exerciseId ? exerciseById(item.exerciseId) : undefined),
+    [exerciseById],
+  );
+
   const workoutById = useCallback(
     (id: string) => data.workouts.find((w) => w.id === id),
     [data.workouts],
@@ -543,6 +551,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     settings: { keepAwake: ui.keepAwake, theme: ui.theme, lang: ui.lang },
     setSettings,
     exerciseById,
+    itemKind,
     workoutById,
     currentWorkout,
     saveWorkout,

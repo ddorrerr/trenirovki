@@ -33,8 +33,11 @@ function typeForDate(iso: string): string | null {
 }
 
 export default function NewWorkoutForm() {
-  const { workouts, saveWorkout, navigate } = useApp();
+  const { workouts, saveWorkout, navigate, itemKind } = useApp();
   const { t } = useT();
+  // разминочные позиции не считаем упражнениями в подписи «(N упражнений)»
+  const exerciseCount = (w: Workout) =>
+    w.items.filter((it) => itemKind(it) !== 'warmup').length;
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(todayISO());
   const [mode, setMode] = useState<FillMode>('empty');
@@ -162,7 +165,7 @@ export default function NewWorkoutForm() {
       {mode === 'last' &&
         (lastWorkout ? (
           <p className="mt-2 text-sm text-muted">
-            {t.form.willCopy(fmtDate(lastWorkout.date), t.counted.exercises(lastWorkout.items.length))}
+            {t.form.willCopy(fmtDate(lastWorkout.date), t.counted.exercises(exerciseCount(lastWorkout)))}
           </p>
         ) : (
           <p className="mt-2 text-sm text-muted">{t.form.nothingToCopy}</p>
@@ -182,7 +185,7 @@ export default function NewWorkoutForm() {
               >
                 <span className="font-medium">{fmtDateShort(w.date)}</span>{' '}
                 <span className="text-sm text-muted">
-                  {fmtWeekday(w.date)} · {t.counted.exercises(w.items.length)}
+                  {fmtWeekday(w.date)} · {t.counted.exercises(exerciseCount(w))}
                   {w.type ? ` · ${t.catalog.workoutType(w.type)}` : ''}
                 </span>
               </button>

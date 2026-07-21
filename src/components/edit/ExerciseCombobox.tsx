@@ -3,7 +3,7 @@
 // карточки — на телефоне это надёжнее плавающего поповера.
 
 import { useMemo, useState } from 'react';
-import type { Exercise } from '../../types';
+import { exerciseKind, type Exercise, type ExerciseKind } from '../../types';
 import { useT } from '../../i18n';
 import { IconCheck, IconPlus } from './ui';
 
@@ -11,12 +11,14 @@ interface Props {
   exercises: Exercise[];
   /** id выбранного упражнения; '' — ещё не выбрано */
   value: string;
+  /** какие типы показывать; не задано — все */
+  kinds?: ExerciseKind[];
   onSelect: (ex: Exercise) => void;
   /** создать упражнение с таким названием и назначить его */
   onCreate: (name: string) => void;
 }
 
-export default function ExerciseCombobox({ exercises, value, onSelect, onCreate }: Props) {
+export default function ExerciseCombobox({ exercises, value, kinds, onSelect, onCreate }: Props) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -26,6 +28,7 @@ export default function ExerciseCombobox({ exercises, value, onSelect, onCreate 
   const options = useMemo(() => {
     return exercises
       .filter((e) => !e.archived)
+      .filter((e) => !kinds || kinds.includes(exerciseKind(e)))
       .filter(
         (e) =>
           !q ||
@@ -35,7 +38,7 @@ export default function ExerciseCombobox({ exercises, value, onSelect, onCreate 
           (e.aliases ?? []).some((a) => a.toLowerCase().includes(q)),
       )
       .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
-  }, [exercises, q, t]);
+  }, [exercises, q, kinds, t]);
 
   const close = () => {
     setOpen(false);

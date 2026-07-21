@@ -1,6 +1,12 @@
 // Ядро модели данных. Это контракт между импортом из таблицы,
 // локальным хранилищем и (позже) Firestore. Не менять без миграции seed.json.
 
+/**
+ * Тип упражнения: обычное силовое / разминочное / кардио.
+ * У старых записей поля нет — это значит 'main' (см. exerciseKind()).
+ */
+export type ExerciseKind = 'main' | 'warmup' | 'cardio';
+
 export interface Exercise {
   id: string; // "ex-1", стабильный
   name: string; // каноническое название, напр. "Румынская тяга со штангой"
@@ -9,7 +15,13 @@ export interface Exercise {
   tags: string[]; // свободные метки
   muscles?: string[]; // группы мышц (можно несколько), см. lib/catalog.ts
   equipment?: string[]; // инвентарь (можно несколько), см. lib/catalog.ts
+  kind?: ExerciseKind; // отсутствует = 'main' (для обычных не записываем)
   archived: boolean;
+}
+
+/** Тип упражнения с учётом старых данных без поля kind */
+export function exerciseKind(e: Exercise | undefined | null): ExerciseKind {
+  return e?.kind ?? 'main';
 }
 
 export interface SetsReps {
@@ -54,6 +66,9 @@ export interface WorkoutItem {
   myComment: string; // колонка "Твои комментарии" + новые комментарии в приложении
   actual: Actual | null; // null = не логировала
   done: boolean; // отметка выполнения в тренировке
+  // Поля кардио-упражнений (у остальных отсутствуют; строки — как ввёл тренер)
+  duration?: string | null; // длительность, напр. "30" или "20-30"
+  pulseZone?: string | null; // пульсовая зона, напр. "120-140"
 }
 
 export interface WarmupItem {

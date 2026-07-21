@@ -40,7 +40,7 @@ interface Preview {
 }
 
 export default function CalendarHeatmap() {
-  const { workouts, navigate } = useApp();
+  const { workouts, navigate, itemKind } = useApp();
   const { t, lang } = useT();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const sectionRef = useRef<HTMLElement | null>(null);
@@ -232,7 +232,8 @@ export default function CalendarHeatmap() {
             {preview.w.status === 'done' ? t.status.done : t.status.planned}
             {preview.w.type ? ` · ${t.catalog.workoutType(preview.w.type)}` : ''}
             {' · '}
-            {t.counted.exercises(preview.w.items.length)}
+            {/* разминочные позиции не считаем упражнениями */}
+            {t.counted.exercises(preview.w.items.filter((it) => itemKind(it) !== 'warmup').length)}
             {preview.w.fatigue != null ? ` · ${t.fatigueN10(preview.w.fatigue)}` : ''}
           </div>
           <button

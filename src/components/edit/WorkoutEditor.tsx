@@ -3,7 +3,15 @@
 // изменению) в черновик; в данные попадает только по кнопке «Сохранить».
 
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import type { Exercise, WarmupItem, Workout, WorkoutItem, WorkoutStatus } from '../../types';
+import {
+  exerciseKind,
+  type Exercise,
+  type ExerciseKind,
+  type WarmupItem,
+  type Workout,
+  type WorkoutItem,
+  type WorkoutStatus,
+} from '../../types';
 import { useApp } from '../../store';
 import { tr, useT } from '../../i18n';
 import { fmtDate } from '../../lib/dates';
@@ -113,63 +121,95 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
 
   /* --- Упражнения ------------------------------------------------------- */
 
-  /* Редактор работает с тем же порядком, что и режим чтения: по order.
-     После любого перемещения order перенумеровывается в 1..n — это заодно
-     чинит импортированные тренировки с дублями и «перепутанным» order. */
-  const sortedItems = useMemo(
-    () => [...draft.items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
-    [draft.items],
-  );
+  /* Позиции разведены по типу упражнения: разминочные редактируются в блоке
+     «Разминка», остальные (обычные и кардио) — в «Упражнениях». Пустая
+     позиция без выбранного упражнения помнит свой блок через warmupSlotIds. */
+  const [warmupSlotIds, setWarmupSlotIds] = useState<Set<string>>(new Set());
 
-  const moveItem = (index: number, dir: -1 | 1) => {
+  /* Редактор работает с тем же порядком, что и режим чтения: по order.
+     После любого перемещения order перенумеровывается заново (разминка —
+     первой, 1..k, затем остальные) — это заодно чинит импортированные
+     тренировки с дублями и «перепутанным» order. */
+  const { warmupItems, mainItems } = useMemo(() => {
+    const isWu = (it: WorkoutItem) =>
+      warmupSlotIds.has(it.id) ||
+      exerciseKind(exercises.find((e) => e.id === it.exerciseId)) === 'warmup';
+    const sorted = [...draft.items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    return {
+      warmupItems: sorted.filter(isWu),
+      mainItems: sorted.filter((it) => !isWu(it)),
+    };
+  }, [draft.items, exercises, warmupSlotIds]);
+
+  /** Единая запись обеих групп с перенумерацией order */
+  const commitItems = (warmups: WorkoutItem[], mains: WorkoutItem[]) =>
+    setDraft((prev) => ({
+      ...prev,
+      items: [
+        ...warmups.map((it, i) => ({ ...it, order: i + 1 })),
+        ...mains.map((it, i) => ({ ...it, order: warmups.length + i + 1 })),
+      ],
+    }));
+
+  const moveItem = (group: 'warmup' | 'main', index: number, dir: -1 | 1) => {
+    const list = group === 'warmup' ? [...warmupItems] : [...mainItems];
     const j = index + dir;
-    if (j < 0 || j >= sortedItems.length) return;
-    const items = [...sortedItems];
-    [items[index], items[j]] = [items[j], items[index]];
-    setDraft((prev) => ({ ...prev, items: items.map((it, i) => ({ ...it, order: i + 1 })) }));
+    if (j < 0 || j >= list.length) return;
+    [list[index], list[j]] = [list[j], list[index]];
+    if (group === 'warmup') commitItems(list, mainItems);
+    else commitItems(warmupItems, list);
   };
 
   const removeItem = (item: WorkoutItem) => {
     const ex = exercises.find((e) => e.id === item.exerciseId);
     const name = t.catalog.exercise(ex?.name || item.nameRaw || t.editor.untitled);
     if (!window.confirm(t.editor.removeItemConfirm(name))) return;
-    setDraft((prev) => ({ ...prev, items: prev.items.filter((it) => it.id !== item.id) }));
+    commitItems(
+      warmupItems.filter((it) => it.id !== item.id),
+      mainItems.filter((it) => it.id !== item.id),
+    );
   };
+
+  const emptyItem = (): WorkoutItem => ({
+    id: nextItemId(
+      draft.id,
+      draft.items.map((it) => it.id),
+    ),
+    exerciseId: '',
+    nameRaw: '',
+    order: 0, // выставит commitItems
+    warmupSets: null,
+    setsReps: null,
+    weight: null,
+    pvr: null,
+    tempo: null,
+    rest: null,
+    ptNote: null,
+    ptRequest: null,
+    videoUrl: null,
+    subNotes: [],
+    myComment: '',
+    actual: null,
+    done: false,
+  });
 
   /** Пустая позиция; вставляется в указанное место списка (index = 0..n) */
   const addItemAt = (index: number) => {
-    const id = nextItemId(
-      draft.id,
-      draft.items.map((it) => it.id),
-    );
-    const item: WorkoutItem = {
-      id,
-      exerciseId: '',
-      nameRaw: '',
-      order: index + 1,
-      warmupSets: null,
-      setsReps: null,
-      weight: null,
-      pvr: null,
-      tempo: null,
-      rest: null,
-      ptNote: null,
-      ptRequest: null,
-      videoUrl: null,
-      subNotes: [],
-      myComment: '',
-      actual: null,
-      done: false,
-    };
-    const items = [...sortedItems];
-    items.splice(index, 0, item);
-    setDraft((prev) => ({ ...prev, items: items.map((it, i) => ({ ...it, order: i + 1 })) }));
+    const items = [...mainItems];
+    items.splice(index, 0, emptyItem());
+    commitItems(warmupItems, items);
   };
 
-  const addItem = () => addItemAt(sortedItems.length);
+  const addItem = () => addItemAt(mainItems.length);
+
+  const addWarmupItem = () => {
+    const item = emptyItem();
+    setWarmupSlotIds((prev) => new Set(prev).add(item.id));
+    commitItems([...warmupItems, item], mainItems);
+  };
 
   /** «создать новое» из комбобокса: сохраняем упражнение и сразу назначаем */
-  const createExercise = (item: WorkoutItem, name: string) => {
+  const createExercise = (item: WorkoutItem, name: string, kind?: ExerciseKind) => {
     const ex: Exercise = {
       id: nextExerciseId(exercises.map((e) => e.id)),
       name: name.trim() || t.lib.newExercise,
@@ -177,6 +217,7 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
       videoUrl: null,
       tags: [],
       archived: false,
+      ...(kind && kind !== 'main' ? { kind } : {}),
     };
     saveExercise(ex);
     patchItem(item.id, { exerciseId: ex.id, nameRaw: ex.name });
@@ -263,8 +304,8 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
           <span className="text-sm font-semibold uppercase tracking-wide text-muted">
             {t.train.warmup}
           </span>
-          {draft.warmup.length > 0 && (
-            <span className="text-sm text-muted">{draft.warmup.length}</span>
+          {draft.warmup.length + warmupItems.length > 0 && (
+            <span className="text-sm text-muted">{draft.warmup.length + warmupItems.length}</span>
           )}
           <span className="text-muted">
             <ChevronIcon open={warmupOpen} size={18} />
@@ -309,16 +350,45 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
                 ))}
               </ul>
             )}
-            {draft.warmup.length === 0 && (
+            {draft.warmup.length === 0 && warmupItems.length === 0 && (
               <p className="mt-3 text-sm text-muted">{t.editor.noWarmup}</p>
             )}
-            <button
-              type="button"
-              onClick={addWarmup}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 font-medium"
-            >
-              <IconPlus size={16} /> {t.editor.addWarmupStep}
-            </button>
+
+            {/* Разминочные упражнения из библиотеки (тип «разминка») */}
+            {warmupItems.length > 0 && (
+              <ul className="mt-3 space-y-3">
+                {warmupItems.map((item, index) => (
+                  <WarmupItemEditorCard
+                    key={item.id}
+                    item={item}
+                    index={index}
+                    total={warmupItems.length}
+                    exercises={exercises}
+                    patchItem={patchItem}
+                    move={(i, dir) => moveItem('warmup', i, dir)}
+                    remove={removeItem}
+                    createExercise={createExercise}
+                  />
+                ))}
+              </ul>
+            )}
+
+            <div className="mt-3 space-y-2">
+              <button
+                type="button"
+                onClick={addWarmup}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 font-medium"
+              >
+                <IconPlus size={16} /> {t.editor.addWarmupStep}
+              </button>
+              <button
+                type="button"
+                onClick={addWarmupItem}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 font-medium"
+              >
+                <IconPlus size={16} /> {t.editor.addWarmupExercise}
+              </button>
+            </div>
           </div>
         )}
       </section>
@@ -328,23 +398,23 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
           {t.train.exercises}
         </h2>
-        {sortedItems.map((item, index) => (
+        {mainItems.map((item, index) => (
           <Fragment key={item.id}>
             {/* вставка нового упражнения прямо в это место списка */}
             <InsertSlot onClick={() => addItemAt(index)} />
             <ItemEditorCard
               item={item}
               index={index}
-              total={sortedItems.length}
+              total={mainItems.length}
               exercises={exercises}
               patchItem={patchItem}
-              move={moveItem}
+              move={(i, dir) => moveItem('main', i, dir)}
               remove={removeItem}
               createExercise={createExercise}
             />
           </Fragment>
         ))}
-        {draft.items.length === 0 && (
+        {mainItems.length === 0 && (
           <p className="rounded-2xl border border-border bg-card p-4 text-sm text-muted">
             {t.editor.noItemsYet}
           </p>
@@ -413,7 +483,7 @@ interface ItemEditorCardProps {
   patchItem: (id: string, p: Partial<WorkoutItem>) => void;
   move: (index: number, dir: -1 | 1) => void;
   remove: (item: WorkoutItem) => void;
-  createExercise: (item: WorkoutItem, name: string) => void;
+  createExercise: (item: WorkoutItem, name: string, kind?: ExerciseKind) => void;
 }
 
 function ItemEditorCard({
@@ -429,6 +499,7 @@ function ItemEditorCard({
   const { t } = useT();
   const subNotes = item.subNotes ?? [];
   const sr = splitSetsReps(item.setsReps?.raw ?? '');
+  const kind = exerciseKind(exercises.find((e) => e.id === item.exerciseId));
   return (
     <article className="rounded-2xl border border-border bg-card p-4">
       <div className="flex items-start gap-2">
@@ -436,6 +507,7 @@ function ItemEditorCard({
         <ExerciseCombobox
           exercises={exercises}
           value={item.exerciseId}
+          kinds={['main', 'cardio']}
           onSelect={(ex) =>
             patchItem(item.id, {
               exerciseId: ex.id,
@@ -460,58 +532,178 @@ function ItemEditorCard({
         </IconBtn>
       </div>
 
-      {/* Порядок полей повторяет карточку чтения: разминка первой,
-          примечание тренера — всегда последним. */}
-      <div className="mt-2">
-        <TextAreaField
-          label={t.train.warmup}
-          value={item.warmupSets ?? ''}
-          placeholder={t.editor.warmupFieldPlaceholder}
-          onCommit={(v) => patchItem(item.id, { warmupSets: v.trim() ? v : null })}
+      {kind === 'cardio' ? (
+        /* Кардио: длительность, пульсовая зона и примечание тренера */
+        <>
+          <div className="mt-2 grid grid-cols-2 gap-3">
+            <TextField
+              label={t.editor.durationMin}
+              value={item.duration ?? ''}
+              placeholder={t.editor.durationPlaceholder}
+              onCommit={(v) => patchItem(item.id, { duration: v.trim() || null })}
+            />
+            <TextField
+              label={t.editor.pulseZone}
+              value={item.pulseZone ?? ''}
+              placeholder={t.editor.pulseZonePlaceholder}
+              onCommit={(v) => patchItem(item.id, { pulseZone: v.trim() || null })}
+            />
+          </div>
+          <div className="mt-3">
+            <TextAreaField
+              label={
+                <span className="inline-flex items-center gap-1">
+                  <PinIcon size={13} /> {t.editor.ptNote}
+                </span>
+              }
+              value={item.ptNote ?? ''}
+              placeholder={t.editor.ptNotePlaceholder}
+              onCommit={(v) => patchItem(item.id, { ptNote: v.trim() ? v : null })}
+            />
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Порядок полей повторяет карточку чтения: разминка первой,
+              примечание тренера — всегда последним. */}
+          <div className="mt-2">
+            <TextAreaField
+              label={t.train.warmup}
+              value={item.warmupSets ?? ''}
+              placeholder={t.editor.warmupFieldPlaceholder}
+              onCommit={(v) => patchItem(item.id, { warmupSets: v.trim() ? v : null })}
+            />
+          </div>
+
+          {/* Подходы и повторы — отдельными полями (в чтении так и останется «3х12») */}
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <TextField
+              label={t.item.sets}
+              value={sr.sets}
+              placeholder={t.editor.setsPlaceholder}
+              onCommit={(v) =>
+                patchItem(item.id, { setsReps: parseSetsReps(joinSetsReps(v, sr.reps)) })
+              }
+            />
+            <TextField
+              label={t.item.reps}
+              value={sr.reps}
+              placeholder={t.editor.repsPlaceholder}
+              onCommit={(v) =>
+                patchItem(item.id, { setsReps: parseSetsReps(joinSetsReps(sr.sets, v)) })
+              }
+            />
+            <TextField
+              label={t.item.weightKg}
+              value={item.weight?.raw ?? ''}
+              placeholder={t.editor.weightPlaceholder}
+              onCommit={(v) => patchItem(item.id, { weight: parseWeight(v) })}
+            />
+            <TextField
+              label={t.editor.pvrLabel}
+              value={item.pvr ?? ''}
+              placeholder={t.editor.pvrPlaceholder}
+              onCommit={(v) => patchItem(item.id, { pvr: v.trim() || null })}
+            />
+            <TextField
+              label={t.editor.restMin}
+              value={item.rest ?? ''}
+              placeholder={t.editor.restPlaceholder}
+              onCommit={(v) => patchItem(item.id, { rest: v.trim() || null })}
+            />
+            <TextField
+              label={t.editor.tempo}
+              value={item.tempo ?? ''}
+              placeholder={t.editor.tempoPlaceholder}
+              onCommit={(v) => patchItem(item.id, { tempo: v.trim() || null })}
+            />
+          </div>
+
+          <div className="mt-3 space-y-3">
+            <TextAreaField
+              label={t.editor.technique}
+              value={subNotes.map((s) => s.text).join('\n')}
+              placeholder={t.editor.techniquePlaceholder}
+              onCommit={(v) => patchItem(item.id, { subNotes: linesToSubNotes(v, subNotes) })}
+            />
+            <TextField
+              label={t.lib.videoLink}
+              type="url"
+              value={item.videoUrl ?? ''}
+              placeholder="https://…"
+              onCommit={(v) => patchItem(item.id, { videoUrl: v.trim() || null })}
+            />
+            <TextAreaField
+              label={
+                <span className="inline-flex items-center gap-1">
+                  <PinIcon size={13} /> {t.editor.ptNote}
+                </span>
+              }
+              value={item.ptNote ?? ''}
+              placeholder={t.editor.ptNotePlaceholder}
+              onCommit={(v) => patchItem(item.id, { ptNote: v.trim() ? v : null })}
+            />
+          </div>
+        </>
+      )}
+    </article>
+  );
+}
+
+/* --- Карточка разминочного упражнения (в блоке «Разминка») ---------------- */
+/* Только повторы, техника и видео: без веса, факта и примечаний — разминке
+   они не нужны. */
+
+function WarmupItemEditorCard({
+  item,
+  index,
+  total,
+  exercises,
+  patchItem,
+  move,
+  remove,
+  createExercise,
+}: ItemEditorCardProps) {
+  const { t } = useT();
+  const subNotes = item.subNotes ?? [];
+  return (
+    <li className="rounded-xl border border-border p-3">
+      <div className="flex items-start gap-2">
+        <span className="mt-2.5 w-5 shrink-0 text-sm font-semibold text-muted">{index + 1}</span>
+        <ExerciseCombobox
+          exercises={exercises}
+          value={item.exerciseId}
+          kinds={['warmup']}
+          onSelect={(ex) =>
+            patchItem(item.id, {
+              exerciseId: ex.id,
+              nameRaw: ex.name,
+              videoUrl: item.videoUrl ?? ex.videoUrl ?? null,
+            })
+          }
+          onCreate={(name) => createExercise(item, name, 'warmup')}
         />
       </div>
 
-      {/* Подходы и повторы — отдельными полями (в чтении так и останется «3х12») */}
-      <div className="mt-3 grid grid-cols-2 gap-3">
-        <TextField
-          label={t.item.sets}
-          value={sr.sets}
-          placeholder={t.editor.setsPlaceholder}
-          onCommit={(v) => patchItem(item.id, { setsReps: parseSetsReps(joinSetsReps(v, sr.reps)) })}
-        />
+      <div className="mt-2 flex justify-end gap-1">
+        <IconBtn label={t.editor.up} disabled={index === 0} onClick={() => move(index, -1)}>
+          <IconUp />
+        </IconBtn>
+        <IconBtn label={t.editor.down} disabled={index === total - 1} onClick={() => move(index, 1)}>
+          <IconDown />
+        </IconBtn>
+        <IconBtn label={t.editor.removeItem} danger onClick={() => remove(item)}>
+          <IconX />
+        </IconBtn>
+      </div>
+
+      <div className="mt-2 space-y-3">
         <TextField
           label={t.item.reps}
-          value={sr.reps}
-          placeholder={t.editor.repsPlaceholder}
-          onCommit={(v) => patchItem(item.id, { setsReps: parseSetsReps(joinSetsReps(sr.sets, v)) })}
+          value={item.setsReps?.raw ?? ''}
+          placeholder={t.editor.warmupRepsPlaceholder}
+          onCommit={(v) => patchItem(item.id, { setsReps: parseSetsReps(v) })}
         />
-        <TextField
-          label={t.item.weightKg}
-          value={item.weight?.raw ?? ''}
-          placeholder={t.editor.weightPlaceholder}
-          onCommit={(v) => patchItem(item.id, { weight: parseWeight(v) })}
-        />
-        <TextField
-          label={t.editor.pvrLabel}
-          value={item.pvr ?? ''}
-          placeholder={t.editor.pvrPlaceholder}
-          onCommit={(v) => patchItem(item.id, { pvr: v.trim() || null })}
-        />
-        <TextField
-          label={t.editor.restMin}
-          value={item.rest ?? ''}
-          placeholder={t.editor.restPlaceholder}
-          onCommit={(v) => patchItem(item.id, { rest: v.trim() || null })}
-        />
-        <TextField
-          label={t.editor.tempo}
-          value={item.tempo ?? ''}
-          placeholder={t.editor.tempoPlaceholder}
-          onCommit={(v) => patchItem(item.id, { tempo: v.trim() || null })}
-        />
-      </div>
-
-      <div className="mt-3 space-y-3">
         <TextAreaField
           label={t.editor.technique}
           value={subNotes.map((s) => s.text).join('\n')}
@@ -525,17 +717,7 @@ function ItemEditorCard({
           placeholder="https://…"
           onCommit={(v) => patchItem(item.id, { videoUrl: v.trim() || null })}
         />
-        <TextAreaField
-          label={
-            <span className="inline-flex items-center gap-1">
-              <PinIcon size={13} /> {t.editor.ptNote}
-            </span>
-          }
-          value={item.ptNote ?? ''}
-          placeholder={t.editor.ptNotePlaceholder}
-          onCommit={(v) => patchItem(item.id, { ptNote: v.trim() ? v : null })}
-        />
       </div>
-    </article>
+    </li>
   );
 }
