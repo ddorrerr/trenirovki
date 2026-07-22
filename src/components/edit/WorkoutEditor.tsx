@@ -112,10 +112,12 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
   // Разминку правят редко — по умолчанию блок свёрнут, как в режиме чтения
   const [warmupOpen, setWarmupOpen] = useState(false);
 
+  /* Свободные текстовые пункты и «Видео разминки» — наследие: с v0.28.0
+     разминка собирается из упражнений библиотеки. Старые данные (если
+     вдруг остались несконвертированными) по-прежнему можно править и
+     удалять, но новые текстовые пункты больше не добавляются. */
   const patchWarmup = (i: number, p: Partial<WarmupItem>) =>
     patch({ warmup: draft.warmup.map((x, j) => (j === i ? { ...x, ...p } : x)) });
-
-  const addWarmup = () => patch({ warmup: [...draft.warmup, { text: '', videoUrl: null }] });
 
   const removeWarmup = (i: number) => patch({ warmup: draft.warmup.filter((_, j) => j !== i) });
 
@@ -313,15 +315,19 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
         </button>
         {warmupOpen && (
           <div className="anim-rise">
-            <div className="mt-2">
-              <TextField
-                label={t.editor.warmupVideoLink}
-                type="url"
-                value={draft.warmupVideoUrl ?? ''}
-                placeholder="https://…"
-                onCommit={(v) => patch({ warmupVideoUrl: v.trim() || null })}
-              />
-            </div>
+            {/* Поле «Видео разминки» — только если в данных ещё есть старая
+                ссылка; в новых тренировках видео живёт у «Суставной разминки» */}
+            {draft.warmupVideoUrl && (
+              <div className="mt-2">
+                <TextField
+                  label={t.editor.warmupVideoLink}
+                  type="url"
+                  value={draft.warmupVideoUrl}
+                  placeholder="https://…"
+                  onCommit={(v) => patch({ warmupVideoUrl: v.trim() || null })}
+                />
+              </div>
+            )}
             {draft.warmup.length > 0 && (
               <ul className="mt-3 space-y-3">
                 {draft.warmup.map((wu, i) => (
@@ -373,22 +379,13 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
               </ul>
             )}
 
-            <div className="mt-3 space-y-2">
-              <button
-                type="button"
-                onClick={addWarmup}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 font-medium"
-              >
-                <IconPlus size={16} /> {t.editor.addWarmupStep}
-              </button>
-              <button
-                type="button"
-                onClick={addWarmupItem}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 font-medium"
-              >
-                <IconPlus size={16} /> {t.editor.addWarmupExercise}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={addWarmupItem}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 font-medium"
+            >
+              <IconPlus size={16} /> {t.editor.addExercise}
+            </button>
           </div>
         )}
       </section>

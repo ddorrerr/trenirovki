@@ -66,6 +66,18 @@ const NAMES: [ru: string, en: string][] = [
   ['Подъёмы на носки', 'Calf raises'],
   ['Эллипс/дорожка', 'Elliptical / treadmill'],
   ['Суставная разминка', 'Joint warm-up'],
+  // разминочные упражнения из миграции v0.28.0 (бывшие текстовые пункты)
+  ['Вращение бедра наружу с ногой на колене', 'Hip external rotation, foot on knee'],
+  ['Растяжка в широком выпаде "раскоряка"', 'Wide lunge stretch'],
+  ['Разгибание поясницы с помощью рук', 'Lumbar extension with arm support'],
+  ['Мобилизация ГО в латеральном выпаде', 'Thoracic mobility in lateral lunge'],
+  ['Растяжка сгибателей бедра через контроль поясницы', 'Hip flexor stretch with lumbar control'],
+  ['Растяжка внутреннего вращения бедра', 'Hip internal rotation stretch'],
+  ['Сгибание плеч у стены', 'Wall shoulder flexion'],
+  ['Растяжка мышц задней части бедра', 'Hamstring stretch'],
+  ['Отведение бедра стоя (активация)', 'Standing hip abduction (activation)'],
+  ['Вращение грудного отдела у стены', 'Thoracic rotation at the wall'],
+  ['Активация кора в положении наклона', 'Core activation in hip hinge'],
 ];
 
 function norm(s: string): string {

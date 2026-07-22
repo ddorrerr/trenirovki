@@ -353,8 +353,6 @@ export const en: typeof ru = {
     warmupPlaceholder: '- hip rotations…',
     removeStep: 'Remove step',
     noWarmup: 'No warm-up yet.',
-    addWarmupStep: 'Warm-up step',
-    addWarmupExercise: 'Exercise from the library',
     warmupRepsPlaceholder: 'e.g. 1x10 or 40 seconds',
     noItemsYet: 'No exercises yet — add the first one.',
     addExercise: 'Exercise',

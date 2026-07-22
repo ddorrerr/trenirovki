@@ -358,8 +358,6 @@ export const ru = {
     warmupPlaceholder: '- вращение бедра…',
     removeStep: 'Убрать пункт',
     noWarmup: 'Разминки пока нет.',
-    addWarmupStep: 'Пункт разминки',
-    addWarmupExercise: 'Упражнение из библиотеки',
     warmupRepsPlaceholder: 'напр. 1х10 или 40 секунд',
     noItemsYet: 'Упражнений пока нет — добавь первое.',
     addExercise: 'Упражнение',

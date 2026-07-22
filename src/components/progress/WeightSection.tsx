@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useApp, type Occurrence } from '../../store';
-import type { WorkoutItem } from '../../types';
+import { exerciseKind, type WorkoutItem } from '../../types';
 import { useT } from '../../i18n';
 import { fmtDateShort, todayISO } from '../../lib/dates';
 import { fmtNum, parseTime } from './chart';
@@ -59,6 +59,8 @@ export default function WeightSection() {
 
   const options = useMemo<ExerciseOption[]>(() => {
     return exercises
+      // разминка и кардио без веса — в графике веса им делать нечего
+      .filter((e) => exerciseKind(e) === 'main')
       .map((e) => ({
         id: e.id,
         name: e.name,
