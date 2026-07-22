@@ -18,6 +18,7 @@ import {
   HistoryIcon,
   PinIcon,
   RepeatIcon,
+  SidesIcon,
   SkullIcon,
   TempoIcon,
   VideoIcon,
@@ -143,6 +144,14 @@ export default function ItemCard({
     });
   if (weightText)
     mainChips.push({ icon: <BarbellIcon />, name: t.item.chipWeight, text: weightText, bold: true });
+  // подсказка «3х12 — это на каждую сторону», без выделения жирным
+  if (kind === 'main' && exercise?.unilateral)
+    mainChips.push({
+      icon: <SidesIcon />,
+      name: null,
+      text: t.item.chipEachSide,
+      bold: false,
+    });
   const detailChips: typeof mainChips = [];
   if (item.pvr)
     detailChips.push({

@@ -9,6 +9,7 @@ import type { Workout } from '../types';
 import { locale, useT, type EquivForms } from '../i18n';
 import { daysBetween, fmtDate, fmtDateShort, fmtWeekday, todayISO } from '../lib/dates';
 import NewWorkoutForm from '../components/edit/NewWorkoutForm';
+import { isPairWeight } from '../components/edit/parse';
 import { BarbellIcon, CommentIcon, FlameIcon, SkullIcon } from '../components/train/icons';
 /* Свои рисованные иконки гонконгских эквивалентов (нарезаны из одного спрайта) */
 import unitLion from '../assets/units/lion.png';
@@ -240,7 +241,9 @@ export default function HomeScreen() {
   const thisWeek = weekCounts[weekCounts.length - 1];
   const usual = Math.max(1, Math.round(median(weekCounts.slice(0, -1))));
 
-  /* Объём прошлой тренировки: вес × подходы × повторы, где всё известно */
+  /* Объём прошлой тренировки: вес × подходы × повторы, где всё известно.
+     «По одной стороне» (unilateral) — ×2: подходы делаются на каждую сторону.
+     Пара гантелей «12+12» — тоже ×2: value хранит вес ОДНОЙ гантели. */
   const lastDone = useMemo(
     () => [...past].reverse().find((w) => w.status === 'done') ?? null,
     [past],
@@ -252,10 +255,13 @@ export default function HomeScreen() {
       const w = it.actual?.weight ?? it.weight?.value;
       const s = it.actual?.sets ?? it.setsReps?.sets;
       const r = it.actual?.reps ?? it.setsReps?.reps;
-      if (w != null && s != null && r != null) kg += w * s * r;
+      if (w == null || s == null || r == null) continue;
+      const sides = exerciseById(it.exerciseId)?.unilateral ? 2 : 1;
+      const pair = isPairWeight(it.weight?.raw) ? 2 : 1;
+      kg += w * s * r * sides * pair;
     }
     return Math.round(kg);
-  }, [lastDone]);
+  }, [lastDone, exerciseById]);
 
   /* Во что «переводится» поднятый объём — весёлый эквивалент; единица
      выбирается из подходящих по величине и меняется от тренировки к

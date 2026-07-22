@@ -230,6 +230,7 @@ export const ru = {
     chipTempo: 'темп',
     chipDuration: 'длительность',
     chipPulse: 'пульсовая зона',
+    chipEachSide: 'на каждую сторону',
     rest: 'отдых',
     startRest: 'Запустить таймер отдыха',
     hasMyComment: 'есть твой комментарий',
@@ -300,6 +301,11 @@ export const ru = {
       ExerciseKind,
       string
     >,
+    /** Стороны: обе сразу / по одной за раз (флаг unilateral) */
+    sidesLabel: 'Стороны',
+    sidesFilter: { uni: 'По одной стороне', both: 'Обе сразу' },
+    sidesOption: { both: 'Обе стороны сразу', uni: 'По одной стороне' },
+    sidesChip: 'по одной стороне',
     muscleGroup: 'Группа мышц',
     equipment: 'Инвентарь',
     empty: 'Библиотека пока пустая.',

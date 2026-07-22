@@ -94,6 +94,27 @@ export function FlameIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+/** «По одной стороне» — стрелки в обе стороны от центра */
+export function SidesIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 5.5v13" />
+      <path d="M8.5 12H3m0 0l2.6-2.6M3 12l2.6 2.6" />
+      <path d="M15.5 12H21m0 0l-2.6-2.6M21 12l-2.6 2.6" />
+    </svg>
+  );
+}
+
 /** Пульсовая зона кардио — сердце с линией пульса */
 export function HeartPulseIcon({ size = 16 }: { size?: number }) {
   return (

@@ -16,6 +16,12 @@ export interface Exercise {
   muscles?: string[]; // группы мышц (можно несколько), см. lib/catalog.ts
   equipment?: string[]; // инвентарь (можно несколько), см. lib/catalog.ts
   kind?: ExerciseKind; // отсутствует = 'main' (для обычных не записываем)
+  /**
+   * true = выполняется по одной стороне за раз (на 1 ноге/руке, боковые):
+   * «3х12» значит 3х12 НА КАЖДУЮ сторону — объём считается ×2.
+   * Отсутствует = обе стороны сразу.
+   */
+  unilateral?: boolean;
   archived: boolean;
 }
 

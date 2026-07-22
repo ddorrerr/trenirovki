@@ -11,7 +11,7 @@ import { nextExerciseId } from '../lib/ids';
 import { EQUIPMENT, MUSCLE_GROUPS } from '../lib/catalog';
 import { splitTags } from '../components/edit/parse';
 import { Chip, ChipPicker, IconPlus, SelectField, TextField, inputCls } from '../components/edit/ui';
-import { BarbellIcon, FlameIcon, HeartPulseIcon, VideoIcon } from '../components/train/icons';
+import { BarbellIcon, FlameIcon, HeartPulseIcon, SidesIcon, VideoIcon } from '../components/train/icons';
 import { equipIcon, muscleIcon } from '../components/catalogIcons';
 
 const KIND_VALUES: ExerciseKind[] = ['main', 'warmup', 'cardio'];
@@ -30,12 +30,14 @@ const paneMemory: {
   expandedId: string | null;
   scroll: number;
   fKind: string | null;
+  fSides: string | null;
   fMuscle: string | null;
   fEquip: string | null;
 } = {
   expandedId: null,
   scroll: 0,
   fKind: null,
+  fSides: null,
   fMuscle: null,
   fEquip: null,
 };
@@ -67,13 +69,19 @@ export default function LibraryScreen() {
     };
   }, []);
 
-  /* Фильтры: тип + одна группа мышц + один инвентарь (тап второй раз — сброс) */
+  /* Фильтры: тип + стороны + одна группа мышц + один инвентарь
+     (тап второй раз — сброс) */
   const [fKind, setFKindState] = useState<string | null>(paneMemory.fKind);
+  const [fSides, setFSidesState] = useState<string | null>(paneMemory.fSides);
   const [fMuscle, setFMuscleState] = useState<string | null>(paneMemory.fMuscle);
   const [fEquip, setFEquipState] = useState<string | null>(paneMemory.fEquip);
   const setFKind = (v: string | null) => {
     paneMemory.fKind = v;
     setFKindState(v);
+  };
+  const setFSides = (v: string | null) => {
+    paneMemory.fSides = v;
+    setFSidesState(v);
   };
   const setFMuscle = (v: string | null) => {
     paneMemory.fMuscle = v;
@@ -117,6 +125,7 @@ export default function LibraryScreen() {
     return exercises
       .filter((e) => showArchive || !e.archived)
       .filter((e) => !fKind || exerciseKind(e) === fKind)
+      .filter((e) => !fSides || (fSides === 'uni') === !!e.unilateral)
       .filter((e) => !fMuscle || (e.muscles ?? []).includes(fMuscle))
       .filter((e) => !fEquip || (e.equipment ?? []).includes(fEquip))
       .filter(
@@ -133,7 +142,7 @@ export default function LibraryScreen() {
         const d = (stats.get(b.id)?.count ?? 0) - (stats.get(a.id)?.count ?? 0);
         return d !== 0 ? d : a.name.localeCompare(b.name, 'ru');
       });
-  }, [exercises, query, showArchive, stats, pinnedId, fKind, fMuscle, fEquip, t]);
+  }, [exercises, query, showArchive, stats, pinnedId, fKind, fSides, fMuscle, fEquip, t]);
 
   const addExercise = () => {
     const ex: Exercise = {
@@ -185,6 +194,15 @@ export default function LibraryScreen() {
         tone="kind"
         icon={kindIcon}
         display={(k) => t.lib.kindFilter[k as ExerciseKind]}
+      />
+      <FilterChips
+        label={t.lib.sidesLabel}
+        options={['uni', 'both']}
+        value={fSides}
+        onChange={setFSides}
+        tone="equip"
+        icon={(v, size = 15) => (v === 'uni' ? <SidesIcon size={size} /> : null)}
+        display={(v) => t.lib.sidesFilter[v as 'uni' | 'both']}
       />
       <FilterChips
         label={t.lib.muscleGroup}
@@ -328,6 +346,12 @@ function ExerciseRow({ e, count, lastDate, expanded, onToggle }: ExerciseRowProp
                 {t.lib.kindChip[exerciseKind(e)]}
               </span>
             )}
+            {e.unilateral && (
+              <span className="inline-flex items-center gap-1 rounded-lg border border-border bg-bg px-2 py-0.5 text-xs font-medium text-muted">
+                <SidesIcon size={12} />
+                {t.lib.sidesChip}
+              </span>
+            )}
             {e.archived && (
               <span className="rounded-lg border border-border bg-bg px-2 py-0.5 text-xs font-medium text-muted">
                 {t.lib.archiveChip}
@@ -381,7 +405,7 @@ function ExerciseDetails({ e }: { e: Exercise }) {
 
   return (
     <div className="space-y-3">
-      {(muscles.length > 0 || equipment.length > 0) && (
+      {(muscles.length > 0 || equipment.length > 0 || e.unilateral) && (
         <div className="flex flex-wrap gap-1.5">
           {muscles.map((m) => (
             <Chip key={'m-' + m}>
@@ -399,6 +423,14 @@ function ExerciseDetails({ e }: { e: Exercise }) {
               </span>
             </Chip>
           ))}
+          {e.unilateral && (
+            <Chip muted>
+              <span className="inline-flex items-center gap-1.5">
+                <SidesIcon size={13} />
+                {t.lib.sidesChip}
+              </span>
+            </Chip>
+          )}
         </div>
       )}
       <div className="flex flex-wrap items-center gap-3">
@@ -481,6 +513,18 @@ function ExerciseEditPanel({ e, used }: { e: Exercise; used: boolean }) {
         onCommit={(v) =>
           // у обычных упражнений поле kind не храним (как в старых данных)
           saveExercise({ ...e, kind: v === 'main' ? undefined : (v as ExerciseKind) })
+        }
+      />
+      <SelectField
+        label={t.lib.sidesLabel}
+        value={e.unilateral ? 'uni' : 'both'}
+        options={[
+          { value: 'both', label: t.lib.sidesOption.both },
+          { value: 'uni', label: t.lib.sidesOption.uni },
+        ]}
+        onCommit={(v) =>
+          // «обе сразу» — поле не храним, как и kind у обычных
+          saveExercise({ ...e, unilateral: v === 'uni' ? true : undefined })
         }
       />
       <TextField
