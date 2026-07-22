@@ -11,6 +11,11 @@ export interface RestRequest {
   itemId: string;
   seconds: number;
   nonce: number;
+  /**
+   * Тихий автозапуск после отмеченного подхода (режим «идёт»): шторка не
+   * открывается, отсчёт сразу идёт и виден плавающей пилюлей.
+   */
+  autostart?: boolean;
 }
 
 const FALLBACK_SECONDS = 90;
@@ -93,12 +98,41 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
   const audioRef = useRef<AudioContext | null>(null);
   const flashTimerRef = useRef<number | null>(null);
 
-  // Открытие по тапу на чип «отдых»
+  // AudioContext создаём/будим строго в обработчике пользовательского тапа (iOS);
+  // для автозапуска годится и эффект сразу после тапа — активация ещё жива
+  const ensureAudio = useCallback(() => {
+    try {
+      if (!audioRef.current) {
+        const Ctor =
+          window.AudioContext ??
+          (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (Ctor) audioRef.current = new Ctor();
+      }
+      if (audioRef.current && audioRef.current.state !== 'running') {
+        void audioRef.current.resume().catch(() => undefined);
+      }
+    } catch {
+      /* будет просто без звука */
+    }
+  }, []);
+
+  // Открытие по тапу на чип «отдых»; автозапуск — по отмеченному подходу
   useEffect(() => {
     if (!request || request.nonce === lastNonceRef.current) return;
     lastNonceRef.current = request.nonce;
     const sameItem = itemRef.current === request.itemId;
     itemRef.current = request.itemId;
+    if (request.autostart) {
+      // каждый новый подход перезапускает отсчёт заново; шторку не трогаем
+      ensureAudio();
+      setFlash(false);
+      finishedRef.current = false;
+      setDuration(request.seconds);
+      setRemaining(request.seconds);
+      endAtRef.current = Date.now() + request.seconds * 1000;
+      setRunning(true);
+      return;
+    }
     setClosing(false);
     setOpen(true);
     if (running && sameItem) return; // отсчёт уже идёт — просто показать
@@ -106,7 +140,7 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
     setFlash(false);
     setDuration(request.seconds);
     setRemaining(request.seconds);
-  }, [request, running]);
+  }, [request, running, ensureAudio]);
 
   /* Финиш один раз на запуск: тик и возврат из фона могут сработать вместе.
      После фона AudioContext подвешен — будим и только потом звоним. */
@@ -161,23 +195,6 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
     },
     [],
   );
-
-  // AudioContext создаём/будим строго в обработчике пользовательского тапа (iOS)
-  const ensureAudio = useCallback(() => {
-    try {
-      if (!audioRef.current) {
-        const Ctor =
-          window.AudioContext ??
-          (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-        if (Ctor) audioRef.current = new Ctor();
-      }
-      if (audioRef.current && audioRef.current.state !== 'running') {
-        void audioRef.current.resume().catch(() => undefined);
-      }
-    } catch {
-      /* будет просто без звука */
-    }
-  }, []);
 
   /* При reduced-motion переходов нет — закрываем сразу, не ждём transitionend */
   const closeSheet = useCallback(() => {

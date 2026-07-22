@@ -45,7 +45,7 @@ export const ru = {
     comments: 'Комментарии',
   },
 
-  status: { done: 'выполнена', planned: 'запланирована' },
+  status: { done: 'выполнена', planned: 'запланирована', active: 'идёт' },
 
   counted: {
     workouts: (n: number) => plural(n, 'тренировка', 'тренировки', 'тренировок'),
@@ -215,6 +215,17 @@ export const ru = {
       'тренировку. Настройки найдёшь в «Меню».',
     emptyEnable: 'Включить редактирование',
     emptyMenu: 'Открыть меню',
+    /* Компактная карточка и режим «идёт» */
+    start: 'Начать тренировку',
+    expandView: 'Развернуть — посмотреть подробно',
+    collapseView: 'Свернуть в карточку',
+    ofCount: (a: number, b: number) => `${a} из ${b}`,
+    doneBlock: 'Выполнено',
+    skippedLabel: 'пропущено',
+    returnToList: 'Вернуть в список',
+    finishConfirm: (list: string) =>
+      `Не выполнено: ${list}. Отметить пропущенными и завершить тренировку?`,
+    cancelStart: 'отменить начало тренировки',
   },
 
   item: {
@@ -260,6 +271,11 @@ export const ru = {
     removeSetAria: (n: number) => `Убрать подход ${n}`,
     perSetWeightAria: (n: number) => `Вес в подходе ${n}, кг`,
     perSetRepsAria: (n: number) => `Повторы в подходе ${n}`,
+    /* Кружки подходов в режиме «идёт» */
+    setsRowLabel: 'подходы',
+    setBubbleAria: (n: number) => `Подход ${n}`,
+    setsDoneOf: (a: number, b: number) => `${a} из ${b} подх.`,
+    skipToday: 'пропустить сегодня',
   },
 
   timer: {

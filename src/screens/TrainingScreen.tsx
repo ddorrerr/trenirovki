@@ -3,15 +3,21 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../store';
-import { useT } from '../i18n';
+import { useT, type Dict } from '../i18n';
 import { fmtDate, fmtWeekday } from '../lib/dates';
-import type { Workout, WorkoutItem } from '../types';
+import { exerciseKind, type Exercise, type ExerciseKind, type Workout, type WorkoutItem } from '../types';
+import { perSetSummary } from '../lib/actual';
 import WorkoutEditor from '../components/edit/WorkoutEditor';
 import NewWorkoutForm from '../components/edit/NewWorkoutForm';
-import ItemCard from '../components/train/ItemCard';
+import ItemCard, {
+  plannedSetsCount,
+  restLabel,
+  stripNumbering,
+  weightLabel,
+} from '../components/train/ItemCard';
 import RestTimer, { parseRestSeconds, type RestRequest } from '../components/train/RestTimer';
 import VideoLink from '../components/train/VideoLink';
-import { CheckIcon, ChevronIcon, VideoIcon } from '../components/train/icons';
+import { CheckIcon, ChevronIcon, FlameIcon, VideoIcon, XIcon } from '../components/train/icons';
 
 /**
  * Разбираем строку разминки из таблицы: маркеры «-», «•» убираем, нумерацию
@@ -43,11 +49,18 @@ export default function TrainingScreen() {
   } = useApp();
   const { t } = useT();
 
+  /* Если есть начатая тренировка («идёт»), без явно открытой показываем её,
+     а не просто последнюю по дате: старт не должен теряться при перезаходе */
+  const activeWorkout =
+    workouts.find((x) => x.status === 'planned' && !!x.startedAt) ?? null;
+  const w = !openWorkoutId && activeWorkout ? activeWorkout : currentWorkout;
+  const isActive = !!w && w.status === 'planned' && !!w.startedAt;
+
   // В режиме редактирования «последняя тренировка» фиксируется по id:
   // иначе правка даты пересортировала бы список и подменила бы редактируемую.
   useEffect(() => {
-    if (editMode && !openWorkoutId && currentWorkout) navigate('train', currentWorkout.id);
-  }, [editMode, openWorkoutId, currentWorkout, navigate]);
+    if (editMode && !openWorkoutId && w) navigate('train', w.id);
+  }, [editMode, openWorkoutId, w, navigate]);
 
   // Свёрнутость блоков помним на время сессии, отдельно для каждой тренировки
   const [warmupOpenMap, setWarmupOpenMap] = useState<Record<string, boolean>>({});
@@ -56,6 +69,8 @@ export default function TrainingScreen() {
   /* Завершённая тренировка «закрыта»: отметки упражнений, разминки и ползунок
      усталости не реагируют, пока не открыть замок внизу (на время сессии). */
   const [unlockedMap, setUnlockedMap] = useState<Record<string, boolean>>({});
+  /* «Развернуть — посмотреть подробно» на компактной карточке (на время сессии) */
+  const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
   const [warmupPop, setWarmupPop] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
   /* Слайд при листании тренировок (стрелки или свайп); null — без анимации */
@@ -63,9 +78,23 @@ export default function TrainingScreen() {
   const prevIdRef = useRef<string | null>(null);
   const touchRef = useRef<{ x: number; y: number; ok: boolean } | null>(null);
 
+  /* Минуты в шапке режима «идёт» обновляются раз в полминуты */
+  const [, setClockTick] = useState(0);
+  useEffect(() => {
+    if (!isActive) return;
+    const id = window.setInterval(() => setClockTick((n) => n + 1), 30_000);
+    return () => window.clearInterval(id);
+  }, [isActive, w?.id]);
+
+  /* Свежая тренировка для отложенных сохранений (таймер «последнего кружка»):
+     иначе патч, пришедший через 400 мс, собрал бы workout из устаревшего w */
+  const wRef = useRef<Workout | null>(null);
+  useEffect(() => {
+    wRef.current = w;
+  });
+
   if (loading) return null;
 
-  const w = currentWorkout;
   if (!w) {
     return editMode ? (
       <NewWorkoutForm />
@@ -111,9 +140,10 @@ export default function TrainingScreen() {
   };
 
   const saveItem = (itemId: string, patch: Partial<WorkoutItem>) => {
+    const cur = wRef.current ?? w;
     saveWorkout({
-      ...w,
-      items: w.items.map((i) => (i.id === itemId ? { ...i, ...patch } : i)),
+      ...cur,
+      items: cur.items.map((i) => (i.id === itemId ? { ...i, ...patch } : i)),
     });
   };
 
@@ -131,6 +161,174 @@ export default function TrainingScreen() {
   const warmupOpen = warmupOpenMap[w.id] ?? (w.status === 'planned' && !w.warmupDone);
   const notesOpen = notesOpenMap[w.id] ?? false;
   const workoutLocked = w.status === 'done' && !unlockedMap[w.id];
+
+  /* Три состояния тренировки: компактная карточка / «идёт» / подробный вид */
+  const wState: 'active' | 'planned' | 'done' =
+    w.status === 'done' ? 'done' : w.startedAt ? 'active' : 'planned';
+  const expanded = expandedMap[w.id] ?? false;
+
+  const todoItems = mainItems.filter((it) => !it.done && !it.skipped);
+  const doneItems = mainItems.filter((it) => it.done);
+  const skippedItems = mainItems.filter((it) => !it.done && it.skipped);
+  const movedCount = doneItems.length + skippedItems.length;
+  const numOf = (it: WorkoutItem) => mainItems.findIndex((x) => x.id === it.id) + 1;
+
+  const elapsedMin = (() => {
+    if (!w.startedAt) return 0;
+    const ms = Date.now() - Date.parse(w.startedAt);
+    return Number.isFinite(ms) ? Math.max(0, Math.round(ms / 60000)) : 0;
+  })();
+
+  const startWorkout = () => saveWorkout({ ...w, startedAt: new Date().toISOString() });
+  const cancelStart = () => saveWorkout({ ...w, startedAt: null });
+
+  /* «Завершить» в режиме «идёт»: неотмеченное — с подтверждением в пропуск */
+  const finishActive = () => {
+    let items = w.items;
+    if (todoItems.length > 0) {
+      const ok = window.confirm(t.train.finishConfirm(t.counted.exercises(todoItems.length)));
+      if (!ok) return;
+      const ids = new Set(todoItems.map((r) => r.id));
+      items = w.items.map((i) => (ids.has(i.id) ? { ...i, skipped: true } : i));
+    }
+    saveWorkout({ ...w, items, status: 'done' });
+    setUnlockedMap((m) => ({ ...m, [w.id]: false }));
+    setCelebrate(true);
+    window.setTimeout(() => setCelebrate(false), 1200);
+  };
+
+  const requestRest = (item: WorkoutItem, autostart = false) =>
+    setRestRequest((prevReq) => ({
+      itemId: item.id,
+      seconds: parseRestSeconds(item.rest),
+      nonce: (prevReq?.nonce ?? 0) + 1,
+      autostart,
+    }));
+
+  /* Разминка: шапка как у карточки упражнения — видео и «выполнено».
+     Секция общая для режима «идёт» и подробного вида */
+  const warmupSection = hasWarmup && (
+    <section className="rounded-2xl border border-border bg-card p-4">
+      <div className="flex items-start gap-3">
+        <button
+          onClick={() => setWarmupOpenMap((m) => ({ ...m, [w.id]: !warmupOpen }))}
+          aria-expanded={warmupOpen}
+          className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left"
+        >
+          <span
+            className={
+              'text-sm font-semibold uppercase tracking-wide ' +
+              (w.warmupDone ? 'text-muted' : '')
+            }
+          >
+            {t.train.warmup}
+          </span>
+          {warmupCount > 0 && <span className="text-sm text-muted">{warmupCount}</span>}
+          <span className="text-muted">
+            <ChevronIcon open={warmupOpen} size={18} />
+          </span>
+        </button>
+        {w.warmupVideoUrl && (
+          <a
+            href={w.warmupVideoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={t.train.warmupVideo}
+            title={t.train.warmupVideo}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"
+          >
+            <VideoIcon />
+          </a>
+        )}
+        <button
+          onClick={() => {
+            saveWorkout({ ...w, warmupDone: !w.warmupDone });
+            // «чпок» — только при отметке; снятие отметки происходит без праздника
+            if (!w.warmupDone) setWarmupPop(true);
+          }}
+          onAnimationEnd={() => setWarmupPop(false)}
+          disabled={workoutLocked}
+          aria-pressed={w.warmupDone ?? false}
+          aria-label={w.warmupDone ? t.train.warmupUndo : t.train.warmupDone}
+          title={workoutLocked ? t.train.lockedHint : undefined}
+          className={
+            'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors ' +
+            (w.warmupDone
+              ? 'border-ok bg-ok text-ok-fg'
+              : 'border-border bg-card text-muted') +
+            (warmupPop ? ' anim-check' : '')
+          }
+        >
+          <CheckIcon />
+        </button>
+      </div>
+      {warmupOpen && warmupCount > 0 && (
+        <ul className={'anim-rise mt-2 space-y-2.5 ' + (w.warmupDone ? 'opacity-70' : '')}>
+          {w.warmup.map((wu, i) => {
+            const line = parseWarmupLine(wu.text, i + 1);
+            return (
+              <li key={i} className="flex items-start gap-2 text-[15px] leading-snug">
+                <span className="mt-0.5 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-chip px-1 text-[11px] font-semibold tabular-nums text-muted">
+                  {line.label}
+                </span>
+                <span className="min-w-0 break-words">
+                  {line.text}
+                  {wu.videoUrl && <VideoLink href={wu.videoUrl} className="ml-1.5" />}
+                </span>
+              </li>
+            );
+          })}
+          {/* Разминочные упражнения из библиотеки — в той же ленте */}
+          {warmupItems.map((it, i) => {
+            const ex = it.exerciseId ? exerciseById(it.exerciseId) : undefined;
+            const name = t.catalog.exercise(ex?.name ?? it.nameRaw) || t.item.fallbackName;
+            const video = it.videoUrl ?? ex?.videoUrl ?? null;
+            return (
+              <li key={it.id} className="flex items-start gap-2 text-[15px] leading-snug">
+                <span className="mt-0.5 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-chip px-1 text-[11px] font-semibold tabular-nums text-muted">
+                  {w.warmup.length + i + 1}
+                </span>
+                <span className="min-w-0 break-words">
+                  {name}
+                  {it.setsReps?.raw && <> — {it.setsReps.raw}</>}
+                  {video && <VideoLink href={video} className="ml-1.5" />}
+                  {(it.subNotes ?? []).map((sn, j) => (
+                    <span key={j} className="mt-0.5 block text-[13px] leading-snug text-muted">
+                      {sn.text}
+                      {sn.videoUrl && <VideoLink href={sn.videoUrl} className="ml-1.5" />}
+                    </span>
+                  ))}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+
+  /* Заметки тренера — тоже общие для «идёт» и подробного вида */
+  const notesSection = w.notes.trim() !== '' && (
+    <section className="rounded-2xl border border-border bg-card p-4">
+      <button
+        onClick={() => setNotesOpenMap((m) => ({ ...m, [w.id]: !notesOpen }))}
+        aria-expanded={notesOpen}
+        className="flex min-h-11 w-full items-center justify-between gap-2 text-left"
+      >
+        <span className="text-sm font-semibold uppercase tracking-wide text-muted">
+          {t.train.trainerNotes}
+        </span>
+        <span className="text-muted">
+          <ChevronIcon open={notesOpen} size={18} />
+        </span>
+      </button>
+      {notesOpen && (
+        <p className="anim-rise mt-2 whitespace-pre-line break-words text-[15px] leading-relaxed">
+          {w.notes}
+        </p>
+      )}
+    </section>
+  );
 
   return (
     <div className="space-y-4" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
@@ -152,112 +350,138 @@ export default function TrainingScreen() {
           <NewWorkoutForm />
           <WorkoutEditor workout={w} />
         </>
-      ) : (
+      ) : wState === 'active' ? (
         <>
-          {/* Разминка: шапка как у карточки упражнения — видео и «выполнено» */}
-          {hasWarmup && (
-            <section className="rounded-2xl border border-border bg-card p-4">
-              <div className="flex items-start gap-3">
-                <button
-                  onClick={() =>
-                    setWarmupOpenMap((m) => ({ ...m, [w.id]: !warmupOpen }))
-                  }
-                  aria-expanded={warmupOpen}
-                  className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left"
-                >
-                  <span
-                    className={
-                      'text-sm font-semibold uppercase tracking-wide ' +
-                      (w.warmupDone ? 'text-muted' : '')
-                    }
-                  >
-                    {t.train.warmup}
-                  </span>
-                  {warmupCount > 0 && (
-                    <span className="text-sm text-muted">{warmupCount}</span>
-                  )}
-                  <span className="text-muted">
-                    <ChevronIcon open={warmupOpen} size={18} />
-                  </span>
-                </button>
-                {w.warmupVideoUrl && (
-                  <a
-                    href={w.warmupVideoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={t.train.warmupVideo}
-                    title={t.train.warmupVideo}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"
-                  >
-                    <VideoIcon />
-                  </a>
-                )}
-                <button
-                  onClick={() => {
-                    saveWorkout({ ...w, warmupDone: !w.warmupDone });
-                    // «чпок» — только при отметке; снятие отметки происходит без праздника
-                    if (!w.warmupDone) setWarmupPop(true);
-                  }}
-                  onAnimationEnd={() => setWarmupPop(false)}
-                  disabled={workoutLocked}
-                  aria-pressed={w.warmupDone ?? false}
-                  aria-label={w.warmupDone ? t.train.warmupUndo : t.train.warmupDone}
-                  title={workoutLocked ? t.train.lockedHint : undefined}
-                  className={
-                    'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors ' +
-                    (w.warmupDone
-                      ? 'border-ok bg-ok text-ok-fg'
-                      : 'border-border bg-card text-muted') +
-                    (warmupPop ? ' anim-check' : '')
-                  }
-                >
-                  <CheckIcon />
-                </button>
-              </div>
-              {warmupOpen && warmupCount > 0 && (
-                <ul className={'anim-rise mt-2 space-y-2.5 ' + (w.warmupDone ? 'opacity-70' : '')}>
-                  {w.warmup.map((wu, i) => {
-                    const line = parseWarmupLine(wu.text, i + 1);
-                    return (
-                      <li key={i} className="flex items-start gap-2 text-[15px] leading-snug">
-                        <span className="mt-0.5 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-chip px-1 text-[11px] font-semibold tabular-nums text-muted">
-                          {line.label}
-                        </span>
-                        <span className="min-w-0 break-words">
-                          {line.text}
-                          {wu.videoUrl && <VideoLink href={wu.videoUrl} className="ml-1.5" />}
-                        </span>
-                      </li>
-                    );
-                  })}
-                  {/* Разминочные упражнения из библиотеки — в той же ленте */}
-                  {warmupItems.map((it, i) => {
-                    const ex = it.exerciseId ? exerciseById(it.exerciseId) : undefined;
-                    const name = t.catalog.exercise(ex?.name ?? it.nameRaw) || t.item.fallbackName;
-                    const video = it.videoUrl ?? ex?.videoUrl ?? null;
-                    return (
-                      <li key={it.id} className="flex items-start gap-2 text-[15px] leading-snug">
-                        <span className="mt-0.5 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-chip px-1 text-[11px] font-semibold tabular-nums text-muted">
-                          {w.warmup.length + i + 1}
-                        </span>
-                        <span className="min-w-0 break-words">
-                          {name}
-                          {it.setsReps?.raw && <> — {it.setsReps.raw}</>}
-                          {video && <VideoLink href={video} className="ml-1.5" />}
-                          {(it.subNotes ?? []).map((sn, j) => (
-                            <span key={j} className="mt-0.5 block text-[13px] leading-snug text-muted">
-                              {sn.text}
-                              {sn.videoUrl && <VideoLink href={sn.videoUrl} className="ml-1.5" />}
-                            </span>
-                          ))}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+          {/* Шапка режима «идёт»: минуты с начала и прогресс по упражнениям */}
+          <section className="rounded-2xl bg-accent-soft px-4 py-3">
+            <div className="flex items-baseline gap-2">
+              <span className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-accent">
+                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" />
+                {t.status.active}
+              </span>
+              <span className="text-[12px] font-bold tabular-nums text-accent">
+                {elapsedMin} {t.min}
+              </span>
+              <span className="ml-auto text-[12px] font-bold tabular-nums">
+                {t.train.ofCount(movedCount, mainItems.length)}
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-accent/20">
+              <div
+                className="h-full origin-left rounded-full bg-accent transition-transform duration-300"
+                style={{
+                  transform: `scaleX(${mainItems.length ? movedCount / mainItems.length : 0})`,
+                }}
+              />
+            </div>
+          </section>
+
+          {warmupSection}
+
+          {/* Осталось сделать: твой «to-do» на сегодня */}
+          <section className="space-y-3">
+            <h2 className="px-1 text-sm font-semibold uppercase tracking-wide text-muted">
+              {t.train.exercises}
+            </h2>
+            {mainItems.length === 0 && (
+              <p className="rounded-2xl border border-border bg-card p-4 text-muted">
+                {t.train.noItems}
+              </p>
+            )}
+            {todoItems.map((it) => (
+              <ItemCard
+                key={it.id}
+                item={it}
+                num={numOf(it)}
+                locked={false}
+                active
+                exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
+                last={it.exerciseId ? lastResultBefore(it.exerciseId, w.date, w.id) : null}
+                onChange={(patch) => saveItem(it.id, patch)}
+                onRest={requestRest}
+              />
+            ))}
+          </section>
+
+          {/* Сделанное уезжает вниз: зелёная галочка — достижение,
+              пропущенное — перечёркнуто; тап возвращает в список */}
+          {movedCount > 0 && (
+            <section className="space-y-2">
+              <h2 className="flex items-baseline gap-2 px-1 text-sm font-semibold uppercase tracking-wide text-ok-text">
+                {t.train.doneBlock}
+                <span className="normal-case tracking-normal text-muted">
+                  {t.train.ofCount(doneItems.length, mainItems.length)}
+                </span>
+              </h2>
+              {doneItems.map((it) => (
+                <DoneRow
+                  key={it.id}
+                  item={it}
+                  exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
+                  skippedRow={false}
+                  onRestore={() => saveItem(it.id, { done: false, skipped: false })}
+                />
+              ))}
+              {skippedItems.map((it) => (
+                <DoneRow
+                  key={it.id}
+                  item={it}
+                  exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
+                  skippedRow
+                  onRestore={() => saveItem(it.id, { done: false, skipped: false })}
+                />
+              ))}
             </section>
           )}
+
+          {/* Усталость + завершение */}
+          <section className="rounded-2xl border border-border bg-card p-4">
+            <FatigueBlock
+              w={w}
+              workoutLocked={false}
+              onSave={(f) => saveWorkout({ ...w, fatigue: f })}
+            />
+            <div className="mt-4">
+              <button
+                onClick={finishActive}
+                className="w-full rounded-xl bg-accent px-4 py-2.5 text-lg font-bold text-accent-fg"
+              >
+                {t.train.finish}
+              </button>
+            </div>
+          </section>
+
+          {/* Случайно нажала «Начать» — можно вернуть карточку-план */}
+          <button
+            type="button"
+            onClick={cancelStart}
+            className="mx-auto block text-sm text-muted underline decoration-dotted underline-offset-2"
+          >
+            {t.train.cancelStart}
+          </button>
+
+          {notesSection}
+        </>
+      ) : !expanded ? (
+        <CompactWorkoutCard
+          w={w}
+          celebrate={celebrate}
+          onStart={startWorkout}
+          onExpand={() => setExpandedMap((m) => ({ ...m, [w.id]: true }))}
+        />
+      ) : (
+        <>
+          {/* Подробный вид: всё как раньше, сверху — путь назад к карточке */}
+          <button
+            type="button"
+            onClick={() => setExpandedMap((m) => ({ ...m, [w.id]: false }))}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted"
+          >
+            <ChevronIcon open size={16} />
+            {t.train.collapseView}
+          </button>
+
+          {warmupSection}
 
           {/* Упражнения */}
           <section className="space-y-3">
@@ -278,13 +502,7 @@ export default function TrainingScreen() {
                 exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
                 last={it.exerciseId ? lastResultBefore(it.exerciseId, w.date, w.id) : null}
                 onChange={(patch) => saveItem(it.id, patch)}
-                onRest={(item) =>
-                  setRestRequest((prevReq) => ({
-                    itemId: item.id,
-                    seconds: parseRestSeconds(item.rest),
-                    nonce: (prevReq?.nonce ?? 0) + 1,
-                  }))
-                }
+                onRest={requestRest}
               />
             ))}
           </section>
@@ -340,28 +558,7 @@ export default function TrainingScreen() {
             </button>
           )}
 
-          {/* Заметки тренера */}
-          {w.notes.trim() !== '' && (
-            <section className="rounded-2xl border border-border bg-card p-4">
-              <button
-                onClick={() => setNotesOpenMap((m) => ({ ...m, [w.id]: !notesOpen }))}
-                aria-expanded={notesOpen}
-                className="flex min-h-11 w-full items-center justify-between gap-2 text-left"
-              >
-                <span className="text-sm font-semibold uppercase tracking-wide text-muted">
-                  {t.train.trainerNotes}
-                </span>
-                <span className="text-muted">
-                  <ChevronIcon open={notesOpen} size={18} />
-                </span>
-              </button>
-              {notesOpen && (
-                <p className="anim-rise mt-2 whitespace-pre-line break-words text-[15px] leading-relaxed">
-                  {w.notes}
-                </p>
-              )}
-            </section>
-          )}
+          {notesSection}
 
         </>
       )}
@@ -403,6 +600,11 @@ function TopBlock({
           {w.status === 'done' ? (
             <span className="rounded-full bg-ok-soft px-2.5 py-1 text-xs font-bold text-ok-text">
               {t.status.done}
+            </span>
+          ) : w.startedAt ? (
+            /* режим «идёт» — единственный залитый петролью бейдж */
+            <span className="rounded-full bg-accent px-2.5 py-1 text-xs font-bold text-accent-fg">
+              {t.status.active}
             </span>
           ) : (
             <span className="rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent">
@@ -481,6 +683,198 @@ function NavButton({
       >
         {dir === 'prev' ? <path d="M14.5 6l-6 6 6 6" /> : <path d="M9.5 6l6 6-6 6" />}
       </svg>
+    </button>
+  );
+}
+
+/* --- Компактная карточка: план и итог одним взглядом ----------------------- */
+
+/** Строка «3х10 · 37.5 кг» для компактного списка: факт вытесняет план */
+function compactSummary(it: WorkoutItem, kind: ExerciseKind, dict: Dict): string {
+  if (kind === 'cardio') {
+    const parts: string[] = [];
+    if (it.duration) parts.push(restLabel(it.duration, dict));
+    if (it.pulseZone) parts.push(it.pulseZone);
+    return parts.join(' · ');
+  }
+  const ps = perSetSummary(it.actual);
+  const sr = ps?.reps
+    ? `${ps.count}х${ps.reps}`
+    : it.actual?.sets != null && it.actual?.reps != null
+      ? `${it.actual.sets}х${it.actual.reps}`
+      : (it.setsReps?.raw ?? '');
+  const wt = ps?.weights
+    ? weightLabel(ps.weights, dict)
+    : it.actual?.weight != null
+      ? weightLabel(String(it.actual.weight), dict)
+      : it.weight?.raw
+        ? weightLabel(it.weight.raw, dict)
+        : '';
+  return [sr, wt].filter(Boolean).join(' · ');
+}
+
+function CompactWorkoutCard({
+  w,
+  celebrate,
+  onStart,
+  onExpand,
+}: {
+  w: Workout;
+  /** Конфетти после «Завершить» из режима «идёт» — прямо на карточке-итоге */
+  celebrate: boolean;
+  onStart: () => void;
+  onExpand: () => void;
+}) {
+  const { exerciseById, itemKind } = useApp();
+  const { t } = useT();
+  const sorted = [...w.items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const warmupCount =
+    w.warmup.length + sorted.filter((it) => itemKind(it) === 'warmup').length;
+  const mains = sorted.filter((it) => itemKind(it) !== 'warmup');
+
+  return (
+    <>
+      <section className="relative rounded-2xl border border-border bg-card p-4">
+        {celebrate && <ConfettiBurst />}
+        {warmupCount > 0 && (
+          <div className="mb-1 flex items-center gap-2.5 border-b border-border/60 pb-2.5">
+            <span
+              aria-hidden="true"
+              className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-lg bg-chip px-1 text-muted"
+            >
+              <FlameIcon size={13} />
+            </span>
+            <span className="text-[15px] font-semibold text-muted">{t.train.warmup}</span>
+            <span className="ml-auto shrink-0 text-xs font-semibold tabular-nums text-muted">
+              {warmupCount}
+            </span>
+          </div>
+        )}
+        {mains.length === 0 && <p className="text-muted">{t.train.noItems}</p>}
+        <ul className="divide-y divide-border/60">
+          {mains.map((it, i) => {
+            const ex = it.exerciseId ? exerciseById(it.exerciseId) : undefined;
+            const name =
+              t.catalog.exercise(ex?.name ?? stripNumbering(it.nameRaw ?? '')) ||
+              t.item.fallbackName;
+            const skipped = !!it.skipped && !it.done;
+            const summary = compactSummary(it, itemKind(it), t);
+            return (
+              <li key={it.id} className="flex items-center gap-2.5 py-2 last:pb-0">
+                <span
+                  aria-hidden="true"
+                  className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-lg bg-chip px-1 text-[13px] font-bold tabular-nums text-muted"
+                >
+                  {i + 1}
+                </span>
+                {skipped && <span className="sr-only">{t.train.skippedLabel}: </span>}
+                <span
+                  className={
+                    'min-w-0 flex-1 truncate text-[15px] ' +
+                    (skipped ? 'font-medium text-muted line-through opacity-60' : 'font-bold')
+                  }
+                >
+                  <span className="sr-only">{i + 1}. </span>
+                  {name}
+                </span>
+                {summary && (
+                  <span
+                    className={
+                      // длинные пояснения веса («36 кг (тренажёр 1)…») обрезаются,
+                      // не выталкивая название упражнения
+                      'ml-auto max-w-[45%] shrink-0 truncate text-xs font-semibold tabular-nums text-muted' +
+                      (skipped ? ' line-through opacity-60' : '')
+                    }
+                  >
+                    {summary}
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        {w.fatigue != null && (
+          <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-border/60 pt-2.5">
+            <span className="rounded-lg bg-chip px-2 py-1 text-xs font-semibold text-muted">
+              {t.fatigueN10(w.fatigue)}
+            </span>
+          </div>
+        )}
+      </section>
+
+      {w.status === 'planned' && (
+        <button
+          onClick={onStart}
+          className="w-full rounded-xl bg-accent px-4 py-2.5 text-lg font-bold text-accent-fg"
+        >
+          {t.train.start}
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={onExpand}
+        className="w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted"
+      >
+        {t.train.expandView}
+      </button>
+    </>
+  );
+}
+
+/* --- Строка сделанного/пропущенного в блоке «Выполнено» -------------------- */
+
+function DoneRow({
+  item,
+  exercise,
+  skippedRow,
+  onRestore,
+}: {
+  item: WorkoutItem;
+  exercise: Exercise | undefined;
+  skippedRow: boolean;
+  onRestore: () => void;
+}) {
+  const { t } = useT();
+  const name =
+    t.catalog.exercise(exercise?.name ?? stripNumbering(item.nameRaw ?? '')) ||
+    t.item.fallbackName;
+  const planned = plannedSetsCount(item);
+  const sd = item.setsDone ?? 0;
+  const summary = skippedRow
+    ? t.train.skippedLabel
+    : sd > 0 && sd < planned
+      ? t.item.setsDoneOf(sd, planned)
+      : compactSummary(item, exerciseKind(exercise), t);
+  return (
+    <button
+      type="button"
+      onClick={onRestore}
+      title={t.train.returnToList}
+      aria-label={`${name} — ${t.train.returnToList}`}
+      className="anim-rise flex w-full items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-2.5 text-left"
+    >
+      <span
+        aria-hidden="true"
+        className={
+          'flex h-6 w-6 shrink-0 items-center justify-center rounded-full ' +
+          (skippedRow ? 'bg-chip text-muted' : 'bg-ok text-ok-fg')
+        }
+      >
+        {skippedRow ? <XIcon size={13} /> : <CheckIcon size={13} />}
+      </span>
+      <span
+        className={
+          'min-w-0 flex-1 truncate text-[15px] ' +
+          (skippedRow ? 'font-medium text-muted line-through opacity-60' : 'font-bold')
+        }
+      >
+        {name}
+      </span>
+      {summary && (
+        <span className="ml-auto max-w-[45%] shrink-0 truncate text-xs font-semibold tabular-nums text-muted">
+          {summary}
+        </span>
+      )}
     </button>
   );
 }

@@ -35,27 +35,36 @@ interface ItemCardProps {
   last: Occurrence | null;
   /** Тренировка завершена и закрыта: отметки «выполнено» не переключаются */
   locked: boolean;
+  /** Режим «идёт»: кружки подходов и ссылка «пропустить сегодня» */
+  active?: boolean;
   /** Иммутабельный патч позиции — экран сам подменит её в workout и сохранит */
   onChange: (patch: Partial<WorkoutItem>) => void;
-  onRest: (item: WorkoutItem) => void;
+  /** autostart — тихий запуск отсчёта после отмеченного подхода */
+  onRest: (item: WorkoutItem, autostart?: boolean) => void;
 }
 
 /** «1. Румынская» / «1.Румынская» / «2) Присед» → без нумерации */
-function stripNumbering(raw: string): string {
+export function stripNumbering(raw: string): string {
   const s = raw.replace(/^\s*\d+(?:\.\d+)*\s*[.)]\s*/, '').trim();
   return s || raw.trim();
 }
 
 /** Для чипа: «1.5» → «1.5 мин» / "1.5 min", а «2 мин» / свободный текст — как есть */
-function restLabel(rest: string, dict: Dict): string {
+export function restLabel(rest: string, dict: Dict): string {
   const t = rest.trim();
   return /^[\d.,\s\-–—+]+$/.test(t) ? `${t} ${dict.min}` : t;
 }
 
 /** Для чипа: «27.5» → «27.5 кг» / "27.5 kg", а «12+12 кг» / свободный текст — как есть */
-function weightLabel(weight: string, dict: Dict): string {
+export function weightLabel(weight: string, dict: Dict): string {
   const t = weight.trim();
   return /^[\d.,\s\-–—+]+$/.test(t) ? `${t} ${dict.kg}` : t;
+}
+
+/** Сколько кружков подходов рисовать: план «разными подходами» или «3х…» */
+export function plannedSetsCount(item: WorkoutItem): number {
+  const n = item.perSetPlan?.length ?? item.setsReps?.sets ?? 0;
+  return Math.max(0, Math.min(8, n));
 }
 
 /** Короткая строка «что было в прошлый раз» */
@@ -97,6 +106,7 @@ export default function ItemCard({
   exercise,
   last,
   locked,
+  active = false,
   onChange,
   onRest,
 }: ItemCardProps) {
@@ -104,6 +114,11 @@ export default function ItemCard({
   const [open, setOpen] = useState(false);
   // «чпок» галочки только на живой тап, не при монтировании карточки
   const [checkPop, setCheckPop] = useState(false);
+  /* Кружки подходов: последний тап заполняется локально и мгновенно, а
+     «выполнено» сохраняется с паузой — видно, как заполнился последний кружок */
+  const [pendingFill, setPendingFill] = useState<number | null>(null);
+  const [popIdx, setPopIdx] = useState<number | null>(null);
+  const completeTimerRef = useRef<number | null>(null);
   /* Быстрая запись факта: долгое нажатие на чипы повторов/веса превращает
      их в компактный редактор прямо на месте — без большой панели */
   const [quickEdit, setQuickEdit] = useState(false);
@@ -115,6 +130,40 @@ export default function ItemCard({
   useEffect(() => {
     if (locked) setQuickEdit(false);
   }, [locked]);
+
+  useEffect(
+    () => () => {
+      if (completeTimerRef.current) window.clearTimeout(completeTimerRef.current);
+    },
+    [],
+  );
+
+  // сохранённые отметки пришли из данных — локальная «дозаливка» больше не нужна
+  useEffect(() => {
+    setPendingFill(null);
+  }, [item.setsDone, item.done]);
+
+  const plannedSets = active && exerciseKind(exercise) !== 'cardio' ? plannedSetsCount(item) : 0;
+  const setsDone = Math.min(item.setsDone ?? 0, plannedSets);
+
+  const tapBubble = (idx: number) => {
+    if (idx < setsDone) {
+      // тап по заполненному — снятие отметок сверху вниз до него
+      onChange({ setsDone: idx });
+      return;
+    }
+    const next = idx + 1;
+    setPopIdx(idx);
+    if (item.rest) onRest(item, true); // отдых стартует сам после отмеченного подхода
+    if (next >= plannedSets) {
+      setPendingFill(next);
+      completeTimerRef.current = window.setTimeout(() => {
+        onChange({ setsDone: next, done: true, skipped: false });
+      }, 400);
+    } else {
+      onChange({ setsDone: next });
+    }
+  };
 
   const kind = exerciseKind(exercise);
   const name = t.catalog.exercise(exercise?.name ?? stripNumbering(item.nameRaw ?? ''));
@@ -248,7 +297,11 @@ export default function ItemCard({
         <h3
           className={
             'min-w-0 flex-1 break-words text-xl font-bold leading-snug ' +
-            (item.done ? 'text-muted' : '')
+            (item.done
+              ? 'text-muted'
+              : item.skipped
+                ? 'text-muted line-through decoration-1'
+                : '')
           }
         >
           <span className="sr-only">{num}. </span>
@@ -269,7 +322,8 @@ export default function ItemCard({
         )}
         <button
           onClick={() => {
-            onChange({ done: !item.done });
+            // отметка «выполнено» заодно снимает пропуск
+            onChange(item.done ? { done: false } : { done: true, skipped: false });
             // «чпок» — только при отметке; снятие отметки происходит без праздника
             if (!item.done) setCheckPop(true);
           }}
@@ -370,6 +424,46 @@ export default function ItemCard({
               </button>
             </span>
           </div>
+        )}
+
+        {/* Кружки подходов (режим «идёт»): тап — подход сделан, повторный —
+            снятие; последний кружок сам завершает упражнение */}
+        {plannedSets > 0 && !quickEdit && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-muted">
+              {t.item.setsRowLabel}
+            </span>
+            {Array.from({ length: plannedSets }, (_, i) => {
+              const on = i < setsDone || (pendingFill != null && i < pendingFill);
+              return (
+                <button
+                  key={i}
+                  onClick={() => tapBubble(i)}
+                  onAnimationEnd={() => setPopIdx((v) => (v === i ? null : v))}
+                  aria-pressed={on}
+                  aria-label={t.item.setBubbleAria(i + 1)}
+                  className={
+                    'flex h-11 w-11 items-center justify-center rounded-full border text-[15px] font-extrabold tabular-nums transition-colors ' +
+                    (on ? 'border-ok bg-ok text-ok-fg' : 'border-border bg-card text-muted') +
+                    (popIdx === i ? ' anim-check' : '')
+                  }
+                >
+                  {i + 1}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Пропуск: упражнение уезжает в «Выполнено» перечёркнутым */}
+        {active && !item.done && !quickEdit && (
+          <button
+            type="button"
+            onClick={() => onChange({ skipped: true, done: false })}
+            className="mt-2.5 text-xs text-muted underline decoration-dotted underline-offset-2"
+          >
+            {t.item.skipToday}
+          </button>
         )}
 
       </div>

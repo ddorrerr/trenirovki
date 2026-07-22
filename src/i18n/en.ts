@@ -68,7 +68,7 @@ export const en: typeof ru = {
     comments: 'Comments',
   },
 
-  status: { done: 'done', planned: 'planned' },
+  status: { done: 'done', planned: 'planned', active: 'in progress' },
 
   counted: {
     workouts: (n) => pl(n, 'workout', 'workouts'),
@@ -221,6 +221,15 @@ export const en: typeof ru = {
       'Settings live behind the gear.',
     emptyEnable: 'Turn on editing',
     emptyMenu: 'Open menu',
+    start: 'Start workout',
+    expandView: 'Expand — view details',
+    collapseView: 'Collapse to card',
+    ofCount: (a, b) => `${a} of ${b}`,
+    doneBlock: 'Done',
+    skippedLabel: 'skipped',
+    returnToList: 'Return to the list',
+    finishConfirm: (list) => `Not done: ${list}. Mark them skipped and finish the workout?`,
+    cancelStart: 'undo workout start',
   },
 
   item: {
@@ -265,6 +274,10 @@ export const en: typeof ru = {
     removeSetAria: (n) => `Remove set ${n}`,
     perSetWeightAria: (n) => `Set ${n} weight, kg`,
     perSetRepsAria: (n) => `Set ${n} reps`,
+    setsRowLabel: 'sets',
+    setBubbleAria: (n) => `Set ${n}`,
+    setsDoneOf: (a, b) => `${a} of ${b} sets`,
+    skipToday: 'skip today',
   },
 
   timer: {
