@@ -8,6 +8,7 @@ import { useApp } from '../store';
 import { useT, type Dict } from '../i18n';
 import { fmtDate, fmtDateShort } from '../lib/dates';
 import { nextExerciseId } from '../lib/ids';
+import { perSetSummary } from '../lib/actual';
 import { EQUIPMENT, MUSCLE_GROUPS } from '../lib/catalog';
 import { splitTags } from '../components/edit/parse';
 import { Chip, ChipPicker, IconPlus, SelectField, TextField, inputCls } from '../components/edit/ui';
@@ -381,9 +382,12 @@ function ExerciseRow({ e, count, lastDate, expanded, onToggle }: ExerciseRowProp
 /** Короткая сводка «что делала» по позиции: факт, иначе план */
 function occurrenceSummary(it: WorkoutItem, dict: Dict): string {
   if (it.actual) {
+    const ps = perSetSummary(it.actual);
     const parts: string[] = [];
-    if (it.actual.weight != null) parts.push(`${it.actual.weight} ${dict.kg}`);
-    if (it.actual.sets != null && it.actual.reps != null)
+    if (ps?.weights) parts.push(`${ps.weights} ${dict.kg}`);
+    else if (it.actual.weight != null) parts.push(`${it.actual.weight} ${dict.kg}`);
+    if (ps?.reps) parts.push(`${ps.count}×${ps.reps}`);
+    else if (it.actual.sets != null && it.actual.reps != null)
       parts.push(`${it.actual.sets}×${it.actual.reps}`);
     if (parts.length) return parts.join(' · ');
   }

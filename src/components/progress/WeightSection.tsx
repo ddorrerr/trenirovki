@@ -6,11 +6,14 @@ import { exerciseKind, type WorkoutItem } from '../../types';
 import { useT } from '../../i18n';
 import { fmtDateShort, todayISO } from '../../lib/dates';
 import { fmtNum, parseTime } from './chart';
+import { perSetSummary } from '../../lib/actual';
 import ExercisePicker, { type ExerciseOption } from './ExercisePicker';
 import WeightChart, { type WeightPoint } from './WeightChart';
 
 function repsLabel(item: WorkoutItem): string | null {
   const a = item.actual;
+  const ps = perSetSummary(a);
+  if (ps?.reps) return `${ps.count}×${ps.reps}`;
   if (a && a.reps != null) return a.sets != null ? `${a.sets}×${a.reps}` : String(a.reps);
   const sr = item.setsReps;
   if (sr && sr.sets != null && sr.reps != null) return `${sr.sets}×${sr.reps}`;

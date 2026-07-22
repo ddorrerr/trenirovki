@@ -252,13 +252,31 @@ export default function HomeScreen() {
     if (!lastDone) return 0;
     let kg = 0;
     for (const it of lastDone.items) {
+      const sides = exerciseById(it.exerciseId)?.unilateral ? 2 : 1;
+      const pair = isPairWeight(it.weight?.raw) ? 2 : 1;
+      // записанные «разные подходы» — самый точный источник
+      if (it.actual?.perSet?.length) {
+        for (const st of it.actual.perSet) {
+          if (st.weight != null && st.reps != null) kg += st.weight * st.reps * sides * pair;
+        }
+        continue;
+      }
       const w = it.actual?.weight ?? it.weight?.value;
       const s = it.actual?.sets ?? it.setsReps?.sets;
       const r = it.actual?.reps ?? it.setsReps?.reps;
-      if (w == null || s == null || r == null) continue;
-      const sides = exerciseById(it.exerciseId)?.unilateral ? 2 : 1;
-      const pair = isPairWeight(it.weight?.raw) ? 2 : 1;
-      kg += w * s * r * sides * pair;
+      if (w != null && s != null && r != null) {
+        kg += w * s * r * sides * pair;
+        continue;
+      }
+      // план «разными подходами» (прогрессия) — когда факт не записан
+      if (it.perSetPlan?.length) {
+        for (const st of it.perSetPlan) {
+          const pw = Number(st.weight.trim().replace(',', '.'));
+          const pr = Number.parseInt(st.reps.trim(), 10);
+          if (Number.isFinite(pw) && st.weight.trim() !== '' && Number.isFinite(pr))
+            kg += pw * pr * sides * pair;
+        }
+      }
     }
     return Math.round(kg);
   }, [lastDone, exerciseById]);

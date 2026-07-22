@@ -250,6 +250,16 @@ export const ru = {
     sets: 'Подходы',
     reps: 'Повторы',
     oldFactNote: (text: string) => `Заметка к факту (старая запись): ${text}`,
+    /* Быстрая запись факта: долгое нажатие на чипы повторов/веса */
+    logFact: 'записать факт',
+    quickFactAria: 'Записать факт: вес, подходы, повторы',
+    doneEditing: 'Готово',
+    perSetOn: 'разные подходы',
+    perSetOff: 'одним числом',
+    addSet: 'подход',
+    removeSetAria: (n: number) => `Убрать подход ${n}`,
+    perSetWeightAria: (n: number) => `Вес в подходе ${n}, кг`,
+    perSetRepsAria: (n: number) => `Повторы в подходе ${n}`,
   },
 
   timer: {
@@ -301,11 +311,11 @@ export const ru = {
       ExerciseKind,
       string
     >,
-    /** Стороны: обе сразу / по одной за раз (флаг unilateral) */
+    /** Стороны: двустороннее / одностороннее (флаг unilateral) */
     sidesLabel: 'Стороны',
-    sidesFilter: { uni: 'По одной стороне', both: 'Обе сразу' },
-    sidesOption: { both: 'Обе стороны сразу', uni: 'По одной стороне' },
-    sidesChip: 'по одной стороне',
+    sidesFilter: { uni: 'Односторонние', both: 'Двусторонние' },
+    sidesOption: { both: 'Двустороннее', uni: 'Одностороннее' },
+    sidesChip: 'одностороннее',
     muscleGroup: 'Группа мышц',
     equipment: 'Инвентарь',
     empty: 'Библиотека пока пустая.',

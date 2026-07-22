@@ -101,6 +101,7 @@ export default function NewWorkoutForm() {
             order: i + 1,
             setsReps: it.setsReps ? { ...it.setsReps } : null,
             weight: it.weight ? { ...it.weight } : null,
+            perSetPlan: it.perSetPlan ? it.perSetPlan.map((s) => ({ ...s })) : undefined,
             subNotes: (it.subNotes ?? []).map((s) => ({ ...s })),
             ptNote: stripPinnedLines(it.ptNote),
             ptRequest: null, // просьба тренера относилась к конкретному дню

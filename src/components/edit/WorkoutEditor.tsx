@@ -7,6 +7,7 @@ import {
   exerciseKind,
   type Exercise,
   type ExerciseKind,
+  type PlanSet,
   type WarmupItem,
   type Workout,
   type WorkoutItem,
@@ -16,7 +17,7 @@ import { useApp } from '../../store';
 import { tr, useT } from '../../i18n';
 import { fmtDate } from '../../lib/dates';
 import { nextExerciseId, nextItemId } from '../../lib/ids';
-import { linesToSubNotes, parseSetsReps, parseWeight } from './parse';
+import { linesToSubNotes, parseSetsReps, parseWeight, serializePerSetPlan } from './parse';
 import ExerciseCombobox from './ExerciseCombobox';
 import { ChevronIcon, PinIcon } from '../train/icons';
 import {
@@ -28,6 +29,7 @@ import {
   SelectField,
   TextAreaField,
   TextField,
+  inputCls,
 } from './ui';
 
 export default function WorkoutEditor({ workout }: { workout: Workout }) {
@@ -572,30 +574,54 @@ function ItemEditorCard({
             />
           </div>
 
-          {/* Подходы и повторы — отдельными полями (в чтении так и останется «3х12») */}
+          {/* Подходы и повторы — отдельными полями (в чтении так и останется
+              «3х12»); «разные подходы» — прогрессия: вес×повторы на каждый */}
+          {!item.perSetPlan?.length ? (
+            <>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <TextField
+                  label={t.item.sets}
+                  value={sr.sets}
+                  placeholder={t.editor.setsPlaceholder}
+                  onCommit={(v) =>
+                    patchItem(item.id, { setsReps: parseSetsReps(joinSetsReps(v, sr.reps)) })
+                  }
+                />
+                <TextField
+                  label={t.item.reps}
+                  value={sr.reps}
+                  placeholder={t.editor.repsPlaceholder}
+                  onCommit={(v) =>
+                    patchItem(item.id, { setsReps: parseSetsReps(joinSetsReps(sr.sets, v)) })
+                  }
+                />
+                <TextField
+                  label={t.item.weightKg}
+                  value={item.weight?.raw ?? ''}
+                  placeholder={t.editor.weightPlaceholder}
+                  onCommit={(v) => patchItem(item.id, { weight: parseWeight(v) })}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const n = Math.min(10, Math.max(2, Number.parseInt(sr.sets, 10) || 3));
+                  const rows: PlanSet[] = Array.from({ length: n }, () => ({
+                    weight: item.weight?.raw ?? '',
+                    reps: sr.reps,
+                  }));
+                  patchItem(item.id, { perSetPlan: rows, ...serializePerSetPlan(rows) });
+                }}
+                className="mt-2 text-sm text-muted underline decoration-dotted underline-offset-2"
+              >
+                {t.item.perSetOn}
+              </button>
+            </>
+          ) : (
+            <PlanPerSetRows item={item} patchItem={patchItem} />
+          )}
+
           <div className="mt-3 grid grid-cols-2 gap-3">
-            <TextField
-              label={t.item.sets}
-              value={sr.sets}
-              placeholder={t.editor.setsPlaceholder}
-              onCommit={(v) =>
-                patchItem(item.id, { setsReps: parseSetsReps(joinSetsReps(v, sr.reps)) })
-              }
-            />
-            <TextField
-              label={t.item.reps}
-              value={sr.reps}
-              placeholder={t.editor.repsPlaceholder}
-              onCommit={(v) =>
-                patchItem(item.id, { setsReps: parseSetsReps(joinSetsReps(sr.sets, v)) })
-              }
-            />
-            <TextField
-              label={t.item.weightKg}
-              value={item.weight?.raw ?? ''}
-              placeholder={t.editor.weightPlaceholder}
-              onCommit={(v) => patchItem(item.id, { weight: parseWeight(v) })}
-            />
             <TextField
               label={t.editor.pvrLabel}
               value={item.pvr ?? ''}
@@ -644,6 +670,113 @@ function ItemEditorCard({
         </>
       )}
     </article>
+  );
+}
+
+/* --- План «разными подходами»: вес×повторы на каждый подход --------------- */
+/* setsReps/weight при каждой правке пересобираются в текст («3х12-10-8»,
+   «20-18-16») — показ и старые читатели работают без изменений. */
+
+function PlanPerSetRows({
+  item,
+  patchItem,
+}: {
+  item: WorkoutItem;
+  patchItem: (id: string, p: Partial<WorkoutItem>) => void;
+}) {
+  const { t } = useT();
+  const rows = item.perSetPlan ?? [];
+
+  const commit = (next: PlanSet[]) =>
+    patchItem(item.id, { perSetPlan: next, ...serializePerSetPlan(next) });
+
+  const patchRow = (i: number, p: Partial<PlanSet>) =>
+    commit(rows.map((x, j) => (j === i ? { ...x, ...p } : x)));
+
+  return (
+    <div className="mt-3">
+      <div className="grid grid-cols-[1.25rem_1fr_1fr_2.75rem] items-end gap-2 text-sm text-muted">
+        <span aria-hidden="true" />
+        <span>{t.item.weightKg}</span>
+        <span>{t.item.reps}</span>
+        <span aria-hidden="true" />
+      </div>
+      <div className="mt-1 space-y-2">
+        {rows.map((row, i) => (
+          <div key={i} className="grid grid-cols-[1.25rem_1fr_1fr_2.75rem] items-center gap-2">
+            <span className="text-center text-sm font-semibold tabular-nums text-muted">
+              {i + 1}
+            </span>
+            <CellInput
+              value={row.weight}
+              aria={t.item.perSetWeightAria(i + 1)}
+              placeholder={t.editor.weightPlaceholder}
+              onCommit={(v) => patchRow(i, { weight: v.trim() })}
+            />
+            <CellInput
+              value={row.reps}
+              aria={t.item.perSetRepsAria(i + 1)}
+              placeholder={t.editor.repsPlaceholder}
+              onCommit={(v) => patchRow(i, { reps: v.trim() })}
+            />
+            <IconBtn
+              label={t.item.removeSetAria(i + 1)}
+              disabled={rows.length === 1}
+              onClick={() => commit(rows.filter((_, j) => j !== i))}
+            >
+              <IconX size={16} />
+            </IconBtn>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => commit([...rows, { ...(rows[rows.length - 1] ?? { weight: '', reps: '' }) }])}
+          className="flex items-center gap-1.5 rounded-lg py-1 pr-2 text-sm font-medium text-accent"
+        >
+          <IconPlus size={14} /> {t.item.addSet}
+        </button>
+        <button
+          type="button"
+          onClick={() => patchItem(item.id, { perSetPlan: undefined })}
+          className="text-sm text-muted underline decoration-dotted underline-offset-2"
+        >
+          {t.item.perSetOff}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Ячейка строки подхода: черновик до blur, как TextField, но без подписи */
+function CellInput({
+  value,
+  aria,
+  placeholder,
+  onCommit,
+}: {
+  value: string;
+  aria: string;
+  placeholder?: string;
+  onCommit: (v: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  return (
+    <input
+      value={draft}
+      aria-label={aria}
+      placeholder={placeholder}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        if (draft !== value) onCommit(draft);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.keyCode === 13) (e.target as HTMLInputElement).blur();
+      }}
+      className={inputCls + ' text-center tabular-nums'}
+    />
   );
 }
 

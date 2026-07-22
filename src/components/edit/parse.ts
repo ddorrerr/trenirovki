@@ -2,7 +2,7 @@
 // Правило: raw сохраняем ровно как введено, числа заполняем только
 // когда строка однозначна. Ошибиться в null безопаснее, чем в число.
 
-import type { SetsReps, SubNote, Weight } from '../../types';
+import type { PlanSet, SetsReps, SubNote, Weight } from '../../types';
 
 /**
  * «3х12» / «3 x 8» / «3х12. См примечания» -> sets/reps.
@@ -73,4 +73,30 @@ export function splitTags(s: string): string[] {
     .split(',')
     .map((t) => t.trim())
     .filter(Boolean);
+}
+
+/**
+ * План «разными подходами» -> сериализованный текст для setsReps/weight,
+ * чтобы показ (чипы, «прошлый раз») и копирование работали как раньше:
+ * повторы [12, 10, 8] -> «3х12-10-8», веса [20, 18, 16] -> «20-18-16».
+ * Нечисловые значения соединяются через «; », пустые показываются как «?».
+ */
+export function serializePerSetPlan(rows: PlanSet[]): {
+  setsReps: SetsReps | null;
+  weight: Weight | null;
+} {
+  const join = (xs: string[], numeric: RegExp): string | null => {
+    const vals = xs.map((x) => x.trim());
+    if (vals.every((x) => x === '')) return null;
+    const uniq = [...new Set(vals)];
+    if (uniq.length === 1) return uniq[0];
+    if (vals.every((x) => numeric.test(x))) return vals.join('-');
+    return vals.map((x) => x || '?').join('; ');
+  };
+  const repsPart = join(rows.map((r) => r.reps), /^\d+$/);
+  const weightPart = join(rows.map((r) => r.weight), /^[\d.,]+$/);
+  return {
+    setsReps: repsPart != null ? parseSetsReps(`${rows.length}х${repsPart}`) : null,
+    weight: weightPart != null ? parseWeight(weightPart) : null,
+  };
 }

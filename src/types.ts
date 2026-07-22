@@ -46,12 +46,30 @@ export interface SubNote {
   videoUrl: string | null;
 }
 
+/** Один подход в «разных подходах» факта */
+export interface ActualSet {
+  weight: number | null; // кг
+  reps: number | null;
+}
+
 // Фактически выполненное (быстрый лог: одно поле на упражнение)
 export interface Actual {
-  weight: number | null; // кг
-  sets: number | null;
-  reps: number | null;
+  weight: number | null; // кг; при perSet — максимум по подходам (для графика)
+  sets: number | null; // при perSet — количество подходов
+  reps: number | null; // при perSet — число, только если во всех подходах одинаково
   text: string; // свободный хвост, напр. "последний сет 12 раз еле-еле"
+  /**
+   * Разные подходы (вес×повторы по каждому), напр. [20×12, 18×10, 16×8].
+   * Отсутствует = обычный лог одним числом. Агрегаты выше заполняются
+   * из подходов при сохранении — старые читатели продолжают работать.
+   */
+  perSet?: ActualSet[];
+}
+
+/** Один подход в плане «разными подходами» (строки — как все поля плана) */
+export interface PlanSet {
+  weight: string; // напр. "20" или "12+12"
+  reps: string; // напр. "12" или "10-12"
 }
 
 export interface WorkoutItem {
@@ -62,6 +80,12 @@ export interface WorkoutItem {
   warmupSets: string | null; // колонка "Разминка" у упражнения
   setsReps: SetsReps | null;
   weight: Weight | null;
+  /**
+   * План «разными подходами» (прогрессия: у каждого подхода свои вес/повторы).
+   * setsReps и weight при этом держат сериализованный текст («3х12-10-8»,
+   * «20-18-16») — показ и старые читатели работают без изменений.
+   */
+  perSetPlan?: PlanSet[];
   pvr: string | null; // колонка ПВР, напр. "4+"
   tempo: string | null;
   rest: string | null; // минуты, как в таблице ("1.0", "1.5")
