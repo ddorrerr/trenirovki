@@ -1,7 +1,7 @@
 // Экран «Тренировка»: текущая (или выбранная) тренировка целиком —
 // разминка, упражнения с чипами и быстрым логом, усталость, заметки тренера.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useApp } from '../store';
 import { useT, type Dict } from '../i18n';
 import { fmtDate, fmtWeekday } from '../lib/dates';
@@ -73,10 +73,24 @@ export default function TrainingScreen() {
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
   const [warmupPop, setWarmupPop] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
-  /* Слайд при листании тренировок (стрелки или свайп); null — без анимации */
-  const [wAnim, setWAnim] = useState<null | 'left' | 'right'>(null);
+
+  /* Свайп между тренировками: карточка идёт за пальцем 1:1, отпускание либо
+     доводит её за край (и открывает соседнюю), либо пружинит обратно.
+     Всё через ref-стили — без ререндеров на каждый кадр. */
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const slideRef = useRef<HTMLDivElement | null>(null);
   const prevIdRef = useRef<string | null>(null);
-  const touchRef = useRef<{ x: number; y: number; ok: boolean } | null>(null);
+  /** Откуда «въезжает» новая тренировка (px со знаком); null = лёгкий шаг по стрелкам */
+  const enterFromRef = useRef<number | null>(null);
+  const dragRef = useRef<{
+    x0: number;
+    y0: number;
+    base: number;
+    horiz: boolean | null;
+    pts: { x: number; t: number }[];
+  } | null>(null);
+  /** Отложенный переход после довода карточки за край: схватила снова — отменяем */
+  const exitTimerRef = useRef<number | null>(null);
 
   /* Минуты в шапке режима «идёт» обновляются раз в полминуты */
   const [, setClockTick] = useState(0);
@@ -89,9 +103,181 @@ export default function TrainingScreen() {
   /* Свежая тренировка для отложенных сохранений (таймер «последнего кружка»):
      иначе патч, пришедший через 400 мс, собрал бы workout из устаревшего w */
   const wRef = useRef<Workout | null>(null);
+  const workoutsRef = useRef(workouts);
+  const editModeRef = useRef(editMode);
+  const navigateRef = useRef(navigate);
   useEffect(() => {
     wRef.current = w;
+    workoutsRef.current = workouts;
+    editModeRef.current = editMode;
+    navigateRef.current = navigate;
   });
+
+  /* Жест свайпа — нативные слушатели: touchmove нужен non-passive, чтобы
+     во время горизонтального жеста глушить вертикальный скролл */
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const translateX = (el: HTMLElement): number => {
+      const tr = getComputedStyle(el).transform;
+      return tr && tr !== 'none' ? new DOMMatrixReadOnly(tr).m41 : 0;
+    };
+    const neighbors = () => {
+      const list = workoutsRef.current;
+      const cur = wRef.current;
+      const i = cur ? list.findIndex((x) => x.id === cur.id) : -1;
+      return {
+        prevW: i > 0 ? list[i - 1] : null,
+        nextW: i >= 0 && i < list.length - 1 ? list[i + 1] : null,
+      };
+    };
+    /* Мягкая граница: чем дальше за край, тем меньше карточка следует за пальцем */
+    const rubber = (x: number, dim: number): number => {
+      const c = 0.55;
+      return (Math.sign(x) * (Math.abs(x) * dim * c)) / (dim + c * Math.abs(x));
+    };
+
+    const onStart = (e: TouchEvent) => {
+      if (editModeRef.current) return;
+      const el = e.target as HTMLElement;
+      if (el.closest('input, textarea, select, .fixed')) return;
+      const slide = slideRef.current;
+      if (!slide) return;
+      // перехват на лету: карточку, ещё едущую после прошлого свайпа, можно схватить
+      if (exitTimerRef.current) {
+        window.clearTimeout(exitTimerRef.current);
+        exitTimerRef.current = null;
+      }
+      const base = translateX(slide);
+      if (base !== 0) {
+        slide.style.transition = 'none';
+        slide.style.transform = `translateX(${base}px)`;
+      }
+      const t0 = e.touches[0];
+      dragRef.current = {
+        x0: t0.clientX,
+        y0: t0.clientY,
+        base,
+        horiz: null,
+        pts: [{ x: t0.clientX, t: e.timeStamp }],
+      };
+    };
+
+    const onMove = (e: TouchEvent) => {
+      const d = dragRef.current;
+      const slide = slideRef.current;
+      if (!d || !slide) return;
+      const t0 = e.touches[0];
+      const dx = t0.clientX - d.x0;
+      const dy = t0.clientY - d.y0;
+      if (d.horiz === null) {
+        if (Math.abs(dx) < 9 && Math.abs(dy) < 9) return;
+        d.horiz = Math.abs(dx) > Math.abs(dy) * 1.2;
+        if (!d.horiz) {
+          dragRef.current = null; // жест вертикальный — отдаём его скроллу
+          return;
+        }
+      }
+      e.preventDefault();
+      d.pts.push({ x: t0.clientX, t: e.timeStamp });
+      while (d.pts.length > 1 && e.timeStamp - d.pts[0].t > 120) d.pts.shift();
+      const { prevW, nextW } = neighbors();
+      const width = slide.clientWidth || window.innerWidth;
+      let x = d.base + dx;
+      if (x < 0 ? !nextW : !prevW) x = rubber(x, width);
+      slide.style.transition = 'none';
+      slide.style.transform = `translateX(${x}px)`;
+    };
+
+    const onEnd = (e: TouchEvent) => {
+      const d = dragRef.current;
+      dragRef.current = null;
+      const slide = slideRef.current;
+      if (!d || d.horiz !== true || !slide) return;
+      const x = translateX(slide);
+      const width = slide.clientWidth || window.innerWidth;
+      // скорость пальца по последним ~120 мс движения; палец замер перед
+      // отпусканием (>80 мс без движения) — скорости нет, это не «бросок»
+      const pts = d.pts;
+      const a = pts[0];
+      const b = pts[pts.length - 1];
+      const held = e.timeStamp - b.t > 80;
+      const v = !held && pts.length >= 2 ? ((b.x - a.x) / Math.max(1, b.t - a.t)) * 1000 : 0;
+      const { prevW, nextW } = neighbors();
+      const target = x < 0 ? nextW : prevW;
+      const commit =
+        !!target &&
+        (Math.abs(x) > width * 0.3 ||
+          (Math.abs(v) > 450 && Math.sign(v) === Math.sign(x) && Math.abs(x) > 24));
+      if (commit) {
+        const sign = Math.sign(x) || 1;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          slide.style.transition = '';
+          slide.style.transform = '';
+          navigateRef.current('train', target.id);
+          return;
+        }
+        // довести за край с текущего места, затем соседняя въедет с той же стороны
+        enterFromRef.current = -sign * width;
+        slide.style.transition = 'transform 0.18s ease-out, opacity 0.18s ease-out';
+        slide.style.transform = `translateX(${sign * width}px)`;
+        slide.style.opacity = '0.4';
+        exitTimerRef.current = window.setTimeout(() => {
+          exitTimerRef.current = null;
+          navigateRef.current('train', target.id);
+        }, 170);
+      } else {
+        slide.style.transition = 'transform 0.3s var(--ease-out-strong), opacity 0.2s ease-out';
+        slide.style.transform = 'translateX(0px)';
+        slide.style.opacity = '1';
+      }
+    };
+
+    root.addEventListener('touchstart', onStart, { passive: true });
+    root.addEventListener('touchmove', onMove, { passive: false });
+    root.addEventListener('touchend', onEnd, { passive: true });
+    root.addEventListener('touchcancel', onEnd, { passive: true });
+    return () => {
+      root.removeEventListener('touchstart', onStart);
+      root.removeEventListener('touchmove', onMove);
+      root.removeEventListener('touchend', onEnd);
+      root.removeEventListener('touchcancel', onEnd);
+    };
+  }, [loading, w == null]);
+
+  /* «Въезд» открывшейся тренировки: после свайпа — во всю ширину с той же
+     стороны, по стрелкам — короткий шаг с проявлением. До отрисовки кадра. */
+  useLayoutEffect(() => {
+    if (!w) {
+      prevIdRef.current = null;
+      return;
+    }
+    if (prevIdRef.current === w.id) return;
+    const cameFrom = prevIdRef.current;
+    prevIdRef.current = w.id;
+    const el = slideRef.current;
+    if (cameFrom === null || !el) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      el.style.transition = '';
+      el.style.transform = '';
+      el.style.opacity = '';
+      enterFromRef.current = null;
+      return;
+    }
+    const prevW2 = workouts.find((x) => x.id === cameFrom);
+    const dateDir = !prevW2 || prevW2.date <= w.date ? 1 : -1;
+    const from = enterFromRef.current ?? dateDir * 72;
+    enterFromRef.current = null;
+    const fullSlide = Math.abs(from) > 120;
+    el.style.transition = 'none';
+    el.style.transform = `translateX(${from}px)`;
+    el.style.opacity = fullSlide ? '1' : '0';
+    void el.offsetWidth; // рефлоу фиксирует стартовое положение
+    el.style.transition = `transform ${fullSlide ? '0.34s' : '0.26s'} var(--ease-out-strong), opacity 0.22s ease-out`;
+    el.style.transform = 'translateX(0px)';
+    el.style.opacity = '1';
+  }, [w, workouts]);
 
   if (loading) return null;
 
@@ -109,35 +295,6 @@ export default function TrainingScreen() {
   const index = workouts.findIndex((x) => x.id === w.id);
   const prev = index > 0 ? workouts[index - 1] : null;
   const next = index >= 0 && index < workouts.length - 1 ? workouts[index + 1] : null;
-
-  // Направление слайда при смене открытой тренировки (derived-state паттерн)
-  if (prevIdRef.current === null) {
-    prevIdRef.current = w.id;
-  } else if (prevIdRef.current !== w.id) {
-    const prevW = workouts.find((x) => x.id === prevIdRef.current);
-    prevIdRef.current = w.id;
-    setWAnim(!prevW || prevW.date <= w.date ? 'right' : 'left');
-  }
-
-  /* Свайп влево/вправо листает тренировки; жест не перехватываем на полях,
-     ползунке и шторке таймера, в редакторе выключен целиком */
-  const onTouchStart = (e: React.TouchEvent) => {
-    const t = e.touches[0];
-    const el = e.target as HTMLElement;
-    const ok = !editMode && !el.closest('input, textarea, select, .fixed');
-    touchRef.current = { x: t.clientX, y: t.clientY, ok };
-  };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    const s = touchRef.current;
-    touchRef.current = null;
-    if (!s || !s.ok || editMode) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - s.x;
-    const dy = t.clientY - s.y;
-    if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
-    const target = dx < 0 ? next : prev;
-    if (target) navigate('train', target.id);
-  };
 
   const saveItem = (itemId: string, patch: Partial<WorkoutItem>) => {
     const cur = wRef.current ?? w;
@@ -172,6 +329,12 @@ export default function TrainingScreen() {
   const skippedItems = mainItems.filter((it) => !it.done && it.skipped);
   const movedCount = doneItems.length + skippedItems.length;
   const numOf = (it: WorkoutItem) => mainItems.findIndex((x) => x.id === it.id) + 1;
+
+  /* Разминка в рабочем режиме — тоже пункт списка: отметил — уехала
+     в «Выполнено» и посчиталась в прогрессе */
+  const workTotal = mainItems.length + (hasWarmup ? 1 : 0);
+  const workMoved = movedCount + (hasWarmup && w.warmupDone ? 1 : 0);
+  const workDone = doneItems.length + (hasWarmup && w.warmupDone ? 1 : 0);
 
   const elapsedMin = (() => {
     if (!w.startedAt) return 0;
@@ -307,6 +470,85 @@ export default function TrainingScreen() {
     </section>
   );
 
+  /* Строка в «Выполнено» для упражнения: имя + сводка (частичные подходы —
+     «2 из 3 подх.», пропуск — «пропущено», иначе — обычная нотация) */
+  const doneRowFor = (it: WorkoutItem, skippedRow: boolean) => {
+    const ex = it.exerciseId ? exerciseById(it.exerciseId) : undefined;
+    const nm =
+      t.catalog.exercise(ex?.name ?? stripNumbering(it.nameRaw ?? '')) || t.item.fallbackName;
+    const planned = plannedSetsCount(it);
+    const sd = it.setsDone ?? 0;
+    const summary = skippedRow
+      ? t.train.skippedLabel
+      : sd > 0 && sd < planned
+        ? t.item.setsDoneOf(sd, planned)
+        : compactSummary(it, exerciseKind(ex), t);
+    return (
+      <DoneRow
+        key={it.id}
+        name={nm}
+        summary={summary}
+        skippedRow={skippedRow}
+        onRestore={() => saveItem(it.id, { done: false, skipped: false })}
+      />
+    );
+  };
+
+  /* Рабочие списки — общие для режима «идёт» и правки завершённой после
+     открытия замка: сверху «to-do», внизу «Выполнено», разминка — пункт списка */
+  const workLists = (
+    <>
+      {hasWarmup && !w.warmupDone && warmupSection}
+
+      {(todoItems.length > 0 || mainItems.length === 0) && (
+        <section className="space-y-3">
+          <h2 className="px-1 text-sm font-semibold uppercase tracking-wide text-muted">
+            {t.train.exercises}
+          </h2>
+          {mainItems.length === 0 && (
+            <p className="rounded-2xl border border-border bg-card p-4 text-muted">
+              {t.train.noItems}
+            </p>
+          )}
+          {todoItems.map((it) => (
+            <ItemCard
+              key={it.id}
+              item={it}
+              num={numOf(it)}
+              locked={false}
+              active
+              exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
+              last={it.exerciseId ? lastResultBefore(it.exerciseId, w.date, w.id) : null}
+              onChange={(patch) => saveItem(it.id, patch)}
+              onRest={requestRest}
+            />
+          ))}
+        </section>
+      )}
+
+      {workMoved > 0 && (
+        <section className="space-y-2">
+          <h2 className="flex items-baseline gap-2 px-1 text-sm font-semibold uppercase tracking-wide text-ok-text">
+            {t.train.doneBlock}
+            <span className="normal-case tracking-normal text-muted">
+              {t.train.ofCount(workDone, workTotal)}
+            </span>
+          </h2>
+          {hasWarmup && w.warmupDone && (
+            <DoneRow
+              name={t.train.warmup}
+              summary={warmupCount > 0 ? String(warmupCount) : ''}
+              skippedRow={false}
+              onRestore={() => saveWorkout({ ...w, warmupDone: false })}
+            />
+          )}
+          {doneItems.map((it) => doneRowFor(it, false))}
+          {skippedItems.map((it) => doneRowFor(it, true))}
+        </section>
+      )}
+    </>
+  );
+
   /* Заметки тренера — тоже общие для «идёт» и подробного вида */
   const notesSection = w.notes.trim() !== '' && (
     <section className="rounded-2xl border border-border bg-card p-4">
@@ -331,17 +573,8 @@ export default function TrainingScreen() {
   );
 
   return (
-    <div className="space-y-4" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-      <div
-        key={w.id}
-        onAnimationEnd={(e) => {
-          if (e.target === e.currentTarget) setWAnim(null);
-        }}
-        className={
-          'space-y-4' +
-          (wAnim === 'right' ? ' anim-screen-right' : wAnim === 'left' ? ' anim-screen-left' : '')
-        }
-      >
+    <div ref={rootRef} className="touch-pan-y space-y-4">
+      <div key={w.id} ref={slideRef} className="space-y-4">
       <TopBlock w={w} prev={prev} next={next} onOpen={(id) => navigate('train', id)} />
 
       {editMode ? (
@@ -363,76 +596,20 @@ export default function TrainingScreen() {
                 {elapsedMin} {t.min}
               </span>
               <span className="ml-auto text-[12px] font-bold tabular-nums">
-                {t.train.ofCount(movedCount, mainItems.length)}
+                {t.train.ofCount(workMoved, workTotal)}
               </span>
             </div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-accent/20">
               <div
                 className="h-full origin-left rounded-full bg-accent transition-transform duration-300"
                 style={{
-                  transform: `scaleX(${mainItems.length ? movedCount / mainItems.length : 0})`,
+                  transform: `scaleX(${workTotal ? workMoved / workTotal : 0})`,
                 }}
               />
             </div>
           </section>
 
-          {warmupSection}
-
-          {/* Осталось сделать: твой «to-do» на сегодня */}
-          <section className="space-y-3">
-            <h2 className="px-1 text-sm font-semibold uppercase tracking-wide text-muted">
-              {t.train.exercises}
-            </h2>
-            {mainItems.length === 0 && (
-              <p className="rounded-2xl border border-border bg-card p-4 text-muted">
-                {t.train.noItems}
-              </p>
-            )}
-            {todoItems.map((it) => (
-              <ItemCard
-                key={it.id}
-                item={it}
-                num={numOf(it)}
-                locked={false}
-                active
-                exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
-                last={it.exerciseId ? lastResultBefore(it.exerciseId, w.date, w.id) : null}
-                onChange={(patch) => saveItem(it.id, patch)}
-                onRest={requestRest}
-              />
-            ))}
-          </section>
-
-          {/* Сделанное уезжает вниз: зелёная галочка — достижение,
-              пропущенное — перечёркнуто; тап возвращает в список */}
-          {movedCount > 0 && (
-            <section className="space-y-2">
-              <h2 className="flex items-baseline gap-2 px-1 text-sm font-semibold uppercase tracking-wide text-ok-text">
-                {t.train.doneBlock}
-                <span className="normal-case tracking-normal text-muted">
-                  {t.train.ofCount(doneItems.length, mainItems.length)}
-                </span>
-              </h2>
-              {doneItems.map((it) => (
-                <DoneRow
-                  key={it.id}
-                  item={it}
-                  exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
-                  skippedRow={false}
-                  onRestore={() => saveItem(it.id, { done: false, skipped: false })}
-                />
-              ))}
-              {skippedItems.map((it) => (
-                <DoneRow
-                  key={it.id}
-                  item={it}
-                  exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
-                  skippedRow
-                  onRestore={() => saveItem(it.id, { done: false, skipped: false })}
-                />
-              ))}
-            </section>
-          )}
+          {workLists}
 
           {/* Усталость + завершение */}
           <section className="rounded-2xl border border-border bg-card p-4">
@@ -481,31 +658,39 @@ export default function TrainingScreen() {
             {t.train.collapseView}
           </button>
 
-          {warmupSection}
+          {wState === 'done' && !workoutLocked ? (
+            /* Замок открыт — правим той же «to-do»-логикой, что и в режиме
+               «идёт»: снятая галочка возвращает упражнение наверх */
+            workLists
+          ) : (
+            <>
+              {warmupSection}
 
-          {/* Упражнения */}
-          <section className="space-y-3">
-            <h2 className="px-1 text-sm font-semibold uppercase tracking-wide text-muted">
-              {t.train.exercises}
-            </h2>
-            {mainItems.length === 0 && (
-              <p className="rounded-2xl border border-border bg-card p-4 text-muted">
-                {t.train.noItems}
-              </p>
-            )}
-            {mainItems.map((it, i) => (
-              <ItemCard
-                key={it.id}
-                item={it}
-                num={i + 1}
-                locked={workoutLocked}
-                exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
-                last={it.exerciseId ? lastResultBefore(it.exerciseId, w.date, w.id) : null}
-                onChange={(patch) => saveItem(it.id, patch)}
-                onRest={requestRest}
-              />
-            ))}
-          </section>
+              {/* Упражнения */}
+              <section className="space-y-3">
+                <h2 className="px-1 text-sm font-semibold uppercase tracking-wide text-muted">
+                  {t.train.exercises}
+                </h2>
+                {mainItems.length === 0 && (
+                  <p className="rounded-2xl border border-border bg-card p-4 text-muted">
+                    {t.train.noItems}
+                  </p>
+                )}
+                {mainItems.map((it, i) => (
+                  <ItemCard
+                    key={it.id}
+                    item={it}
+                    num={i + 1}
+                    locked={workoutLocked}
+                    exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
+                    last={it.exerciseId ? lastResultBefore(it.exerciseId, w.date, w.id) : null}
+                    onChange={(patch) => saveItem(it.id, patch)}
+                    onRest={requestRest}
+                  />
+                ))}
+              </section>
+            </>
+          )}
 
           {/* Конец тренировки: усталость + завершение-замок */}
           <section className="relative rounded-2xl border border-border bg-card p-4">
@@ -824,27 +1009,17 @@ function CompactWorkoutCard({
 /* --- Строка сделанного/пропущенного в блоке «Выполнено» -------------------- */
 
 function DoneRow({
-  item,
-  exercise,
+  name,
+  summary,
   skippedRow,
   onRestore,
 }: {
-  item: WorkoutItem;
-  exercise: Exercise | undefined;
+  name: string;
+  summary: string;
   skippedRow: boolean;
   onRestore: () => void;
 }) {
   const { t } = useT();
-  const name =
-    t.catalog.exercise(exercise?.name ?? stripNumbering(item.nameRaw ?? '')) ||
-    t.item.fallbackName;
-  const planned = plannedSetsCount(item);
-  const sd = item.setsDone ?? 0;
-  const summary = skippedRow
-    ? t.train.skippedLabel
-    : sd > 0 && sd < planned
-      ? t.item.setsDoneOf(sd, planned)
-      : compactSummary(item, exerciseKind(exercise), t);
   return (
     <button
       type="button"
