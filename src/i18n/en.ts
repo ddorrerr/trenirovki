@@ -221,6 +221,7 @@ export const en: typeof ru = {
       'Settings live behind the gear.',
     emptyEnable: 'Turn on editing',
     emptyMenu: 'Open menu',
+    cardio: 'Cardio',
     start: 'Start workout',
     expandView: 'Expand — view details',
     collapseView: 'Collapse to card',

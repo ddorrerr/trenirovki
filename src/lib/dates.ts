@@ -10,8 +10,10 @@ function toDate(iso: string): Date {
   return new Date(iso + 'T00:00:00Z');
 }
 
-/** "13 июня 2025" / "13 June 2025" — без хвостового « г.», одинаково на всех экранах */
+/** "13 июня" в текущем году, "13 июня 2025" в других — год пишем, только
+    когда он не очевиден (экономия места на телефоне) */
 export function fmtDate(iso: string): string {
+  if (iso.slice(0, 4) === todayISO().slice(0, 4)) return fmtDateShort(iso);
   return toDate(iso)
     .toLocaleDateString(locale(), { ...UTC, day: 'numeric', month: 'long', year: 'numeric' })
     .replace(/\s*г\.$/, '');
@@ -22,9 +24,9 @@ export function fmtDateShort(iso: string): string {
   return toDate(iso).toLocaleDateString(locale(), { ...UTC, day: 'numeric', month: 'long' });
 }
 
-/** "пятница" / "Friday" */
+/** "пт" / "Fri" — коротко везде, полное название дня места не стоит */
 export function fmtWeekday(iso: string): string {
-  return toDate(iso).toLocaleDateString(locale(), { ...UTC, weekday: 'long' });
+  return toDate(iso).toLocaleDateString(locale(), { ...UTC, weekday: 'short' });
 }
 
 /** "2025-06" — ключ для группировки по месяцам */

@@ -2,6 +2,7 @@
 // разминка, упражнения с чипами и быстрым логом, усталость, заметки тренера.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useApp } from '../store';
 import { useT, type Dict } from '../i18n';
 import { fmtDate, fmtWeekday } from '../lib/dates';
@@ -17,7 +18,14 @@ import ItemCard, {
 } from '../components/train/ItemCard';
 import RestTimer, { parseRestSeconds, type RestRequest } from '../components/train/RestTimer';
 import VideoLink from '../components/train/VideoLink';
-import { CheckIcon, ChevronIcon, FlameIcon, VideoIcon, XIcon } from '../components/train/icons';
+import {
+  CheckIcon,
+  ChevronIcon,
+  FlameIcon,
+  HeartPulseIcon,
+  VideoIcon,
+  XIcon,
+} from '../components/train/icons';
 
 /**
  * Разбираем строку разминки из таблицы: маркеры «-», «•» убираем, нумерацию
@@ -79,6 +87,9 @@ export default function TrainingScreen() {
      Всё через ref-стили — без ререндеров на каждый кадр. */
   const rootRef = useRef<HTMLDivElement | null>(null);
   const slideRef = useRef<HTMLDivElement | null>(null);
+  /** Центр шапки (дата и бейджи): шапка со стрелками стоит на месте,
+      а дата едет за свайпом слегка и мягче */
+  const headCenterRef = useRef<HTMLDivElement | null>(null);
   const prevIdRef = useRef<string | null>(null);
   /** Откуда «въезжает» новая тренировка (px со знаком); null = лёгкий шаг по стрелкам */
   const enterFromRef = useRef<number | null>(null);
@@ -188,6 +199,13 @@ export default function TrainingScreen() {
       if (x < 0 ? !nextW : !prevW) x = rubber(x, width);
       slide.style.transition = 'none';
       slide.style.transform = `translateX(${x}px)`;
+      // дата в шапке подыгрывает: лёгкий сдвиг и растворение
+      const head = headCenterRef.current;
+      if (head) {
+        head.style.transition = 'none';
+        head.style.transform = `translateX(${x / 6}px)`;
+        head.style.opacity = String(Math.max(0.35, 1 - Math.abs(x) / width));
+      }
     };
 
     const onEnd = (e: TouchEvent) => {
@@ -210,11 +228,17 @@ export default function TrainingScreen() {
         !!target &&
         (Math.abs(x) > width * 0.3 ||
           (Math.abs(v) > 450 && Math.sign(v) === Math.sign(x) && Math.abs(x) > 24));
+      const head = headCenterRef.current;
       if (commit) {
         const sign = Math.sign(x) || 1;
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
           slide.style.transition = '';
           slide.style.transform = '';
+          if (head) {
+            head.style.transition = '';
+            head.style.transform = '';
+            head.style.opacity = '';
+          }
           navigateRef.current('train', target.id);
           return;
         }
@@ -223,6 +247,11 @@ export default function TrainingScreen() {
         slide.style.transition = 'transform 0.18s ease-out, opacity 0.18s ease-out';
         slide.style.transform = `translateX(${sign * width}px)`;
         slide.style.opacity = '0.4';
+        if (head) {
+          head.style.transition = 'transform 0.18s ease-out, opacity 0.18s ease-out';
+          head.style.transform = `translateX(${sign * 24}px)`;
+          head.style.opacity = '0';
+        }
         exitTimerRef.current = window.setTimeout(() => {
           exitTimerRef.current = null;
           navigateRef.current('train', target.id);
@@ -231,6 +260,11 @@ export default function TrainingScreen() {
         slide.style.transition = 'transform 0.3s var(--ease-out-strong), opacity 0.2s ease-out';
         slide.style.transform = 'translateX(0px)';
         slide.style.opacity = '1';
+        if (head) {
+          head.style.transition = 'transform 0.3s var(--ease-out-strong), opacity 0.2s ease-out';
+          head.style.transform = 'translateX(0px)';
+          head.style.opacity = '1';
+        }
       }
     };
 
@@ -257,11 +291,17 @@ export default function TrainingScreen() {
     const cameFrom = prevIdRef.current;
     prevIdRef.current = w.id;
     const el = slideRef.current;
+    const head = headCenterRef.current;
     if (cameFrom === null || !el) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       el.style.transition = '';
       el.style.transform = '';
       el.style.opacity = '';
+      if (head) {
+        head.style.transition = '';
+        head.style.transform = '';
+        head.style.opacity = '';
+      }
       enterFromRef.current = null;
       return;
     }
@@ -273,10 +313,20 @@ export default function TrainingScreen() {
     el.style.transition = 'none';
     el.style.transform = `translateX(${from}px)`;
     el.style.opacity = fullSlide ? '1' : '0';
+    if (head) {
+      head.style.transition = 'none';
+      head.style.transform = `translateX(${Math.sign(from) * 18}px)`;
+      head.style.opacity = '0';
+    }
     void el.offsetWidth; // рефлоу фиксирует стартовое положение
     el.style.transition = `transform ${fullSlide ? '0.34s' : '0.26s'} var(--ease-out-strong), opacity 0.22s ease-out`;
     el.style.transform = 'translateX(0px)';
     el.style.opacity = '1';
+    if (head) {
+      head.style.transition = 'transform 0.3s var(--ease-out-strong), opacity 0.24s ease-out';
+      head.style.transform = 'translateX(0px)';
+      head.style.opacity = '1';
+    }
   }, [w, workouts]);
 
   if (loading) return null;
@@ -307,10 +357,14 @@ export default function TrainingScreen() {
   const sortedItems = [...w.items].sort(
     (a, b) => (a.order ?? 0) - (b.order ?? 0),
   );
-  /* Разминочные упражнения собираются в общую карточку «Разминка»,
-     остальные (обычные и кардио) — отдельными карточками с нумерацией */
+  /* Разминочные упражнения собираются в общую карточку «Разминка», кардио —
+     отдельным блоком с сердечком (не считается упражнением), обычные —
+     нумерованными карточками */
   const warmupItems = sortedItems.filter((it) => itemKind(it) === 'warmup');
-  const mainItems = sortedItems.filter((it) => itemKind(it) !== 'warmup');
+  const mainItems = sortedItems.filter((it) => itemKind(it) === 'main');
+  const cardioItems = sortedItems.filter((it) => itemKind(it) === 'cardio');
+  /* Пункты рабочего списка: упражнения + кардио (кардио в конце) */
+  const flowItems = [...mainItems, ...cardioItems];
 
   const hasWarmup = w.warmup.length > 0 || warmupItems.length > 0 || !!w.warmupVideoUrl;
   const warmupCount = w.warmup.length + warmupItems.length;
@@ -324,15 +378,17 @@ export default function TrainingScreen() {
     w.status === 'done' ? 'done' : w.startedAt ? 'active' : 'planned';
   const expanded = expandedMap[w.id] ?? false;
 
-  const todoItems = mainItems.filter((it) => !it.done && !it.skipped);
-  const doneItems = mainItems.filter((it) => it.done);
-  const skippedItems = mainItems.filter((it) => !it.done && it.skipped);
+  const todoItems = flowItems.filter((it) => !it.done && !it.skipped);
+  const doneItems = flowItems.filter((it) => it.done);
+  const skippedItems = flowItems.filter((it) => !it.done && it.skipped);
   const movedCount = doneItems.length + skippedItems.length;
   const numOf = (it: WorkoutItem) => mainItems.findIndex((x) => x.id === it.id) + 1;
+  const todoMains = todoItems.filter((it) => itemKind(it) === 'main');
+  const todoCardio = todoItems.filter((it) => itemKind(it) === 'cardio');
 
-  /* Разминка в рабочем режиме — тоже пункт списка: отметил — уехала
-     в «Выполнено» и посчиталась в прогрессе */
-  const workTotal = mainItems.length + (hasWarmup ? 1 : 0);
+  /* Разминка и кардио в рабочем режиме — тоже пункты списка: отметил —
+     уехали в «Выполнено» и посчитались в прогрессе */
+  const workTotal = flowItems.length + (hasWarmup ? 1 : 0);
   const workMoved = movedCount + (hasWarmup && w.warmupDone ? 1 : 0);
   const workDone = doneItems.length + (hasWarmup && w.warmupDone ? 1 : 0);
 
@@ -342,8 +398,22 @@ export default function TrainingScreen() {
     return Number.isFinite(ms) ? Math.max(0, Math.round(ms / 60000)) : 0;
   })();
 
-  const startWorkout = () => saveWorkout({ ...w, startedAt: new Date().toISOString() });
-  const cancelStart = () => saveWorkout({ ...w, startedAt: null });
+  /* Плавная смена вида (компакт ⇄ подробный ⇄ «идёт»): мягкий кроссфейд через
+     View Transitions, где браузер умеет; иначе — мгновенно, как раньше */
+  const switchView = (apply: () => void) => {
+    const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
+    if (!doc.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      apply();
+      return;
+    }
+    doc.startViewTransition(() => {
+      flushSync(apply);
+    });
+  };
+
+  const startWorkout = () =>
+    switchView(() => saveWorkout({ ...w, startedAt: new Date().toISOString() }));
+  const cancelStart = () => switchView(() => saveWorkout({ ...w, startedAt: null }));
 
   /* «Завершить» в режиме «идёт»: неотмеченное — с подтверждением в пропуск */
   const finishActive = () => {
@@ -354,9 +424,11 @@ export default function TrainingScreen() {
       const ids = new Set(todoItems.map((r) => r.id));
       items = w.items.map((i) => (ids.has(i.id) ? { ...i, skipped: true } : i));
     }
-    saveWorkout({ ...w, items, status: 'done' });
-    setUnlockedMap((m) => ({ ...m, [w.id]: false }));
-    setCelebrate(true);
+    switchView(() => {
+      saveWorkout({ ...w, items, status: 'done' });
+      setUnlockedMap((m) => ({ ...m, [w.id]: false }));
+      setCelebrate(true);
+    });
     window.setTimeout(() => setCelebrate(false), 1200);
   };
 
@@ -378,6 +450,10 @@ export default function TrainingScreen() {
           aria-expanded={warmupOpen}
           className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left"
         >
+          {/* огонёк — как у строки разминки в компактной карточке */}
+          <span aria-hidden="true" className="text-muted">
+            <FlameIcon size={15} />
+          </span>
           <span
             className={
               'text-sm font-semibold uppercase tracking-wide ' +
@@ -500,21 +576,42 @@ export default function TrainingScreen() {
     <>
       {hasWarmup && !w.warmupDone && warmupSection}
 
-      {(todoItems.length > 0 || mainItems.length === 0) && (
+      {(todoMains.length > 0 || flowItems.length === 0) && (
         <section className="space-y-3">
           <h2 className="px-1 text-sm font-semibold uppercase tracking-wide text-muted">
             {t.train.exercises}
           </h2>
-          {mainItems.length === 0 && (
+          {flowItems.length === 0 && (
             <p className="rounded-2xl border border-border bg-card p-4 text-muted">
               {t.train.noItems}
             </p>
           )}
-          {todoItems.map((it) => (
+          {todoMains.map((it) => (
             <ItemCard
               key={it.id}
               item={it}
               num={numOf(it)}
+              locked={false}
+              active
+              exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
+              last={it.exerciseId ? lastResultBefore(it.exerciseId, w.date, w.id) : null}
+              onChange={(patch) => saveItem(it.id, patch)}
+              onRest={requestRest}
+            />
+          ))}
+        </section>
+      )}
+
+      {todoCardio.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="px-1 text-sm font-semibold uppercase tracking-wide text-muted">
+            {t.train.cardio}
+          </h2>
+          {todoCardio.map((it) => (
+            <ItemCard
+              key={it.id}
+              item={it}
+              num={0}
               locked={false}
               active
               exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
@@ -574,8 +671,16 @@ export default function TrainingScreen() {
 
   return (
     <div ref={rootRef} className="touch-pan-y space-y-4">
+      {/* Шапка со стрелками стоит на месте при свайпе — едет только контент,
+          а дата с бейджами меняется своей мягкой анимацией */}
+      <TopBlock
+        w={w}
+        prev={prev}
+        next={next}
+        centerRef={headCenterRef}
+        onOpen={(id) => navigate('train', id)}
+      />
       <div key={w.id} ref={slideRef} className="space-y-4">
-      <TopBlock w={w} prev={prev} next={next} onOpen={(id) => navigate('train', id)} />
 
       {editMode ? (
         <>
@@ -644,14 +749,14 @@ export default function TrainingScreen() {
           w={w}
           celebrate={celebrate}
           onStart={startWorkout}
-          onExpand={() => setExpandedMap((m) => ({ ...m, [w.id]: true }))}
+          onExpand={() => switchView(() => setExpandedMap((m) => ({ ...m, [w.id]: true })))}
         />
       ) : (
         <>
           {/* Подробный вид: всё как раньше, сверху — путь назад к карточке */}
           <button
             type="button"
-            onClick={() => setExpandedMap((m) => ({ ...m, [w.id]: false }))}
+            onClick={() => switchView(() => setExpandedMap((m) => ({ ...m, [w.id]: false })))}
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted"
           >
             <ChevronIcon open size={16} />
@@ -689,6 +794,27 @@ export default function TrainingScreen() {
                   />
                 ))}
               </section>
+
+              {/* Кардио — свой блок с сердечком, упражнением не считается */}
+              {cardioItems.length > 0 && (
+                <section className="space-y-3">
+                  <h2 className="px-1 text-sm font-semibold uppercase tracking-wide text-muted">
+                    {t.train.cardio}
+                  </h2>
+                  {cardioItems.map((it) => (
+                    <ItemCard
+                      key={it.id}
+                      item={it}
+                      num={0}
+                      locked={workoutLocked}
+                      exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
+                      last={it.exerciseId ? lastResultBefore(it.exerciseId, w.date, w.id) : null}
+                      onChange={(patch) => saveItem(it.id, patch)}
+                      onRest={requestRest}
+                    />
+                  ))}
+                </section>
+              )}
             </>
           )}
 
@@ -715,9 +841,12 @@ export default function TrainingScreen() {
                   {t.train.finish}
                 </button>
               ) : (
-                /* Общий замок: «Завершить» закрывает отметки всей тренировки */
+                /* Общий замок: «Завершить» закрывает отметки всей тренировки;
+                   открытие/закрытие меняет вид на рабочие списки — с кроссфейдом */
                 <button
-                  onClick={() => setUnlockedMap((m) => ({ ...m, [w.id]: workoutLocked }))}
+                  onClick={() =>
+                    switchView(() => setUnlockedMap((m) => ({ ...m, [w.id]: workoutLocked })))
+                  }
                   aria-pressed={!workoutLocked}
                   className={
                     'flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium ' +
@@ -761,11 +890,14 @@ function TopBlock({
   w,
   prev,
   next,
+  centerRef,
   onOpen,
 }: {
   w: Workout;
   prev: Workout | null;
   next: Workout | null;
+  /** Центр шапки: свайп-анимация двигает только дату и бейджи, не стрелки */
+  centerRef?: React.Ref<HTMLDivElement>;
   onOpen: (id: string | null) => void;
 }) {
   const { t } = useT();
@@ -776,7 +908,7 @@ function TopBlock({
         disabled={!prev}
         onClick={() => prev && onOpen(prev.id)}
       />
-      <div className="min-w-0 flex-1 text-center">
+      <div ref={centerRef} className="min-w-0 flex-1 text-center">
         <h2 className="text-xl font-extrabold leading-snug tracking-tight">
           {fmtDate(w.date)}, {fmtWeekday(w.date)}
         </h2>
@@ -915,7 +1047,8 @@ function CompactWorkoutCard({
   const sorted = [...w.items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const warmupCount =
     w.warmup.length + sorted.filter((it) => itemKind(it) === 'warmup').length;
-  const mains = sorted.filter((it) => itemKind(it) !== 'warmup');
+  const mains = sorted.filter((it) => itemKind(it) === 'main');
+  const cardio = sorted.filter((it) => itemKind(it) === 'cardio');
 
   return (
     <>
@@ -935,7 +1068,9 @@ function CompactWorkoutCard({
             </span>
           </div>
         )}
-        {mains.length === 0 && <p className="text-muted">{t.train.noItems}</p>}
+        {mains.length === 0 && cardio.length === 0 && (
+          <p className="text-muted">{t.train.noItems}</p>
+        )}
         <ul className="divide-y divide-border/60">
           {mains.map((it, i) => {
             const ex = it.exerciseId ? exerciseById(it.exerciseId) : undefined;
@@ -967,6 +1102,44 @@ function CompactWorkoutCard({
                     className={
                       // длинные пояснения веса («36 кг (тренажёр 1)…») обрезаются,
                       // не выталкивая название упражнения
+                      'ml-auto max-w-[45%] shrink-0 truncate text-xs font-semibold tabular-nums text-muted' +
+                      (skipped ? ' line-through opacity-60' : '')
+                    }
+                  >
+                    {summary}
+                  </span>
+                )}
+              </li>
+            );
+          })}
+          {/* Кардио — с сердечком вместо номера, упражнением не считается */}
+          {cardio.map((it) => {
+            const ex = it.exerciseId ? exerciseById(it.exerciseId) : undefined;
+            const name =
+              t.catalog.exercise(ex?.name ?? stripNumbering(it.nameRaw ?? '')) ||
+              t.item.fallbackName;
+            const skipped = !!it.skipped && !it.done;
+            const summary = compactSummary(it, 'cardio', t);
+            return (
+              <li key={it.id} className="flex items-center gap-2.5 py-2 last:pb-0">
+                <span
+                  aria-hidden="true"
+                  className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-lg bg-chip px-1 text-muted"
+                >
+                  <HeartPulseIcon size={13} />
+                </span>
+                {skipped && <span className="sr-only">{t.train.skippedLabel}: </span>}
+                <span
+                  className={
+                    'min-w-0 flex-1 truncate text-[15px] ' +
+                    (skipped ? 'font-medium text-muted line-through opacity-60' : 'font-bold')
+                  }
+                >
+                  {name}
+                </span>
+                {summary && (
+                  <span
+                    className={
                       'ml-auto max-w-[45%] shrink-0 truncate text-xs font-semibold tabular-nums text-muted' +
                       (skipped ? ' line-through opacity-60' : '')
                     }

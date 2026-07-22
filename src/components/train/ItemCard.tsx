@@ -292,7 +292,8 @@ export default function ItemCard({
             (item.done ? 'bg-bg text-muted' : 'bg-chip text-muted')
           }
         >
-          {num}
+          {/* кардио — не упражнение: вместо номера сердечко */}
+          {kind === 'cardio' ? <HeartPulseIcon size={13} /> : num}
         </span>
         <h3
           className={
@@ -304,7 +305,7 @@ export default function ItemCard({
                 : '')
           }
         >
-          <span className="sr-only">{num}. </span>
+          {kind !== 'cardio' && <span className="sr-only">{num}. </span>}
           {name || t.item.fallbackName}
         </h3>
         {videoUrl && (
