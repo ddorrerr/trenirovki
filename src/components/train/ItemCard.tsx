@@ -110,6 +110,12 @@ export default function ItemCard({
   const pressRef = useRef<{ timer: number; x: number; y: number } | null>(null);
   const pressFiredRef = useRef(false);
 
+  // Замок завершённой тренировки закрывает и запись факта: открытый
+  // редактор сворачивается (например, «Завершить» нажали при открытом)
+  useEffect(() => {
+    if (locked) setQuickEdit(false);
+  }, [locked]);
+
   const kind = exerciseKind(exercise);
   const name = t.catalog.exercise(exercise?.name ?? stripNumbering(item.nameRaw ?? ''));
   const videoUrl = item.videoUrl ?? exercise?.videoUrl ?? null;
@@ -205,7 +211,7 @@ export default function ItemCard({
     }
   };
   const startPress = (e: React.PointerEvent) => {
-    if (kind === 'cardio' || quickEdit) return;
+    if (kind === 'cardio' || quickEdit || locked) return;
     if ((e.target as HTMLElement).closest('button,a,input')) return;
     cancelPress();
     pressRef.current = {
@@ -447,7 +453,7 @@ export default function ItemCard({
 
             {/* Дублирующий вход в быструю запись: для упражнений без чипов
                 (нет плана) и для тех, кто не знает про долгое нажатие */}
-            {kind !== 'cardio' && !quickEdit && (
+            {kind !== 'cardio' && !quickEdit && !locked && (
               <button
                 type="button"
                 onClick={() => setQuickEdit(true)}
