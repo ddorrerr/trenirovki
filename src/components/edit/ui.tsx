@@ -24,10 +24,11 @@ interface TextFieldProps {
   type?: 'text' | 'url' | 'date';
   placeholder?: string;
   list?: string;
+  inputMode?: 'decimal' | 'numeric';
 }
 
 /** Однострочное поле: сохраняет по blur/Enter (дата — сразу при выборе) */
-export function TextField({ label, value, onCommit, type = 'text', placeholder, list }: TextFieldProps) {
+export function TextField({ label, value, onCommit, type = 'text', placeholder, list, inputMode }: TextFieldProps) {
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
 
@@ -39,6 +40,7 @@ export function TextField({ label, value, onCommit, type = 'text', placeholder, 
     <Labelled label={label}>
       <input
         type={type}
+        inputMode={inputMode}
         className={inputCls}
         value={draft}
         placeholder={placeholder}

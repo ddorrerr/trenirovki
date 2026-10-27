@@ -1,4 +1,4 @@
-// Экран «Меню»: режим редактирования, настройки (тема, язык), данные, о приложении.
+// Экран «Меню»: настройки, комментарии, данные и информация о приложении.
 
 import { useId, useState, type ReactNode } from 'react';
 import { useApp, type Theme } from '../store';
@@ -6,13 +6,13 @@ import { useT, type Dict, type Lang } from '../i18n';
 import { wakeLockSupported } from '../hooks/useWakeLock';
 import { downloadBackup } from '../lib/backup';
 import { fmtDate } from '../lib/dates';
+import { version } from '../../package.json';
 
 export default function MenuScreen() {
   const {
     exercises,
     workouts,
-    editMode,
-    setEditMode,
+    navigate,
     settings,
     setSettings,
     sync,
@@ -37,14 +37,10 @@ export default function MenuScreen() {
 
   return (
     <div className="space-y-6">
-      <Section title={t.menu.sectionMode}>
-        <ToggleRow
-          title={t.menu.editing}
-          subtitle={t.menu.editingSub}
-          checked={editMode}
-          onChange={setEditMode}
-        />
-      </Section>
+      <button type="button" onClick={() => navigate('comments')}
+        className="flex min-h-11 w-full items-center rounded-xl border border-border bg-card px-4 py-3 font-medium">
+        {t.nav.comments}
+      </button>
 
       <Section title={t.menu.sectionSettings}>
         <ToggleRow
@@ -112,7 +108,7 @@ export default function MenuScreen() {
         <div className="space-y-1 px-4 py-3.5 text-sm text-muted">
           <p>{workoutsLine}</p>
           <p>{exercisesLine}</p>
-          <p>{t.menu.version} 0.33.0</p>
+          <p>{t.menu.version} {version}</p>
         </div>
       </Section>
     </div>

@@ -11,13 +11,14 @@ import LibraryScreen from './screens/LibraryScreen';
 import ProgressScreen from './screens/ProgressScreen';
 import MenuScreen from './screens/MenuScreen';
 import KeyScreen from './screens/KeyScreen';
+import NewWorkoutForm from './components/edit/NewWorkoutForm';
+import RestTimer from './components/train/RestTimer';
 
 /* «Настройки» больше не вкладка — шестерёнка в шапке Главной.
    Подписи вкладок берутся из словаря по id (t.nav[id]) при рендере. */
 const TABS: { id: Tab; icon: (active: boolean) => React.ReactNode }[] = [
   { id: 'home', icon: (a) => <IconHome active={a} /> },
-  { id: 'train', icon: (a) => <IconDumbbell active={a} /> },
-  { id: 'history', icon: (a) => <IconHistory active={a} /> },
+  { id: 'history', icon: (a) => <IconDumbbell active={a} /> },
   { id: 'library', icon: (a) => <IconLibrary active={a} /> },
   { id: 'progress', icon: (a) => <IconChart active={a} /> },
 ];
@@ -33,13 +34,14 @@ export default function App() {
     navigate,
     canGoBack,
     goBack,
-    editMode,
-    setEditMode,
     settings,
+    restRequest,
     currentWorkout,
   } = useApp();
   const { t, lang } = useT();
   useWakeLock(settings.keepAwake);
+
+  const activeTab = tab === 'train' || tab === 'create' ? 'history' : tab;
 
   // Язык — на <html> и в заголовок вкладки (индексный скрипт делает то же до загрузки)
   useEffect(() => {
@@ -69,14 +71,12 @@ export default function App() {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
-  // На Главной вместо имени приложения — приветствие: Лизе или Тане (режим тренера)
+  // На Главной — личное приветствие.
   const title =
     tab === 'train' && scrolled && currentWorkout
       ? `${fmtDateShort(currentWorkout.date)}, ${fmtWeekday(currentWorkout.date)}`
       : tab === 'home'
-        ? editMode
-          ? t.home.greetTrainer
-          : t.home.greetUser
+        ? t.home.greetUser
         : t.nav[tab];
 
   // Экран «въезжает» со стороны, куда шагнула навигация (по порядку вкладок)
@@ -110,7 +110,7 @@ export default function App() {
           (black-translucent), в обычном браузере env() = 0 и ничего не меняется */}
       <header className="sticky top-0 z-20 border-b border-border bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
-          {canGoBack && (
+          {canGoBack && !TABS.some((item) => item.id === tab) && (
             <button
               onClick={goBack}
               aria-label={t.back}
@@ -137,7 +137,7 @@ export default function App() {
                 onClick={() => navigate(tb.id)}
                 className={
                   'rounded-lg px-3 py-1.5 text-sm ' +
-                  (tab === tb.id
+                  (activeTab === tb.id
                     ? 'font-bold text-accent'
                     : 'font-medium text-muted hover:text-fg')
                 }
@@ -158,19 +158,7 @@ export default function App() {
                 <IconCog active={false} size={22} />
               </button>
             )}
-            <button
-              onClick={() => setEditMode(!editMode)}
-              aria-label={editMode ? t.editMode.turnOff : t.editMode.turnOn}
-              title={editMode ? t.editMode.titleOff : t.editMode.titleOn}
-              className={
-                'flex h-9 w-9 items-center justify-center rounded-lg border ' +
-                (editMode
-                  ? 'border-accent bg-accent text-accent-fg'
-                  : 'border-border bg-card text-muted hover:text-fg')
-              }
-            >
-              <IconPencil />
-            </button>
+
           </div>
         </div>
       </header>
@@ -184,35 +172,38 @@ export default function App() {
           {tab === 'library' && <LibraryScreen />}
           {tab === 'progress' && <ProgressScreen />}
           {tab === 'menu' && <MenuScreen />}
+          {tab === 'create' && <NewWorkoutForm />}
         </div>
       </main>
 
-      {/* Нижняя навигация для телефона: только иконки */}
+      {/* Четыре раздела; открытая тренировка — деталь коллекции. */}
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 backdrop-blur md:hidden">
-        <div className="grid grid-cols-5 pb-[env(safe-area-inset-bottom)]">
+        <div className="grid grid-cols-4 pb-[env(safe-area-inset-bottom)]">
           {TABS.map((tb) => (
             <button
               key={tb.id}
               onClick={() => navigate(tb.id)}
               aria-label={t.nav[tb.id]}
               title={t.nav[tb.id]}
-              aria-current={tab === tb.id ? 'page' : undefined}
+              aria-current={activeTab === tb.id ? 'page' : undefined}
               className={
-                'relative flex items-center justify-center py-3 ' +
-                (tab === tb.id ? 'text-accent' : 'text-muted')
+                'relative flex flex-col items-center justify-center gap-1 py-2 ' +
+                (activeTab === tb.id ? 'text-accent' : 'text-muted')
               }
             >
-              {tb.icon(tab === tb.id)}
-              {tab === tb.id && (
+              {tb.icon(activeTab === tb.id)}
+              <span className="text-[11px] font-medium leading-tight">{t.nav[tb.id]}</span>
+              {activeTab === tb.id && (
                 <span
                   aria-hidden="true"
-                  className="absolute bottom-1 h-1 w-1 rounded-full bg-accent"
+                  className="absolute top-1 h-1 w-1 rounded-full bg-accent"
                 />
               )}
             </button>
           ))}
         </div>
       </nav>
+      <RestTimer request={restRequest} />
     </div>
   );
 }
@@ -323,14 +314,6 @@ function IconCog({ active, size = 26 }: { active: boolean; size?: number }) {
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.1 : 1.7} strokeLinecap="round" strokeLinejoin="round">
       <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
       <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
-
-function IconPencil() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 3l4 4L8 20l-5 1 1-5L17 3z" />
     </svg>
   );
 }

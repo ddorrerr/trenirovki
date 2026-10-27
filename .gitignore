@@ -6,6 +6,7 @@ dist
 
 # local-only: agent config and private material must never reach this PUBLIC repo
 CLAUDE.md
+AGENTS.md
 .claude/
 .agents/
 .codex/

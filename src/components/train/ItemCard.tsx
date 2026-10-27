@@ -2,12 +2,12 @@
 // «прошлый раз», отметка «выполнено» и лёгкий редактор (комментарий + факт).
 
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
-import { exerciseKind, type Actual, type ActualSet, type Exercise, type WorkoutItem } from '../../types';
+import { exerciseKind, type Actual, type Exercise, type WorkoutItem } from '../../types';
 import type { Occurrence } from '../../store';
 import { useT, type Dict } from '../../i18n';
 import { fmtDateShort } from '../../lib/dates';
 import { perSetSummary } from '../../lib/actual';
-import { IconPlus } from '../edit/ui';
+import ActionMenu from '../edit/ActionMenu';
 import VideoLink from './VideoLink';
 import {
   BarbellIcon,
@@ -28,6 +28,10 @@ import {
 } from './icons';
 
 interface ItemCardProps {
+  onEdit?: () => void;
+  onMove?: () => void;
+  onRemove?: () => void;
+  initialOpen?: boolean;
   item: WorkoutItem;
   /** Порядковый номер в тренировке (1..n) */
   num: number;
@@ -107,11 +111,15 @@ export default function ItemCard({
   last,
   locked,
   active = false,
+  initialOpen = false,
+  onEdit,
+  onMove,
+  onRemove,
   onChange,
   onRest,
 }: ItemCardProps) {
   const { t } = useT();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   // «чпок» галочки только на живой тап, не при монтировании карточки
   const [checkPop, setCheckPop] = useState(false);
   /* Кружки подходов: последний тап заполняется локально и мгновенно, а
@@ -119,18 +127,6 @@ export default function ItemCard({
   const [pendingFill, setPendingFill] = useState<number | null>(null);
   const [popIdx, setPopIdx] = useState<number | null>(null);
   const completeTimerRef = useRef<number | null>(null);
-  /* Быстрая запись факта: долгое нажатие на чипы повторов/веса превращает
-     их в компактный редактор прямо на месте — без большой панели */
-  const [quickEdit, setQuickEdit] = useState(false);
-  const pressRef = useRef<{ timer: number; x: number; y: number } | null>(null);
-  const pressFiredRef = useRef(false);
-
-  // Замок завершённой тренировки закрывает и запись факта: открытый
-  // редактор сворачивается (например, «Завершить» нажали при открытом)
-  useEffect(() => {
-    if (locked) setQuickEdit(false);
-  }, [locked]);
-
   useEffect(
     () => () => {
       if (completeTimerRef.current) window.clearTimeout(completeTimerRef.current);
@@ -241,45 +237,15 @@ export default function ItemCard({
 
   // Тап по карточке раскрывает её, но не когда попали в ссылку/кнопку/поле
   const handleCardClick = (e: MouseEvent<HTMLDivElement>) => {
-    // клик, «дозвучавший» после долгого нажатия, — не тап
-    if (pressFiredRef.current) {
-      pressFiredRef.current = false;
-      return;
-    }
     const el = e.target as HTMLElement;
     if (el.closest('a,button,input,textarea,select,label')) return;
     setOpen((v) => !v);
   };
 
-  /* Долгое нажатие (450 мс) на строке чипов; сдвиг пальца > 12px — скролл,
-     не нажатие. Кнопки в строке (отдых) жест не перехватывают. */
-  const cancelPress = () => {
-    if (pressRef.current) {
-      window.clearTimeout(pressRef.current.timer);
-      pressRef.current = null;
-    }
-  };
-  const startPress = (e: React.PointerEvent) => {
-    if (kind === 'cardio' || quickEdit || locked) return;
-    if ((e.target as HTMLElement).closest('button,a,input')) return;
-    cancelPress();
-    pressRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      timer: window.setTimeout(() => {
-        pressRef.current = null;
-        pressFiredRef.current = true;
-        setQuickEdit(true);
-      }, 450),
-    };
-  };
-  const movePress = (e: React.PointerEvent) => {
-    const p = pressRef.current;
-    if (p && (Math.abs(e.clientX - p.x) > 12 || Math.abs(e.clientY - p.y) > 12)) cancelPress();
-  };
-
   return (
     <div
+      data-workout-item={item.id}
+      data-item-expanded={open}
       onClick={handleCardClick}
       className="cursor-pointer rounded-2xl border border-border bg-card p-4"
     >
@@ -308,19 +274,12 @@ export default function ItemCard({
           {kind !== 'cardio' && <span className="sr-only">{num}. </span>}
           {name || t.item.fallbackName}
         </h3>
-        {videoUrl && (
-          <a
-            href={videoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            aria-label={t.item.techVideo}
-            title={t.item.techVideo}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"
-          >
-            <VideoIcon />
-          </a>
-        )}
+        {onEdit && <ActionMenu label={`${t.actions.exerciseActions}: ${name}`} actions={[
+          { label: t.actions.editWorkout, run: onEdit },
+          ...(onMove ? [{ label: t.actions.moveExercise, run: onMove }] : []),
+          ...(active && !item.done && !item.skipped ? [{ label: t.actions.skipExercise, run: () => onChange({ skipped: true, done: false }) }] : []),
+          ...(onRemove ? [{ label: t.actions.removeFromWorkout, run: onRemove, danger: true }] : []),
+        ]} />}
         <button
           onClick={() => {
             // отметка «выполнено» заодно снимает пропуск
@@ -361,22 +320,21 @@ export default function ItemCard({
 
         {/* Строка данных: повторы × вес + отдых; справа — значки
             «есть комментарий» / «есть заметка тренера» и шеврон раскрытия.
-            Долгое нажатие на чипы включает быструю запись факта на месте. */}
-        {quickEdit ? (
-          <QuickFact item={item} onChange={onChange} onClose={() => setQuickEdit(false)} />
-        ) : (
-          <div
-            onPointerDown={startPress}
-            onPointerMove={movePress}
-            onPointerUp={cancelPress}
-            onPointerLeave={cancelPress}
-            onPointerCancel={cancelPress}
-            onContextMenu={(e) => {
-              // долгое нажатие на Android открывает контекстное меню — глушим
-              if (kind !== 'cardio') e.preventDefault();
-            }}
-            className="mt-2.5 flex select-none flex-wrap items-center gap-1.5 [-webkit-touch-callout:none]"
+            Правка плана и результата доступна через меню действий. */}
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+        {videoUrl && (
+          <a
+            href={videoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            aria-label={t.item.techVideo}
+            title={t.item.techVideo}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"
           >
+            <VideoIcon />
+          </a>
+        )}
             {mainChips.map((c, i) => (
               <span
                 key={i}
@@ -425,11 +383,10 @@ export default function ItemCard({
               </button>
             </span>
           </div>
-        )}
 
         {/* Кружки подходов (режим «идёт»): тап — подход сделан, повторный —
             снятие; последний кружок сам завершает упражнение */}
-        {plannedSets > 0 && !quickEdit && (
+        {plannedSets > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-muted">
               {t.item.setsRowLabel}
@@ -456,16 +413,6 @@ export default function ItemCard({
           </div>
         )}
 
-        {/* Пропуск: упражнение уезжает в «Выполнено» перечёркнутым */}
-        {active && !item.done && !quickEdit && (
-          <button
-            type="button"
-            onClick={() => onChange({ skipped: true, done: false })}
-            className="mt-2.5 text-xs text-muted underline decoration-dotted underline-offset-2"
-          >
-            {t.item.skipToday}
-          </button>
-        )}
 
       </div>
 
@@ -546,17 +493,6 @@ export default function ItemCard({
               </p>
             )}
 
-            {/* Дублирующий вход в быструю запись: для упражнений без чипов
-                (нет плана) и для тех, кто не знает про долгое нажатие */}
-            {kind !== 'cardio' && !quickEdit && !locked && (
-              <button
-                type="button"
-                onClick={() => setQuickEdit(true)}
-                className="mt-2.5 text-sm text-muted underline decoration-dotted underline-offset-2"
-              >
-                {t.item.logFact}
-              </button>
-            )}
           </div>
           <CommentEditor item={item} open={open} onChange={onChange} />
         </div>
@@ -566,26 +502,6 @@ export default function ItemCard({
 }
 
 /* --- Лёгкий редактор: комментарий + быстрый лог факта ------------------- */
-
-function numToStr(n: number | null | undefined): string {
-  return n == null ? '' : String(n);
-}
-
-function parseNum(s: string): number | null {
-  const t = s.trim().replace(',', '.');
-  if (!t) return null;
-  const n = Number(t);
-  return Number.isFinite(n) ? n : null;
-}
-
-function parseIntOrNull(s: string): number | null {
-  const t = s.trim();
-  if (!t) return null;
-  const n = Number.parseInt(t, 10);
-  return Number.isFinite(n) ? n : null;
-}
-
-/* --- Комментарий-фидбэк (раскрытая часть): факт живёт у чипов ------------ */
 
 function CommentEditor({
   item,
@@ -654,298 +570,6 @@ function CommentEditor({
       {(item.actual?.text ?? '').trim() !== '' && (
         <p className="mt-2 text-xs text-muted">{t.item.oldFactNote(item.actual?.text ?? '')}</p>
       )}
-    </div>
-  );
-}
-
-/* --- Быстрая запись факта на месте чипов --------------------------------- */
-/* Компактный редактор: одно число (вес × подходы × повторы) или «разные
-   подходы» — строка на подход. Сохранение по blur, галочка закрывает. */
-
-function QuickFact({
-  item,
-  onChange,
-  onClose,
-}: {
-  item: WorkoutItem;
-  onChange: (patch: Partial<WorkoutItem>) => void;
-  onClose: () => void;
-}) {
-  const { t } = useT();
-  const [mode, setMode] = useState<'single' | 'perSet'>(
-    item.actual?.perSet?.length ? 'perSet' : 'single',
-  );
-  const [wStr, setWStr] = useState(numToStr(item.actual?.weight ?? item.weight?.value));
-  const [sStr, setSStr] = useState(numToStr(item.actual?.sets ?? item.setsReps?.sets));
-  const [rStr, setRStr] = useState(numToStr(item.actual?.reps ?? item.setsReps?.reps));
-  const [rows, setRows] = useState<{ w: string; r: string }[]>(() =>
-    (item.actual?.perSet ?? []).map((s) => ({ w: numToStr(s.weight), r: numToStr(s.reps) })),
-  );
-  const [dirty, setDirty] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const savedTimerRef = useRef<number | null>(null);
-
-  useEffect(
-    () => () => {
-      if (savedTimerRef.current) window.clearTimeout(savedTimerRef.current);
-    },
-    [],
-  );
-
-  const flashSaved = () => {
-    setSaved(true);
-    if (savedTimerRef.current) window.clearTimeout(savedTimerRef.current);
-    savedTimerRef.current = window.setTimeout(() => setSaved(false), 1800);
-  };
-
-  // Сохраняем факт только если поля реально трогали — иначе не выдумываем actual.
-  // Старый свободный текст записи (actual.text) бережно переносим как есть.
-  const commitSingle = () => {
-    if (!dirty) return;
-    const weight = parseNum(wStr);
-    const sets = parseIntOrNull(sStr);
-    const reps = parseIntOrNull(rStr);
-    const text = (item.actual?.text ?? '').trim();
-    const actual: Actual | null =
-      weight == null && sets == null && reps == null && text === ''
-        ? null
-        : { weight, sets, reps, text };
-    onChange({ actual });
-    setDirty(false);
-    flashSaved();
-  };
-
-  /** Сохранить строки подходов; агрегаты выводятся из них (вес = максимум) */
-  const commitRows = (rs: { w: string; r: string }[]) => {
-    const clean: ActualSet[] = rs
-      .map((x) => ({ weight: parseNum(x.w), reps: parseIntOrNull(x.r) }))
-      .filter((s) => s.weight != null || s.reps != null);
-    const text = (item.actual?.text ?? '').trim();
-    if (clean.length === 0) {
-      onChange({ actual: text === '' ? null : { weight: null, sets: null, reps: null, text } });
-    } else {
-      const weights = clean.map((s) => s.weight).filter((x): x is number => x != null);
-      const reps = clean.map((s) => s.reps);
-      const sameReps =
-        reps.every((x) => x != null) && new Set(reps as number[]).size === 1
-          ? (reps[0] as number)
-          : null;
-      onChange({
-        actual: {
-          weight: weights.length ? Math.max(...weights) : null,
-          sets: clean.length,
-          reps: sameReps,
-          text,
-          perSet: clean,
-        },
-      });
-    }
-    setDirty(false);
-    flashSaved();
-  };
-
-  const commitRowsIfDirty = () => {
-    if (dirty) commitRows(rows);
-  };
-
-  const patchRow = (i: number, p: Partial<{ w: string; r: string }>) => {
-    setRows((prev) => prev.map((x, j) => (j === i ? { ...x, ...p } : x)));
-    setDirty(true);
-  };
-
-  const addRow = () => {
-    // новый подход повторяет предыдущий — обычно меняется одно число
-    const last = rows[rows.length - 1];
-    const next = [...rows, { w: last?.w ?? wStr, r: last?.r ?? rStr }];
-    setRows(next);
-    commitRows(next);
-  };
-
-  const removeRow = (i: number) => {
-    const next = rows.filter((_, j) => j !== i);
-    setRows(next);
-    commitRows(next);
-  };
-
-  const enablePerSet = () => {
-    // подходы берём из записи, из плана «разными подходами» или повторяем
-    // видимые числа столько раз, сколько в поле «подходы»
-    const fromActual = item.actual?.perSet?.map((s) => ({
-      w: numToStr(s.weight),
-      r: numToStr(s.reps),
-    }));
-    const fromPlan = item.perSetPlan?.map((p) => ({
-      w: numToStr(parseNum(p.weight)),
-      r: numToStr(parseIntOrNull(p.reps)),
-    }));
-    const n = Math.min(10, Math.max(1, parseIntOrNull(sStr) ?? 3));
-    const next =
-      fromActual?.length
-        ? fromActual
-        : fromPlan?.length
-          ? fromPlan
-          : Array.from({ length: n }, () => ({ w: wStr, r: rStr }));
-    setRows(next);
-    setMode('perSet');
-    commitRows(next);
-  };
-
-  const disablePerSet = () => {
-    setMode('single');
-    setDirty(false);
-    if (item.actual?.perSet) {
-      // агрегаты уже посчитаны при сохранении подходов — убираем детализацию
-      const { perSet: _drop, ...rest } = item.actual;
-      onChange({ actual: rest });
-      setWStr(numToStr(rest.weight));
-      setSStr(numToStr(rest.sets));
-      setRStr(numToStr(rest.reps));
-      flashSaved();
-    }
-  };
-
-  const inputCls =
-    'h-10 w-full rounded-lg border border-border bg-chip px-2 text-center text-base font-semibold tabular-nums outline-none focus:border-accent';
-
-  return (
-    <div
-      role="group"
-      aria-label={t.item.quickFactAria}
-      onClick={(e) => e.stopPropagation()}
-      className="anim-rise mt-2.5 rounded-xl border border-accent/50 bg-bg p-2"
-    >
-      {mode === 'single' ? (
-        <div className="flex items-center gap-1.5">
-          <input
-            autoFocus
-            type="number"
-            step={0.5}
-            inputMode="decimal"
-            value={wStr}
-            aria-label={t.item.weightKg}
-            onChange={(e) => {
-              setWStr(e.target.value);
-              setDirty(true);
-            }}
-            onBlur={commitSingle}
-            className={inputCls + ' max-w-20'}
-          />
-          <span className="shrink-0 text-sm text-muted">{t.kg}</span>
-          <input
-            type="number"
-            step={1}
-            min={0}
-            inputMode="numeric"
-            value={sStr}
-            aria-label={t.item.sets}
-            onChange={(e) => {
-              setSStr(e.target.value);
-              setDirty(true);
-            }}
-            onBlur={commitSingle}
-            className={inputCls + ' max-w-12'}
-          />
-          <span className="shrink-0 text-sm text-muted">х</span>
-          <input
-            type="number"
-            step={1}
-            min={0}
-            inputMode="numeric"
-            value={rStr}
-            aria-label={t.item.reps}
-            onChange={(e) => {
-              setRStr(e.target.value);
-              setDirty(true);
-            }}
-            onBlur={commitSingle}
-            className={inputCls + ' max-w-14'}
-          />
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          {rows.map((row, i) => (
-            <div
-              key={i}
-              className="grid grid-cols-[1.1rem_1fr_0.9rem_1fr_2rem] items-center gap-1.5"
-            >
-              <span className="text-center text-sm font-semibold tabular-nums text-muted">
-                {i + 1}
-              </span>
-              <input
-                type="number"
-                step={0.5}
-                inputMode="decimal"
-                value={row.w}
-                aria-label={t.item.perSetWeightAria(i + 1)}
-                onChange={(e) => patchRow(i, { w: e.target.value })}
-                onBlur={commitRowsIfDirty}
-                className={inputCls}
-              />
-              <span className="text-center text-sm text-muted">х</span>
-              <input
-                type="number"
-                step={1}
-                min={0}
-                inputMode="numeric"
-                value={row.r}
-                aria-label={t.item.perSetRepsAria(i + 1)}
-                onChange={(e) => patchRow(i, { r: e.target.value })}
-                onBlur={commitRowsIfDirty}
-                className={inputCls}
-              />
-              <button
-                type="button"
-                onClick={() => removeRow(i)}
-                disabled={rows.length === 1}
-                aria-label={t.item.removeSetAria(i + 1)}
-                title={t.item.removeSetAria(i + 1)}
-                className="flex h-9 w-8 items-center justify-center rounded-lg text-muted disabled:opacity-35"
-              >
-                <XIcon size={15} />
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={addRow}
-            className="flex items-center gap-1.5 rounded-lg py-1 pr-2 text-sm font-medium text-accent"
-          >
-            <IconPlus size={14} /> {t.item.addSet}
-          </button>
-        </div>
-      )}
-
-      <div className="mt-1.5 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={mode === 'perSet' ? disablePerSet : enablePerSet}
-          className="text-sm text-muted underline decoration-dotted underline-offset-2"
-        >
-          {mode === 'perSet' ? t.item.perSetOff : t.item.perSetOn}
-        </button>
-        <span
-          aria-live="polite"
-          className={
-            'ml-auto text-xs font-medium text-ok-text transition-opacity duration-300 ' +
-            (saved ? 'opacity-100' : 'opacity-0')
-          }
-        >
-          {t.item.savedFlash}
-        </span>
-        <button
-          type="button"
-          onClick={() => {
-            if (mode === 'perSet') commitRowsIfDirty();
-            else commitSingle();
-            onClose();
-          }}
-          aria-label={t.item.doneEditing}
-          title={t.item.doneEditing}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-fg"
-        >
-          <CheckIcon size={16} />
-        </button>
-      </div>
     </div>
   );
 }

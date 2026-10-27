@@ -1,79 +1,74 @@
-// Экран «История»: месячный календарь-навигатор и список тренировок
-// по месяцам. В режиме редактирования здесь же создаются новые тренировки.
-// Библиотека упражнений живёт на своей вкладке («Библиотека»).
-
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Workout } from '../types';
 import { useApp } from '../store';
 import { useT } from '../i18n';
-import { fmtDate, fmtDateShort, fmtMonthYear, fmtWeekday, monthKey } from '../lib/dates';
-import NewWorkoutForm from '../components/edit/NewWorkoutForm';
+import { fmtDateShort, fmtWeekday, todayISO } from '../lib/dates';
 import MonthCalendar from '../components/history/MonthCalendar';
-import { Chip, IconCheck, IconComment, IconX } from '../components/edit/ui';
+import { Chip, IconCheck, IconComment, IconPlus } from '../components/edit/ui';
 
-/* Экран запоминает прокрутку, чтобы стрелка «назад» возвращала туда же */
-const paneMemory = { scroll: 0 };
+const memory = { scroll: 0, view: 'list' as 'list' | 'calendar', month: todayISO().slice(0, 7), date: null as string | null };
 
 export default function HistoryScreen() {
-  const { workouts, editMode } = useApp();
+  const { workouts, navigate } = useApp();
   const { t } = useT();
-
-  // вернулись на экран: восстанавливаем прокрутку (после первого рендера)
+  const [view, setView] = useState(memory.view);
+  const [month, setMonth] = useState(memory.month);
+  const [date, setDate] = useState(memory.date);
   useEffect(() => {
-    if (paneMemory.scroll > 0) {
-      const y = paneMemory.scroll;
-      requestAnimationFrame(() => window.scrollTo({ top: y }));
-    }
-    return () => {
-      paneMemory.scroll = window.scrollY;
-    };
+    const frame = requestAnimationFrame(() => window.scrollTo({ top: memory.scroll, behavior: 'instant' }));
+    const remember = () => { memory.scroll = window.scrollY; };
+    window.addEventListener('scroll', remember, { passive: true });
+    return () => { cancelAnimationFrame(frame); window.removeEventListener('scroll', remember); };
   }, []);
-
-  /* Группы по месяцам: самый свежий месяц первым, внутри — свежие даты выше */
+  const open = (workout: Workout) => {
+    memory.scroll = window.scrollY;
+    navigate('train', workout.id);
+  };
   const groups = useMemo(() => {
-    const map = new Map<string, Workout[]>();
-    for (let i = workouts.length - 1; i >= 0; i--) {
-      const w = workouts[i];
-      const k = monthKey(w.date);
-      const arr = map.get(k);
-      if (arr) arr.push(w);
-      else map.set(k, [w]);
-    }
-    return [...map.entries()];
-  }, [workouts]);
-
+    if (view === 'calendar' && date) return [{ title: fmtDateShort(date), workouts: workouts.filter((workout) => workout.date === date) }];
+    const active = workouts.filter((workout) => workout.status === 'planned' && workout.startedAt);
+    const planned = workouts.filter((workout) => workout.status === 'planned' && !workout.startedAt);
+    const done = [...workouts].reverse().filter((workout) => workout.status === 'done');
+    return [
+      { title: t.actions.currentWorkout, workouts: active },
+      { title: t.actions.plannedWorkouts, workouts: planned },
+      { title: t.actions.pastWorkouts, workouts: done },
+    ].filter((group) => group.workouts.length > 0);
+  }, [workouts, view, date, t]);
   return (
     <div className="space-y-4">
-      <MonthCalendar />
-
-      {editMode && <NewWorkoutForm />}
-
-      {workouts.length === 0 && (
-        <div className="rounded-2xl border border-border bg-card p-6 text-center text-muted">
-          {t.hist.emptyTitle}
-          <br />
-          {editMode ? t.hist.emptyEdit : t.hist.emptyNoEdit}
+      <div className="sticky top-[calc(60px+env(safe-area-inset-top))] z-10 -mx-1 flex items-center gap-3 rounded-xl bg-bg p-1">
+        <div className="flex rounded-xl border border-border bg-card p-1" role="group" aria-label={t.actions.workoutView}>
+          {(['list', 'calendar'] as const).map((value) => (
+            <button key={value} type="button" aria-pressed={view === value}
+              onClick={() => { memory.view = value; setView(value); }}
+              className={'min-h-11 rounded-lg px-3 text-sm font-semibold ' + (view === value ? 'bg-accent-soft text-accent' : 'text-muted')}>
+              {value === 'list' ? t.actions.listView : t.actions.calendarView}
+            </button>
+          ))}
         </div>
-      )}
-
-      {groups.map(([k, ws]) => (
-        <section key={k}>
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">
-            {fmtMonthYear(k)}
-          </h2>
-          <ul className="space-y-2">
-            {ws.map((w) => (
-              <WorkoutRow key={w.id} w={w} />
-            ))}
-          </ul>
-        </section>
-      ))}
+        <button type="button" aria-label={t.actions.createWorkout}
+          onClick={() => { memory.scroll = window.scrollY; navigate('create'); }}
+          className="ml-auto flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl bg-accent px-3 py-2 font-semibold text-accent-fg">
+          <IconPlus size={20} /><span className="hidden min-[420px]:inline">{t.actions.addWorkout}</span>
+        </button>
+      </div>
+      {view === 'calendar' && <MonthCalendar month={month} selectedDate={date}
+        onMonthChange={(value) => { memory.month = value; memory.date = null; setMonth(value); setDate(null); }}
+        onSelectDate={(value) => { memory.date = value; setDate(value); }} />}
+      {view === 'calendar' && date && <button type="button" onClick={() => { memory.date = null; setDate(null); }}
+        className="min-h-11 rounded-lg px-2 text-sm font-semibold text-accent">{t.actions.allWorkouts}</button>}
+      {workouts.length === 0 && <p className="py-12 text-center text-muted">{t.hist.emptyNoEdit}</p>}
+      {groups.map((group) => <section key={group.title} className="space-y-2">
+        <h2 className="px-1 text-sm font-semibold text-muted">{group.title}</h2>
+        <ul className="space-y-2">{group.workouts.map((workout) => <WorkoutRow key={workout.id} w={workout} onOpen={open} />)}</ul>
+      </section>)}
     </div>
   );
 }
 
-function WorkoutRow({ w }: { w: Workout }) {
-  const { editMode, navigate, deleteWorkout, itemKind } = useApp();
+function WorkoutRow({ w, onOpen }: { w: Workout; onOpen: (workout: Workout) => void }) {
+  const { itemKind } = useApp();
   const { t } = useT();
   const hasComment = w.items.some((it) => it.myComment && it.myComment.trim() !== '');
   // разминка и кардио — не упражнения, в счётчик не входят
@@ -83,12 +78,13 @@ function WorkoutRow({ w }: { w: Workout }) {
     <li className="flex items-stretch gap-2">
       <button
         type="button"
-        onClick={() => navigate('train', w.id)}
+        onClick={() => onOpen(w)}
         className="min-w-0 flex-1 rounded-2xl border border-border bg-card p-4 text-left"
       >
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-lg font-bold leading-tight">{fmtDateShort(w.date)}</span>
           <span className="text-muted">{fmtWeekday(w.date)}</span>
+          {w.status === 'planned' && <span className="rounded-full bg-accent-soft px-2 py-1 text-xs font-semibold text-accent">{w.startedAt ? t.status.active : w.date < todayISO() ? t.actions.unfinished : t.status.planned}</span>}
           {w.status === 'done' && (
             <span className="text-ok" title={t.hist.doneTitle}>
               <IconCheck size={16} />
@@ -106,19 +102,7 @@ function WorkoutRow({ w }: { w: Workout }) {
           {w.fatigue != null && <Chip muted>{t.fatigueN(w.fatigue)}</Chip>}
         </div>
       </button>
-      {editMode && (
-        <button
-          type="button"
-          onClick={() => {
-            if (window.confirm(t.hist.deleteConfirm(fmtDate(w.date)))) deleteWorkout(w.id);
-          }}
-          aria-label={t.hist.deleteWorkout}
-          title={t.hist.deleteWorkout}
-          className="flex w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-card text-danger"
-        >
-          <IconX />
-        </button>
-      )}
+
     </li>
   );
 }

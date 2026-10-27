@@ -1,5 +1,4 @@
-// Редактор тренировки. Рендерится экраном «Тренировка», когда включён
-// режим редактирования. Каждая правка сохраняется сразу (по blur или
+// Локальный редактор плана тренировки или отдельного упражнения. Каждая правка сохраняется сразу (по blur или
 // изменению) в черновик; в данные попадает только по кнопке «Сохранить».
 
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
@@ -17,6 +16,8 @@ import { useApp } from '../../store';
 import { tr, useT } from '../../i18n';
 import { fmtDate } from '../../lib/dates';
 import { nextExerciseId, nextItemId } from '../../lib/ids';
+import { mergeWorkoutDraft } from '../../lib/workout-draft';
+import ActualEditor from './ActualEditor';
 import { linesToSubNotes, parseSetsReps, parseWeight, serializePerSetPlan } from './parse';
 import ExerciseCombobox from './ExerciseCombobox';
 import { ChevronIcon, PinIcon } from '../train/icons';
@@ -32,9 +33,18 @@ import {
   inputCls,
 } from './ui';
 
-export default function WorkoutEditor({ workout }: { workout: Workout }) {
-  const { exercises, saveWorkout, deleteWorkout, saveExercise, setEditMode, setDirtyGuard } =
-    useApp();
+interface WorkoutEditorProps {
+  workout: Workout;
+  onClose: () => void;
+  onSaved?: (workout: Workout) => void;
+  isNew?: boolean;
+  itemId?: string;
+}
+
+export default function WorkoutEditor({ workout, onClose, onSaved, isNew = false, itemId }: WorkoutEditorProps) {
+  const { exercises: savedExercises, saveWorkout, deleteWorkout, saveExercise, setDirtyGuard } = useApp();
+  const [createdExercises, setCreatedExercises] = useState<Exercise[]>([]);
+  const exercises = useMemo(() => [...savedExercises, ...createdExercises], [savedExercises, createdExercises]);
   const { t } = useT();
 
   /* Правки копятся в черновике и попадают в данные только по «Сохранить».
@@ -43,18 +53,15 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
   const [draft, setDraft] = useState<Workout>(workout);
   const baseRef = useRef<Workout>(workout);
 
-  // тренировка обновилась извне (синхронизация): чистый черновик подхватывает её
+  // A clean editor follows sync; a dirty draft keeps its original comparison base.
   useEffect(() => {
-    setDraft((prev) =>
-      JSON.stringify(prev) === JSON.stringify(baseRef.current) ? workout : prev,
-    );
+    if (draft === workout || JSON.stringify(draft) !== JSON.stringify(baseRef.current)) return;
     baseRef.current = workout;
-  }, [workout]);
+    setDraft(workout);
+  }, [workout, draft]);
 
-  const dirty = useMemo(
-    () => JSON.stringify(draft) !== JSON.stringify(workout),
-    [draft, workout],
-  );
+  const changed = JSON.stringify(draft) !== JSON.stringify(baseRef.current);
+  const dirty = changed || (isNew && draft.items.length > 0);
 
   useEffect(() => {
     if (!dirty) {
@@ -75,15 +82,20 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
 
   const save = () => {
     setDirtyGuard(null);
-    saveWorkout(draft);
-    setEditMode(false);
+    const next = isNew ? draft : mergeWorkoutDraft(baseRef.current, draft, workout);
+    for (const exercise of createdExercises) {
+      if (next.items.some((item) => item.exerciseId === exercise.id)) saveExercise(exercise);
+    }
+    saveWorkout(next);
+    if (onSaved) onSaved(next);
+    else onClose();
   };
 
   const cancel = () => {
     if (dirty && !window.confirm(t.editor.discardConfirm)) return;
     setDirtyGuard(null);
     setDraft(workout);
-    setEditMode(false);
+    onClose();
   };
 
   const patch = (p: Partial<Workout>) => setDraft((prev) => ({ ...prev, ...p }));
@@ -223,7 +235,7 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
       archived: false,
       ...(kind && kind !== 'main' ? { kind } : {}),
     };
-    saveExercise(ex);
+    setCreatedExercises((prev) => [...prev, ex]);
     patchItem(item.id, { exerciseId: ex.id, nameRaw: ex.name });
   };
 
@@ -231,29 +243,41 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
     if (!window.confirm(t.hist.deleteConfirm(fmtDate(draft.date)))) return;
     setDirtyGuard(null); // удаление подтверждено — черновик больше не охраняем
     deleteWorkout(draft.id);
-    setEditMode(false);
+    onClose();
   };
+
+  const actions = (
+    <div className="sticky top-[calc(60px+env(safe-area-inset-top))] z-10 flex items-center gap-2 rounded-xl border border-border bg-bg p-2">
+      <button type="button" onClick={cancel}
+        className="min-h-11 rounded-lg border border-border bg-card px-4 py-2 font-medium">
+        {t.cancel}
+      </button>
+      <button type="button" onClick={save} disabled={!isNew && !changed}
+        className="min-h-11 flex-1 rounded-lg bg-accent px-4 py-2 font-semibold text-accent-fg disabled:opacity-40">
+        {isNew ? t.actions.createWorkout : changed ? t.save : t.editor.noChanges}
+      </button>
+    </div>
+  );
+
+  if (itemId) {
+    const item = mainItems.find((entry) => entry.id === itemId);
+    if (!item) return null;
+    return (
+      <div className="space-y-3">
+        {actions}
+        <h3 className="px-1 font-semibold">{t.actions.planSection}</h3>
+        <ItemEditorCard item={item} index={mainItems.indexOf(item)} total={mainItems.length}
+          exercises={exercises} patchItem={patchItem} move={() => {}} remove={removeItem}
+          createExercise={createExercise} compact />
+        {exerciseKind(exercises.find((exercise) => exercise.id === item.exerciseId)) === 'main' &&
+          <ActualEditor item={item} onChange={(actual) => patchItem(item.id, { actual })} />}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      {/* Панель действий: липнет под шапкой, всегда под рукой */}
-      <div className="sticky top-[calc(60px+env(safe-area-inset-top))] z-10 -mx-1 flex items-center gap-2 rounded-xl border border-border bg-bg/95 p-2 backdrop-blur">
-        <button
-          type="button"
-          onClick={cancel}
-          className="rounded-lg border border-border bg-card px-4 py-2 font-medium"
-        >
-          {t.cancel}
-        </button>
-        <button
-          type="button"
-          onClick={save}
-          disabled={!dirty}
-          className="flex-1 rounded-lg bg-accent px-4 py-2 font-semibold text-accent-fg disabled:opacity-40"
-        >
-          {dirty ? t.save : t.editor.noChanges}
-        </button>
-      </div>
+      {actions}
 
       {/* --- Шапка --------------------------------------------------------- */}
       <section className="rounded-2xl border border-border bg-card p-4">
@@ -427,13 +451,13 @@ export default function WorkoutEditor({ workout }: { workout: Workout }) {
         </button>
       </section>
 
-      <button
+      {!isNew && <button
         type="button"
         onClick={removeWorkout}
         className="w-full rounded-xl border border-danger/40 bg-card px-4 py-2.5 font-semibold text-danger"
       >
         {t.hist.deleteWorkout}
-      </button>
+      </button>}
     </div>
   );
 }
@@ -475,6 +499,7 @@ function joinSetsReps(sets: string, reps: string): string {
 }
 
 interface ItemEditorCardProps {
+  compact?: boolean;
   item: WorkoutItem;
   index: number;
   total: number;
@@ -494,13 +519,14 @@ function ItemEditorCard({
   move,
   remove,
   createExercise,
+  compact = false,
 }: ItemEditorCardProps) {
   const { t } = useT();
   const subNotes = item.subNotes ?? [];
   const sr = splitSetsReps(item.setsReps?.raw ?? '');
   const kind = exerciseKind(exercises.find((e) => e.id === item.exerciseId));
   return (
-    <article className="rounded-2xl border border-border bg-card p-4">
+    <article data-workout-item={item.id} className="rounded-2xl border border-border bg-card p-4">
       <div className="flex items-start gap-2">
         <span className="mt-2.5 w-5 shrink-0 text-sm font-semibold text-muted">{index + 1}</span>
         <ExerciseCombobox
@@ -519,7 +545,7 @@ function ItemEditorCard({
         />
       </div>
 
-      <div className="mt-2 flex justify-end gap-1">
+      {!compact && <div className="mt-2 flex justify-end gap-1">
         <IconBtn label={t.editor.up} disabled={index === 0} onClick={() => move(index, -1)}>
           <IconUp />
         </IconBtn>
@@ -529,7 +555,7 @@ function ItemEditorCard({
         <IconBtn label={t.editor.removeItem} danger onClick={() => remove(item)}>
           <IconX />
         </IconBtn>
-      </div>
+      </div>}
 
       {kind === 'cardio' ? (
         /* Кардио: длительность, пульсовая зона и примечание тренера */
@@ -563,17 +589,6 @@ function ItemEditorCard({
         </>
       ) : (
         <>
-          {/* Порядок полей повторяет карточку чтения: разминка первой,
-              примечание тренера — всегда последним. */}
-          <div className="mt-2">
-            <TextAreaField
-              label={t.train.warmup}
-              value={item.warmupSets ?? ''}
-              placeholder={t.editor.warmupFieldPlaceholder}
-              onCommit={(v) => patchItem(item.id, { warmupSets: v.trim() ? v : null })}
-            />
-          </div>
-
           {/* Подходы и повторы — отдельными полями (в чтении так и останется
               «3х12»); «разные подходы» — прогрессия: вес×повторы на каждый */}
           {!item.perSetPlan?.length ? (
@@ -601,6 +616,12 @@ function ItemEditorCard({
                   placeholder={t.editor.weightPlaceholder}
                   onCommit={(v) => patchItem(item.id, { weight: parseWeight(v) })}
                 />
+            <TextField
+              label={t.editor.restMin}
+              value={item.rest ?? ''}
+              placeholder={t.editor.restPlaceholder}
+              onCommit={(v) => patchItem(item.id, { rest: v.trim() || null })}
+            />
               </div>
               <button
                 type="button"
@@ -618,8 +639,26 @@ function ItemEditorCard({
               </button>
             </>
           ) : (
-            <PlanPerSetRows item={item} patchItem={patchItem} />
+            <>
+              <PlanPerSetRows item={item} patchItem={patchItem} />
+              <div className="mt-3">
+                <TextField label={t.editor.restMin} value={item.rest ?? ''}
+                  placeholder={t.editor.restPlaceholder}
+                  onCommit={(v) => patchItem(item.id, { rest: v.trim() || null })} />
+              </div>
+            </>
           )}
+
+          <details className="mt-3">
+            <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-muted">{t.actions.moreDetails}</summary>
+          <div className="mt-2">
+            <TextAreaField
+              label={t.train.warmup}
+              value={item.warmupSets ?? ''}
+              placeholder={t.editor.warmupFieldPlaceholder}
+              onCommit={(v) => patchItem(item.id, { warmupSets: v.trim() ? v : null })}
+            />
+          </div>
 
           <div className="mt-3 grid grid-cols-2 gap-3">
             <TextField
@@ -628,12 +667,7 @@ function ItemEditorCard({
               placeholder={t.editor.pvrPlaceholder}
               onCommit={(v) => patchItem(item.id, { pvr: v.trim() || null })}
             />
-            <TextField
-              label={t.editor.restMin}
-              value={item.rest ?? ''}
-              placeholder={t.editor.restPlaceholder}
-              onCommit={(v) => patchItem(item.id, { rest: v.trim() || null })}
-            />
+
             <TextField
               label={t.editor.tempo}
               value={item.tempo ?? ''}
@@ -667,6 +701,7 @@ function ItemEditorCard({
               onCommit={(v) => patchItem(item.id, { ptNote: v.trim() ? v : null })}
             />
           </div>
+          </details>
         </>
       )}
     </article>
@@ -793,6 +828,7 @@ function WarmupItemEditorCard({
   move,
   remove,
   createExercise,
+  compact = false,
 }: ItemEditorCardProps) {
   const { t } = useT();
   const subNotes = item.subNotes ?? [];
@@ -815,7 +851,7 @@ function WarmupItemEditorCard({
         />
       </div>
 
-      <div className="mt-2 flex justify-end gap-1">
+      {!compact && <div className="mt-2 flex justify-end gap-1">
         <IconBtn label={t.editor.up} disabled={index === 0} onClick={() => move(index, -1)}>
           <IconUp />
         </IconBtn>
@@ -825,7 +861,7 @@ function WarmupItemEditorCard({
         <IconBtn label={t.editor.removeItem} danger onClick={() => remove(item)}>
           <IconX />
         </IconBtn>
-      </div>
+      </div>}
 
       <div className="mt-2 space-y-3">
         <TextField

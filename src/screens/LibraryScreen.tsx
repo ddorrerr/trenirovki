@@ -44,7 +44,7 @@ const paneMemory: {
 };
 
 export default function LibraryScreen() {
-  const { exercises, exerciseHistory, editMode, saveExercise } = useApp();
+  const { exercises, exerciseHistory, saveExercise } = useApp();
   const { t } = useT();
   const [query, setQuery] = useState('');
   const [showArchive, setShowArchive] = useState(false);
@@ -169,15 +169,13 @@ export default function LibraryScreen() {
 
   return (
     <div className="space-y-3">
-      {editMode && (
-        <button
+      <button
           type="button"
           onClick={addExercise}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 font-semibold text-accent-fg"
         >
           <IconPlus size={16} /> {t.lib.newExercise}
         </button>
-      )}
 
       <input
         value={query}
@@ -227,7 +225,7 @@ export default function LibraryScreen() {
       {exercises.length === 0 && (
         <div className="rounded-2xl border border-border bg-card p-6 text-center text-muted">
           {t.lib.empty}
-          {editMode ? t.lib.emptyEdit : ''}
+          {t.lib.emptyEdit}
         </div>
       )}
 
@@ -241,6 +239,7 @@ export default function LibraryScreen() {
               count={st.count}
               lastDate={st.lastDate}
               expanded={expandedId === e.id}
+              initialEditing={pinnedId === e.id}
               onToggle={() => toggle(e.id)}
             />
           );
@@ -322,6 +321,7 @@ function FilterChips({
 }
 
 interface ExerciseRowProps {
+  initialEditing?: boolean;
   e: Exercise;
   count: number;
   lastDate: string | null;
@@ -329,8 +329,8 @@ interface ExerciseRowProps {
   onToggle: () => void;
 }
 
-function ExerciseRow({ e, count, lastDate, expanded, onToggle }: ExerciseRowProps) {
-  const { editMode } = useApp();
+function ExerciseRow({ e, count, lastDate, expanded, onToggle, initialEditing = false }: ExerciseRowProps) {
+  const [editing, setEditing] = useState(initialEditing);
   const { t } = useT();
 
   return (
@@ -372,7 +372,15 @@ function ExerciseRow({ e, count, lastDate, expanded, onToggle }: ExerciseRowProp
 
       {expanded && (
         <div className="border-t border-border p-4">
-          {editMode ? <ExerciseEditPanel e={e} used={count > 0} /> : <ExerciseDetails e={e} />}
+          {editing ? (
+            <><ExerciseEditPanel e={e} used={count > 0} />
+              <button type="button" onClick={() => setEditing(false)}
+                className="mt-3 min-h-11 rounded-xl bg-accent px-4 py-2 font-semibold text-accent-fg">{t.actions.doneEditing}</button>
+            </>
+          ) : <><ExerciseDetails e={e} />
+              <button type="button" onClick={() => setEditing(true)}
+                className="mt-3 min-h-11 rounded-lg px-2 text-sm font-semibold text-accent">{t.actions.editExercise}</button>
+            </>}
         </div>
       )}
     </li>

@@ -1,223 +1,72 @@
-// Форма «Новая тренировка»: пустая или копия существующей.
-// Используется в «Истории» и на «Тренировке» в режиме редактирования.
-
 import { useMemo, useState } from 'react';
 import type { Workout } from '../../types';
 import { useApp } from '../../store';
 import { useT } from '../../i18n';
-import { fmtDate, fmtDateShort, fmtWeekday, todayISO } from '../../lib/dates';
-import { itemId, workoutIdForDate } from '../../lib/ids';
-import { IconPlus, inputCls } from './ui';
+import { fmtDateShort, fmtWeekday, todayISO } from '../../lib/dates';
+import { workoutIdForDate } from '../../lib/ids';
+import { newWorkoutDraft } from '../../lib/workout-draft';
+import WorkoutEditor from './WorkoutEditor';
 
-type FillMode = 'empty' | 'last' | 'pick';
-
-/**
- * Строки-«просьбы» (начинаются с 📌) относятся к конкретному дню —
- * при копировании тренировки их не переносим.
- */
-function stripPinnedLines(note: string | null): string | null {
-  if (!note) return null;
-  const kept = note.split('\n').filter((l) => !l.trim().startsWith('📌'));
-  return kept.join('\n').trim() ? kept.join('\n') : null;
-}
-
-/**
- * Тип тренировки по дню недели: среда — «с тренером», вс/пн — «сама»
- * (правило Лизы; остальные дни — без типа, можно выбрать вручную).
- */
-function typeForDate(iso: string): string | null {
-  const wd = new Date(iso + 'T00:00:00Z').getUTCDay(); // 0 = вс
-  if (wd === 3) return 'с тренером';
-  if (wd === 0 || wd === 1) return 'сама';
-  return null;
-}
-
+/** Creation stays a draft until the editor's explicit Save. */
 export default function NewWorkoutForm() {
-  const { workouts, saveWorkout, navigate, itemKind } = useApp();
+  const { workouts, navigate, goBack, canGoBack, itemKind } = useApp();
   const { t } = useT();
-  // разминочные позиции не считаем упражнениями в подписи «(N упражнений)»
-  const exerciseCount = (w: Workout) =>
-    w.items.filter((it) => itemKind(it) !== 'warmup').length;
-  const [open, setOpen] = useState(false);
-  const [date, setDate] = useState(todayISO());
-  const [mode, setMode] = useState<FillMode>('empty');
-  const [pickedId, setPickedId] = useState<string | null>(null);
-
-  const last10 = useMemo(() => workouts.slice(-10).reverse(), [workouts]);
-  const lastWorkout = workouts.length ? workouts[workouts.length - 1] : null;
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => {
-          setDate(todayISO());
-          setOpen(true);
-        }}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 font-semibold text-accent-fg"
-      >
-        <IconPlus size={16} /> {t.form.newWorkout}
-      </button>
-    );
-  }
-
-  const fillOptions: { id: FillMode; label: string }[] = [
-    { id: 'empty', label: t.form.empty },
-    { id: 'last', label: t.form.copyLast },
-    { id: 'pick', label: t.form.copyPicked },
-  ];
-
-  const source: Workout | null =
-    mode === 'empty'
-      ? null
-      : mode === 'last'
-        ? lastWorkout
-        : (last10.find((w) => w.id === pickedId) ?? null);
-
-  const canCreate = date !== '' && (mode === 'empty' || source !== null);
-
-  const create = () => {
-    if (!canCreate) return;
-    const id = workoutIdForDate(
-      date,
-      workouts.map((w) => w.id),
-    );
-    const w: Workout = {
-      id,
-      date,
-      title: source?.title ?? null,
-      type: typeForDate(date),
-      status: 'planned',
-      fatigue: null,
-      source: 'app',
-      sourceRef: null,
-      notes: '',
-      warmup: source ? source.warmup.map((x) => ({ ...x })) : [],
-      warmupVideoUrl: source?.warmupVideoUrl ?? null,
-      items: source
-        ? source.items.map((it, i) => ({
-            ...it,
-            id: itemId(id, i + 1),
-            order: i + 1,
-            setsReps: it.setsReps ? { ...it.setsReps } : null,
-            weight: it.weight ? { ...it.weight } : null,
-            perSetPlan: it.perSetPlan ? it.perSetPlan.map((s) => ({ ...s })) : undefined,
-            subNotes: (it.subNotes ?? []).map((s) => ({ ...s })),
-            ptNote: stripPinnedLines(it.ptNote),
-            ptRequest: null, // просьба тренера относилась к конкретному дню
-            myComment: '',
-            actual: null,
-            done: false,
-          }))
-        : [],
-    };
-    saveWorkout(w);
-    setOpen(false);
-    setMode('empty');
-    setPickedId(null);
-    navigate('train', id);
+  const [draft, setDraft] = useState<Workout | null>(null);
+  const [repeat, setRepeat] = useState(false);
+  const sources = useMemo(() => [...workouts].reverse(), [workouts]);
+  const latestCompleted = sources.find((workout) => workout.status === 'done');
+  const [sourceId, setSourceId] = useState<string | null>(latestCompleted?.id ?? sources[0]?.id ?? null);
+  const close = () => canGoBack ? goBack() : navigate('home');
+  const begin = (source: Workout | null) => {
+    const date = todayISO();
+    setDraft(newWorkoutDraft(workoutIdForDate(date, workouts.map((workout) => workout.id)), date, source));
   };
 
+  if (draft) {
+    return <WorkoutEditor workout={draft} isNew onClose={close}
+      onSaved={(workout) => navigate('train', workout.id, { replace: true })} />;
+  }
+
   return (
-    <div className="rounded-2xl border border-border bg-card p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
-        {t.form.newWorkout}
-      </h2>
-
-      <div className="mt-3">
-        <label className="block">
-          <span className="mb-1 block text-sm text-muted">{t.form.date}</span>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className={inputCls}
-          />
-        </label>
+    <section className="space-y-5">
+      <h2 className="text-2xl font-bold">{t.form.newWorkout}</h2>
+      <p className="text-muted">{t.actions.newWorkoutHint}</p>
+      <div className="grid grid-cols-2 gap-3">
+        <button type="button" onClick={() => begin(null)}
+          className="min-h-14 rounded-xl border border-border bg-card px-4 py-3 font-semibold">
+          {t.actions.fromScratch}
+        </button>
+        <button type="button" onClick={() => setRepeat(true)} disabled={sources.length === 0}
+          className="min-h-14 rounded-xl border border-border bg-card px-4 py-3 font-semibold disabled:opacity-40">
+          {t.actions.repeatWorkout}
+        </button>
       </div>
-
-      <div className="mt-3">
-        <span className="mb-1 block text-sm text-muted">{t.form.fillWith}</span>
-        <div className="space-y-1.5">
-          {fillOptions.map((o) => (
-            <button
-              key={o.id}
-              type="button"
-              onClick={() => setMode(o.id)}
-              className={
-                'flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left ' +
-                (mode === o.id ? 'border-accent bg-accent-soft' : 'border-border bg-bg')
-              }
-            >
-              <span
-                className={
-                  'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ' +
-                  (mode === o.id ? 'border-accent' : 'border-border')
-                }
-              >
-                {mode === o.id && <span className="h-2 w-2 rounded-full bg-accent" />}
-              </span>
-              <span className="font-medium">{o.label}</span>
-            </button>
-          ))}
+      {repeat && (
+        <div className="space-y-3">
+          <p className="text-sm text-muted">{t.actions.repeatHint}</p>
+          <ul className="max-h-[45dvh] space-y-2 overflow-y-auto">
+            {sources.map((workout) => (
+              <li key={workout.id}>
+                <button type="button" onClick={() => setSourceId(workout.id)} aria-pressed={sourceId === workout.id}
+                  className={'min-h-14 w-full rounded-xl border px-4 py-3 text-left ' +
+                    (sourceId === workout.id ? 'border-accent bg-accent-soft' : 'border-border bg-card')}>
+                  <span className="font-semibold">{fmtDateShort(workout.date)}, {fmtWeekday(workout.date)}</span>
+                  <span className="mt-1 block text-sm text-muted">
+                    {t.counted.exercises(workout.items.filter((item) => itemKind(item) === 'main').length)}
+                    {workout.type && ` · ${t.catalog.workoutType(workout.type)}`}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button type="button" disabled={!sourceId}
+            onClick={() => { const source = sources.find((workout) => workout.id === sourceId); if (source) begin(source); }}
+            className="min-h-11 w-full rounded-xl bg-accent px-4 py-2.5 font-semibold text-accent-fg disabled:opacity-40">
+            {t.actions.usePlan}
+          </button>
         </div>
-      </div>
-
-      {mode === 'last' &&
-        (lastWorkout ? (
-          <p className="mt-2 text-sm text-muted">
-            {t.form.willCopy(fmtDate(lastWorkout.date), t.counted.exercises(exerciseCount(lastWorkout)))}
-          </p>
-        ) : (
-          <p className="mt-2 text-sm text-muted">{t.form.nothingToCopy}</p>
-        ))}
-
-      {mode === 'pick' && (
-        <ul className="mt-2 max-h-64 space-y-1.5 overflow-y-auto">
-          {last10.map((w) => (
-            <li key={w.id}>
-              <button
-                type="button"
-                onClick={() => setPickedId(w.id)}
-                className={
-                  'w-full rounded-xl border px-3 py-2.5 text-left ' +
-                  (pickedId === w.id ? 'border-accent bg-accent-soft' : 'border-border bg-bg')
-                }
-              >
-                <span className="font-medium">{fmtDateShort(w.date)}</span>{' '}
-                <span className="text-sm text-muted">
-                  {fmtWeekday(w.date)} · {t.counted.exercises(exerciseCount(w))}
-                  {w.type ? ` · ${t.catalog.workoutType(w.type)}` : ''}
-                </span>
-              </button>
-            </li>
-          ))}
-          {last10.length === 0 && (
-            <li className="px-1 py-2 text-sm text-muted">{t.form.nothingToCopy}</li>
-          )}
-        </ul>
       )}
-
-      <div className="mt-4 flex gap-2">
-        <button
-          type="button"
-          onClick={create}
-          disabled={!canCreate}
-          className={
-            'flex-1 rounded-xl bg-accent px-4 py-2.5 font-semibold text-accent-fg ' +
-            (canCreate ? '' : 'opacity-50')
-          }
-        >
-          {t.create}
-        </button>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="rounded-xl border border-border bg-card px-4 py-2.5"
-        >
-          {t.cancel}
-        </button>
-      </div>
-    </div>
+      <button type="button" onClick={close} className="min-h-11 rounded-xl px-4 py-2.5 text-muted">{t.cancel}</button>
+    </section>
   );
 }

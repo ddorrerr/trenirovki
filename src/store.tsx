@@ -1,4 +1,4 @@
-// Глобальное состояние приложения: данные, навигация, режим редактирования,
+// Глобальное состояние приложения: данные, навигация,
 // настройки, синхронизация. Все экраны работают ТОЛЬКО через useApp() —
 // прямых обращений к адаптерам хранилища в экранах быть не должно.
 //
@@ -20,6 +20,8 @@ import {
 import { exerciseKind, type AppData, type Exercise, type ExerciseKind, type StorageAdapter, type Workout, type WorkoutItem } from './types';
 import { setLang, tr, type Lang } from './i18n';
 import { DATA_REPO } from './config';
+import type { RestRequest } from './lib/rest-timer';
+import { timerAudio } from './lib/timer-audio';
 import { LocalAdapter } from './storage/local';
 import {
   AuthError,
@@ -30,7 +32,7 @@ import {
   type SyncState,
 } from './storage/github';
 
-export type Tab = 'home' | 'train' | 'history' | 'library' | 'progress' | 'menu' | 'comments';
+export type Tab = 'home' | 'train' | 'history' | 'library' | 'progress' | 'menu' | 'comments' | 'create';
 
 /** Тема оформления: как в системе / всегда светлая / всегда тёмная */
 export type Theme = 'system' | 'light' | 'dark';
@@ -59,19 +61,18 @@ const UI_KEY = 'trenirovki:ui:v1';
 const RELOAD_IF_STALE_MS = 60_000;
 
 interface UiPersist {
-  editMode: boolean;
   keepAwake: boolean;
   theme: Theme;
   lang: Lang;
 }
 
 function readUi(): UiPersist {
-  const fallback: UiPersist = { editMode: false, keepAwake: false, theme: 'system', lang: 'ru' };
+  const fallback: UiPersist = { keepAwake: false, theme: 'system', lang: 'ru' };
   try {
     const raw = localStorage.getItem(UI_KEY);
     const ui = raw ? { ...fallback, ...(JSON.parse(raw) as Partial<UiPersist>) } : fallback;
     if (ui.lang !== 'ru' && ui.lang !== 'en') ui.lang = 'ru';
-    return ui;
+    return { keepAwake: ui.keepAwake, theme: ui.theme, lang: ui.lang };
   } catch {
     return fallback;
   }
@@ -107,6 +108,9 @@ export interface AppContextValue {
   /** Досохранить очередь и перечитать данные с сервера */
   syncNow: () => Promise<void>;
 
+  restRequest: RestRequest | null;
+  requestRestTimer: (itemId: string, seconds: number, autostart?: boolean) => void;
+
   /** Все упражнения (библиотека), включая archived */
   exercises: Exercise[];
   /** Все тренировки, отсортированы по дате по возрастанию */
@@ -116,14 +120,10 @@ export interface AppContextValue {
   tab: Tab;
   /** Какая тренировка открыта на экране «Тренировка»; null = последняя по дате */
   openWorkoutId: string | null;
-  navigate: (tab: Tab, workoutId?: string | null) => void;
+  navigate: (tab: Tab, workoutId?: string | null, options?: { preserveScroll?: boolean; replace?: boolean }) => void;
   /** Есть куда возвращаться внутри приложения (для стрелки «назад» в шапке) */
   canGoBack: boolean;
   goBack: () => void;
-
-  /** Режим редактирования (глобальный тумблер) */
-  editMode: boolean;
-  setEditMode: (v: boolean) => void;
 
   /**
    * Защита от потери несохранённых правок: редактор регистрирует функцию,
@@ -178,6 +178,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     conflicts: 0,
   });
   const [data, setData] = useState<AppData>({ exercises: [], workouts: [] });
+  const [restRequest, setRestRequest] = useState<RestRequest | null>(null);
+  const requestRestTimer = useCallback((itemId: string, seconds: number, autostart = false) => {
+    void timerAudio.prepare();
+    setRestRequest((previous) => ({ itemId, seconds, autostart, nonce: (previous?.nonce ?? 0) + 1 }));
+  }, []);
   const [tab, setTab] = useState<Tab>('home');
   const [openWorkoutId, setOpenWorkoutId] = useState<string | null>(null);
   const [openExerciseId, setOpenExerciseId] = useState<string | null>(null);
@@ -387,18 +392,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const navigate = useCallback(
-    (nextTab: Tab, workoutId?: string | null) => {
+    (nextTab: Tab, workoutId?: string | null, options?: { preserveScroll?: boolean; replace?: boolean }) => {
       if (!canLeave()) return;
       const nextOpenId = workoutId !== undefined ? workoutId : openIdRef.current;
       const same = nextTab === tabRef.current && nextOpenId === openIdRef.current;
       setTab(nextTab);
       if (workoutId !== undefined) setOpenWorkoutId(workoutId);
-      if (!same) {
+      if (options?.replace) {
+        history.replaceState({ t: nextTab, w: nextOpenId, d: depthRef.current }, '');
+      } else if (!same) {
         depthRef.current += 1;
         history.pushState({ t: nextTab, w: nextOpenId, d: depthRef.current }, '');
         setCanGoBack(true);
       }
-      window.scrollTo({ top: 0 });
+      if (!options?.preserveScroll) window.scrollTo({ top: 0 });
     },
     [canLeave],
   );
@@ -407,18 +414,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const goBack = useCallback(() => {
     history.back();
   }, []);
-
-  const setEditMode = useCallback(
-    (v: boolean) => {
-      if (!v && !canLeave()) return;
-      setUi((prev) => {
-        const next = { ...prev, editMode: v };
-        writeUi(next);
-        return next;
-      });
-    },
-    [canLeave],
-  );
 
   const showExerciseProgress = useCallback(
     (exerciseId: string) => {
@@ -536,6 +531,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     changeAccessKey,
     sync,
     syncNow,
+    restRequest,
+    requestRestTimer,
     exercises: data.exercises,
     workouts: data.workouts,
     tab,
@@ -543,8 +540,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     navigate,
     canGoBack,
     goBack,
-    editMode: ui.editMode,
-    setEditMode,
     setDirtyGuard,
     openExerciseId,
     showExerciseProgress,

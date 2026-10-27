@@ -46,7 +46,7 @@ export default function StatTiles() {
   const today = todayISO();
   // Вся сводка — по уже прошедшим датам: запланированные на будущее
   // тренировки не должны увеличивать счётчик и среднее.
-  const past = workouts.filter((w) => w.date <= today);
+  const past = workouts.filter((w) => w.date <= today && w.status === 'done');
   const total = past.length;
   const first = past.length > 0 ? past[0] : null;
   const last = past.length > 0 ? past[past.length - 1] : null;

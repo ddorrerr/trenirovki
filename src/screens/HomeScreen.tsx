@@ -1,16 +1,16 @@
 // Экран «Главная»: дашборд из реальных данных — дни с последней тренировки,
 // лента текущей недели, ритм по неделям, объём поднятого, группы мышц за
 // неделю, следующая/прошлая тренировки и свежий рекорд. Блоки без данных
-// не показываются. В режиме тренера — добавление тренировки и фидбэк Лизы.
+// не показываются. Добавление тренировки доступно прямо на Главной.
 
 import { useMemo } from 'react';
 import { useApp } from '../store';
 import type { Workout } from '../types';
 import { locale, useT, type EquivForms } from '../i18n';
 import { daysBetween, fmtDate, fmtDateShort, fmtWeekday, todayISO } from '../lib/dates';
-import NewWorkoutForm from '../components/edit/NewWorkoutForm';
+import { IconPlus } from '../components/edit/ui';
 import { isPairWeight } from '../components/edit/parse';
-import { BarbellIcon, CommentIcon, FlameIcon, SkullIcon } from '../components/train/icons';
+import { BarbellIcon, CommentIcon, FlameIcon } from '../components/train/icons';
 /* Свои рисованные иконки гонконгских эквивалентов (нарезаны из одного спрайта) */
 import unitLion from '../assets/units/lion.png';
 import unitTaxi from '../assets/units/taxi.png';
@@ -145,7 +145,7 @@ const UNITS: ({ kg: number; emoji: string; img?: string } & EquivForms)[] = [
 ];
 
 export default function HomeScreen() {
-  const { workouts, navigate, editMode, exerciseById, showExerciseProgress } = useApp();
+  const { workouts, navigate, exerciseById, showExerciseProgress } = useApp();
   const { t } = useT();
   const today = todayISO();
 
@@ -323,120 +323,16 @@ export default function HomeScreen() {
     return [...set];
   }, [past, today, exerciseById]);
 
-  /* --- Режим тренера: фидбэк Лизы ----------------------------------------- */
-
-  /* Последняя тренировка, ГДЕ ЕСТЬ комментарии — а не просто последняя:
-     тренеру нужен свежий фидбэк, даже если вчера прошло молча */
-  const lastWithComments = useMemo(
-    () =>
-      [...past]
-        .reverse()
-        .find((w) => w.items.some((i) => (i.myComment ?? '').trim() !== '')) ?? null,
-    [past],
-  );
-
-  const feedbackItems = useMemo(() => {
-    if (!lastWithComments) return [];
-    return lastWithComments.items
-      .filter((i) => (i.myComment ?? '').trim() !== '')
-      .map((i) => ({
-        id: i.id,
-        name:
-          exerciseById(i.exerciseId)?.name ??
-          i.nameRaw.replace(/^\s*\d+(?:\.\d+)*\s*[.)]\s*/, ''),
-        pvr: i.pvr,
-        comment: (i.myComment ?? '').trim(),
-      }));
-  }, [lastWithComments, exerciseById]);
-
-  /* Упражнения, к которым за месяц было ≥2 комментариев — что даётся тяжело */
-  const frequent = useMemo(() => {
-    const cutoff = addDaysISO(today, -28);
-    const counts = new Map<string, number>();
-    for (const w of past) {
-      if (w.date < cutoff) continue;
-      for (const it of w.items) {
-        if ((it.myComment ?? '').trim() === '' || !it.exerciseId) continue;
-        counts.set(it.exerciseId, (counts.get(it.exerciseId) ?? 0) + 1);
-      }
-    }
-    return [...counts.entries()]
-      .filter(([, n]) => n >= 2)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([id, n]) => ({ id, name: exerciseById(id)?.name ?? id, n }));
-  }, [past, today, exerciseById]);
-
-  /* Режим тренера: добавить тренировку + фидбэк, без мотивационных блоков */
-  if (editMode) {
-    return (
-      <div className="space-y-3">
-        <NewWorkoutForm />
-
-        {lastWithComments && (
-          <section className="rounded-2xl border border-border bg-card p-4">
-            <p className="text-[12px] font-bold uppercase tracking-wider text-muted">
-              {t.home.feedback(fmtDateShort(lastWithComments.date))}
-            </p>
-            <ul className="mt-2 space-y-2.5">
-              {feedbackItems.map((f) => (
-                <li key={f.id} className="text-sm leading-snug">
-                  <span className="font-bold">{t.catalog.exercise(f.name)}</span>
-                  {f.pvr && (
-                    <span className="ml-1.5 inline-flex items-center gap-1 rounded-lg bg-chip px-1.5 py-0.5 align-middle text-xs font-bold tabular-nums">
-                      <span className="text-muted">
-                        <SkullIcon size={12} />
-                      </span>
-                      {f.pvr}
-                    </span>
-                  )}
-                  <span className="block text-muted">«{f.comment}»</span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-3 border-t border-border pt-2.5">
-              <button
-                type="button"
-                onClick={() => navigate('comments')}
-                className="text-sm font-semibold text-accent"
-              >
-                {t.home.allComments}
-              </button>
-            </div>
-          </section>
-        )}
-
-        {frequent.length > 0 && (
-          <section className="rounded-2xl border border-border bg-card p-4">
-            <p className="text-[12px] font-bold uppercase tracking-wider text-muted">
-              {t.home.oftenMonth}
-            </p>
-            <ul className="mt-2 space-y-1 text-sm">
-              {frequent.map((f) => (
-                <li key={f.id} className="flex items-baseline justify-between gap-2">
-                  <span className="min-w-0 flex-1 truncate font-medium">
-                    {t.catalog.exercise(f.name)}
-                  </span>
-                  <span className="shrink-0 text-muted">{t.counted.entries(f.n)}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {last && (
-          <LastCard w={last} comments={lastComments} onOpen={() => navigate('train', last.id)} />
-        )}
-      </div>
-    );
-  }
+  const addWorkout = <button type="button" onClick={() => navigate('create')}
+    aria-label={t.actions.createWorkout}
+    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-accent/40 bg-card px-4 py-3 font-semibold text-accent">
+    <IconPlus size={22} /> {t.form.newWorkout}
+  </button>;
 
   if (workouts.length === 0) {
-    return (
-      <div className="rounded-2xl border border-border bg-card p-6 text-center text-muted">
-        {t.home.empty}
-      </div>
-    );
+    return <div className="space-y-4 text-center"><p className="py-8 text-muted">{t.home.empty}</p>
+      {addWorkout}
+    </div>;
   }
 
   return (
@@ -596,6 +492,8 @@ export default function HomeScreen() {
         )}
       </div>
 
+      {addWorkout}
+
       {/* Следующая запланированная — петрольная карточка: «иди делать» */}
       {next && (
         <button
@@ -713,7 +611,7 @@ function WeekBars({ counts }: { counts: number[] }) {
   );
 }
 
-/* Карточка «Прошлая» — общая для обычного режима и режима тренера */
+/* Карточка «Прошлая» */
 function LastCard({ w, comments, onOpen }: { w: Workout; comments: number; onOpen: () => void }) {
   const { t } = useT();
   return (

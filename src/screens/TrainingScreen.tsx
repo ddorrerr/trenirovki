@@ -9,14 +9,17 @@ import { fmtDate, fmtWeekday } from '../lib/dates';
 import { exerciseKind, type Exercise, type ExerciseKind, type Workout, type WorkoutItem } from '../types';
 import { perSetSummary } from '../lib/actual';
 import WorkoutEditor from '../components/edit/WorkoutEditor';
-import NewWorkoutForm from '../components/edit/NewWorkoutForm';
+import ActionMenu from '../components/edit/ActionMenu';
+import WorkoutOrderDialog from '../components/edit/WorkoutOrderDialog';
+import { applyWorkoutOrder } from '../lib/workout-order';
+import { captureWorkoutAnchor, restoreWorkoutAnchor, type WorkoutAnchor } from '../lib/scroll-anchor';
 import ItemCard, {
   plannedSetsCount,
   restLabel,
   stripNumbering,
   weightLabel,
 } from '../components/train/ItemCard';
-import RestTimer, { parseRestSeconds, type RestRequest } from '../components/train/RestTimer';
+import { parseRestSeconds } from '../lib/rest-timer';
 import VideoLink from '../components/train/VideoLink';
 import {
   CheckIcon,
@@ -48,12 +51,11 @@ export default function TrainingScreen() {
     currentWorkout,
     openWorkoutId,
     navigate,
-    editMode,
-    setEditMode,
     exerciseById,
     itemKind,
     lastResultBefore,
     saveWorkout,
+    requestRestTimer,
   } = useApp();
   const { t } = useT();
 
@@ -64,16 +66,51 @@ export default function TrainingScreen() {
   const w = !openWorkoutId && activeWorkout ? activeWorkout : currentWorkout;
   const isActive = !!w && w.status === 'planned' && !!w.startedAt;
 
-  // В режиме редактирования «последняя тренировка» фиксируется по id:
-  // иначе правка даты пересортировала бы список и подменила бы редактируемую.
+  const [editing, setEditing] = useState<{ workoutId: string; itemId?: string } | null>(null);
+  const [reordering, setReordering] = useState<string | null>(null);
+  const orderAnchorRef = useRef<WorkoutAnchor | null>(null);
+  const restoreAnchorRef = useRef<WorkoutAnchor | null>(null);
+  const viewAnchorRef = useRef<WorkoutAnchor | null>(null);
+  const returnCompactRef = useRef(false);
+  const openedItemsRef = useRef<Record<string, boolean>>({});
+
+  const beginEdit = (itemId?: string, fromCompact = false) => {
+    if (!w) return;
+    returnCompactRef.current = fromCompact;
+    if (fromCompact) setExpandedMap((current) => ({ ...current, [w.id]: true }));
+    const anchor = captureWorkoutAnchor(itemId);
+    viewAnchorRef.current = anchor;
+    restoreAnchorRef.current = anchor;
+    document.querySelectorAll<HTMLElement>('[data-workout-item][data-item-expanded]').forEach((card) => {
+      openedItemsRef.current[card.dataset.workoutItem!] = card.dataset.itemExpanded === 'true';
+    });
+    // Pin the identity without adding history or treating editing as navigation.
+    navigate('train', w.id, { preserveScroll: true, replace: true });
+    setEditing({ workoutId: w.id, itemId });
+  };
+  const endEdit = () => {
+    const current = captureWorkoutAnchor(editing?.itemId);
+    restoreAnchorRef.current = current.itemId ? current : viewAnchorRef.current;
+    if (returnCompactRef.current && w) setExpandedMap((map) => ({ ...map, [w.id]: false }));
+    returnCompactRef.current = false;
+    setEditing(null);
+  };
+  useLayoutEffect(() => {
+    if (!restoreAnchorRef.current) return;
+    const anchor = restoreAnchorRef.current;
+    restoreAnchorRef.current = null;
+    restoreWorkoutAnchor(anchor);
+    // The browser may adjust focus/scroll anchoring after the DOM replacement.
+    const frame = requestAnimationFrame(() => restoreWorkoutAnchor(anchor));
+    return () => cancelAnimationFrame(frame);
+  }, [editing, reordering, w]);
   useEffect(() => {
-    if (editMode && !openWorkoutId && w) navigate('train', w.id);
-  }, [editMode, openWorkoutId, w, navigate]);
+    if (editing && editing.workoutId !== w?.id) setEditing(null);
+  }, [editing, w?.id]);
 
   // Свёрнутость блоков помним на время сессии, отдельно для каждой тренировки
   const [warmupOpenMap, setWarmupOpenMap] = useState<Record<string, boolean>>({});
   const [notesOpenMap, setNotesOpenMap] = useState<Record<string, boolean>>({});
-  const [restRequest, setRestRequest] = useState<RestRequest | null>(null);
   /* Завершённая тренировка «закрыта»: отметки упражнений, разминки и ползунок
      усталости не реагируют, пока не открыть замок внизу (на время сессии). */
   const [unlockedMap, setUnlockedMap] = useState<Record<string, boolean>>({});
@@ -82,264 +119,20 @@ export default function TrainingScreen() {
   const [warmupPop, setWarmupPop] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
 
-  /* Свайп между тренировками: карточка идёт за пальцем 1:1, отпускание либо
-     доводит её за край (и открывает соседнюю), либо пружинит обратно.
-     Всё через ref-стили — без ререндеров на каждый кадр. */
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const slideRef = useRef<HTMLDivElement | null>(null);
-  /** Центр шапки (дата и бейджи): шапка со стрелками стоит на месте,
-      а дата едет за свайпом слегка и мягче */
-  const headCenterRef = useRef<HTMLDivElement | null>(null);
-  const prevIdRef = useRef<string | null>(null);
-  /** Откуда «въезжает» новая тренировка (px со знаком); null = лёгкий шаг по стрелкам */
-  const enterFromRef = useRef<number | null>(null);
-  const dragRef = useRef<{
-    x0: number;
-    y0: number;
-    base: number;
-    horiz: boolean | null;
-    pts: { x: number; t: number }[];
-  } | null>(null);
-  /** Отложенный переход после довода карточки за край: схватила снова — отменяем */
-  const exitTimerRef = useRef<number | null>(null);
-
-  /* Минуты в шапке режима «идёт» обновляются раз в полминуты */
+  // The detail screen uses visible navigation and actions, without horizontal gestures.
+  const wRef = useRef<Workout | null>(w);
+  useEffect(() => { wRef.current = w; }, [w]);
   const [, setClockTick] = useState(0);
   useEffect(() => {
     if (!isActive) return;
-    const id = window.setInterval(() => setClockTick((n) => n + 1), 30_000);
-    return () => window.clearInterval(id);
+    const interval = window.setInterval(() => setClockTick((tick) => tick + 1), 30_000);
+    return () => window.clearInterval(interval);
   }, [isActive, w?.id]);
-
-  /* Свежая тренировка для отложенных сохранений (таймер «последнего кружка»):
-     иначе патч, пришедший через 400 мс, собрал бы workout из устаревшего w */
-  const wRef = useRef<Workout | null>(null);
-  const workoutsRef = useRef(workouts);
-  const editModeRef = useRef(editMode);
-  const navigateRef = useRef(navigate);
-  useEffect(() => {
-    wRef.current = w;
-    workoutsRef.current = workouts;
-    editModeRef.current = editMode;
-    navigateRef.current = navigate;
-  });
-
-  /* Жест свайпа — нативные слушатели: touchmove нужен non-passive, чтобы
-     во время горизонтального жеста глушить вертикальный скролл */
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-
-    const translateX = (el: HTMLElement): number => {
-      const tr = getComputedStyle(el).transform;
-      return tr && tr !== 'none' ? new DOMMatrixReadOnly(tr).m41 : 0;
-    };
-    const neighbors = () => {
-      const list = workoutsRef.current;
-      const cur = wRef.current;
-      const i = cur ? list.findIndex((x) => x.id === cur.id) : -1;
-      return {
-        prevW: i > 0 ? list[i - 1] : null,
-        nextW: i >= 0 && i < list.length - 1 ? list[i + 1] : null,
-      };
-    };
-    /* Мягкая граница: чем дальше за край, тем меньше карточка следует за пальцем */
-    const rubber = (x: number, dim: number): number => {
-      const c = 0.55;
-      return (Math.sign(x) * (Math.abs(x) * dim * c)) / (dim + c * Math.abs(x));
-    };
-
-    const onStart = (e: TouchEvent) => {
-      if (editModeRef.current) return;
-      const el = e.target as HTMLElement;
-      if (el.closest('input, textarea, select, .fixed')) return;
-      const slide = slideRef.current;
-      if (!slide) return;
-      // перехват на лету: карточку, ещё едущую после прошлого свайпа, можно схватить
-      if (exitTimerRef.current) {
-        window.clearTimeout(exitTimerRef.current);
-        exitTimerRef.current = null;
-      }
-      const base = translateX(slide);
-      if (base !== 0) {
-        slide.style.transition = 'none';
-        slide.style.transform = `translateX(${base}px)`;
-      }
-      const t0 = e.touches[0];
-      dragRef.current = {
-        x0: t0.clientX,
-        y0: t0.clientY,
-        base,
-        horiz: null,
-        pts: [{ x: t0.clientX, t: e.timeStamp }],
-      };
-    };
-
-    const onMove = (e: TouchEvent) => {
-      const d = dragRef.current;
-      const slide = slideRef.current;
-      if (!d || !slide) return;
-      const t0 = e.touches[0];
-      const dx = t0.clientX - d.x0;
-      const dy = t0.clientY - d.y0;
-      if (d.horiz === null) {
-        if (Math.abs(dx) < 9 && Math.abs(dy) < 9) return;
-        d.horiz = Math.abs(dx) > Math.abs(dy) * 1.2;
-        if (!d.horiz) {
-          dragRef.current = null; // жест вертикальный — отдаём его скроллу
-          return;
-        }
-      }
-      e.preventDefault();
-      d.pts.push({ x: t0.clientX, t: e.timeStamp });
-      while (d.pts.length > 1 && e.timeStamp - d.pts[0].t > 120) d.pts.shift();
-      const { prevW, nextW } = neighbors();
-      const width = slide.clientWidth || window.innerWidth;
-      let x = d.base + dx;
-      if (x < 0 ? !nextW : !prevW) x = rubber(x, width);
-      slide.style.transition = 'none';
-      slide.style.transform = `translateX(${x}px)`;
-      // дата в шапке подыгрывает: лёгкий сдвиг и растворение
-      const head = headCenterRef.current;
-      if (head) {
-        head.style.transition = 'none';
-        head.style.transform = `translateX(${x / 6}px)`;
-        head.style.opacity = String(Math.max(0.35, 1 - Math.abs(x) / width));
-      }
-    };
-
-    const onEnd = (e: TouchEvent) => {
-      const d = dragRef.current;
-      dragRef.current = null;
-      const slide = slideRef.current;
-      if (!d || d.horiz !== true || !slide) return;
-      const x = translateX(slide);
-      const width = slide.clientWidth || window.innerWidth;
-      // скорость пальца по последним ~120 мс движения; палец замер перед
-      // отпусканием (>80 мс без движения) — скорости нет, это не «бросок»
-      const pts = d.pts;
-      const a = pts[0];
-      const b = pts[pts.length - 1];
-      const held = e.timeStamp - b.t > 80;
-      const v = !held && pts.length >= 2 ? ((b.x - a.x) / Math.max(1, b.t - a.t)) * 1000 : 0;
-      const { prevW, nextW } = neighbors();
-      const target = x < 0 ? nextW : prevW;
-      const commit =
-        !!target &&
-        (Math.abs(x) > width * 0.3 ||
-          (Math.abs(v) > 450 && Math.sign(v) === Math.sign(x) && Math.abs(x) > 24));
-      const head = headCenterRef.current;
-      if (commit) {
-        const sign = Math.sign(x) || 1;
-        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-          slide.style.transition = '';
-          slide.style.transform = '';
-          if (head) {
-            head.style.transition = '';
-            head.style.transform = '';
-            head.style.opacity = '';
-          }
-          navigateRef.current('train', target.id);
-          return;
-        }
-        // довести за край с текущего места, затем соседняя въедет с той же стороны
-        enterFromRef.current = -sign * width;
-        slide.style.transition = 'transform 0.18s ease-out, opacity 0.18s ease-out';
-        slide.style.transform = `translateX(${sign * width}px)`;
-        slide.style.opacity = '0.4';
-        if (head) {
-          head.style.transition = 'transform 0.18s ease-out, opacity 0.18s ease-out';
-          head.style.transform = `translateX(${sign * 24}px)`;
-          head.style.opacity = '0';
-        }
-        exitTimerRef.current = window.setTimeout(() => {
-          exitTimerRef.current = null;
-          navigateRef.current('train', target.id);
-        }, 170);
-      } else {
-        slide.style.transition = 'transform 0.3s var(--ease-out-strong), opacity 0.2s ease-out';
-        slide.style.transform = 'translateX(0px)';
-        slide.style.opacity = '1';
-        if (head) {
-          head.style.transition = 'transform 0.3s var(--ease-out-strong), opacity 0.2s ease-out';
-          head.style.transform = 'translateX(0px)';
-          head.style.opacity = '1';
-        }
-      }
-    };
-
-    root.addEventListener('touchstart', onStart, { passive: true });
-    root.addEventListener('touchmove', onMove, { passive: false });
-    root.addEventListener('touchend', onEnd, { passive: true });
-    root.addEventListener('touchcancel', onEnd, { passive: true });
-    return () => {
-      root.removeEventListener('touchstart', onStart);
-      root.removeEventListener('touchmove', onMove);
-      root.removeEventListener('touchend', onEnd);
-      root.removeEventListener('touchcancel', onEnd);
-    };
-  }, [loading, w == null]);
-
-  /* «Въезд» открывшейся тренировки: после свайпа — во всю ширину с той же
-     стороны, по стрелкам — короткий шаг с проявлением. До отрисовки кадра. */
-  useLayoutEffect(() => {
-    if (!w) {
-      prevIdRef.current = null;
-      return;
-    }
-    if (prevIdRef.current === w.id) return;
-    const cameFrom = prevIdRef.current;
-    prevIdRef.current = w.id;
-    const el = slideRef.current;
-    const head = headCenterRef.current;
-    if (cameFrom === null || !el) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      el.style.transition = '';
-      el.style.transform = '';
-      el.style.opacity = '';
-      if (head) {
-        head.style.transition = '';
-        head.style.transform = '';
-        head.style.opacity = '';
-      }
-      enterFromRef.current = null;
-      return;
-    }
-    const prevW2 = workouts.find((x) => x.id === cameFrom);
-    const dateDir = !prevW2 || prevW2.date <= w.date ? 1 : -1;
-    const from = enterFromRef.current ?? dateDir * 72;
-    enterFromRef.current = null;
-    const fullSlide = Math.abs(from) > 120;
-    el.style.transition = 'none';
-    el.style.transform = `translateX(${from}px)`;
-    el.style.opacity = fullSlide ? '1' : '0';
-    if (head) {
-      head.style.transition = 'none';
-      head.style.transform = `translateX(${Math.sign(from) * 18}px)`;
-      head.style.opacity = '0';
-    }
-    void el.offsetWidth; // рефлоу фиксирует стартовое положение
-    el.style.transition = `transform ${fullSlide ? '0.34s' : '0.26s'} var(--ease-out-strong), opacity 0.22s ease-out`;
-    el.style.transform = 'translateX(0px)';
-    el.style.opacity = '1';
-    if (head) {
-      head.style.transition = 'transform 0.3s var(--ease-out-strong), opacity 0.24s ease-out';
-      head.style.transform = 'translateX(0px)';
-      head.style.opacity = '1';
-    }
-  }, [w, workouts]);
 
   if (loading) return null;
 
   if (!w) {
-    return editMode ? (
-      <NewWorkoutForm />
-    ) : (
-      <EmptyState
-        onEdit={() => setEditMode(true)}
-        onMenu={() => navigate('menu')}
-      />
-    );
+    return <EmptyState onEdit={() => navigate('create')} onMenu={() => navigate('menu')} />;
   }
 
   const index = workouts.findIndex((x) => x.id === w.id);
@@ -433,12 +226,7 @@ export default function TrainingScreen() {
   };
 
   const requestRest = (item: WorkoutItem, autostart = false) =>
-    setRestRequest((prevReq) => ({
-      itemId: item.id,
-      seconds: parseRestSeconds(item.rest),
-      nonce: (prevReq?.nonce ?? 0) + 1,
-      autostart,
-    }));
+    requestRestTimer(item.id, parseRestSeconds(item.rest), autostart);
 
   /* Разминка: шапка как у карточки упражнения — видео и «выполнено».
      Секция общая для режима «идёт» и подробного вида */
@@ -546,6 +334,25 @@ export default function TrainingScreen() {
     </section>
   );
 
+  const beginOrder = (itemId?: string) => {
+    orderAnchorRef.current = captureWorkoutAnchor(itemId);
+    setReordering(itemId ?? '');
+  };
+  const endOrder = () => {
+    restoreAnchorRef.current = orderAnchorRef.current;
+    setReordering(null);
+  };
+  const removeItem = (item: WorkoutItem) => {
+    const name = t.catalog.exercise(exerciseById(item.exerciseId)?.name ?? stripNumbering(item.nameRaw));
+    if (!window.confirm(t.editor.removeItemConfirm(name))) return;
+    const current = wRef.current ?? w;
+    const index = current.items.findIndex((entry) => entry.id === item.id);
+    const neighbor = current.items[index + 1] ?? current.items[index - 1];
+    restoreAnchorRef.current = captureWorkoutAnchor(neighbor?.id);
+    saveWorkout({ ...current, items: current.items.filter((entry) => entry.id !== item.id)
+      .map((entry, i) => ({ ...entry, order: i + 1 })) });
+  };
+
   /* Строка в «Выполнено» для упражнения: имя + сводка (частичные подходы —
      «2 из 3 подх.», пропуск — «пропущено», иначе — обычная нотация) */
   const doneRowFor = (it: WorkoutItem, skippedRow: boolean) => {
@@ -559,19 +366,36 @@ export default function TrainingScreen() {
       : sd > 0 && sd < planned
         ? t.item.setsDoneOf(sd, planned)
         : compactSummary(it, exerciseKind(ex), t);
+    if (editing?.itemId === it.id) return <WorkoutEditor key={it.id} workout={w} itemId={it.id} onClose={endEdit} />;
     return (
-      <DoneRow
-        key={it.id}
-        name={nm}
-        summary={summary}
-        skippedRow={skippedRow}
-        onRestore={() => saveItem(it.id, { done: false, skipped: false })}
-      />
+      <div key={it.id} data-workout-item={it.id} className="flex items-center gap-1 rounded-xl border border-border bg-card pr-1">
+        <DoneRow name={nm} summary={summary} skippedRow={skippedRow}
+          onRestore={() => saveItem(it.id, { done: false, skipped: false })} />
+        {!editing && <ActionMenu label={`${t.actions.exerciseActions}: ${nm}`} actions={[
+          { label: t.actions.editWorkout, run: () => beginEdit(it.id) },
+          { label: t.actions.moveExercise, run: () => beginOrder(it.id) },
+          { label: t.actions.removeFromWorkout, run: () => removeItem(it), danger: true },
+        ]} />}
+      </div>
     );
   };
 
   /* Рабочие списки — общие для режима «идёт» и правки завершённой после
      открытия замка: сверху «to-do», внизу «Выполнено», разминка — пункт списка */
+  const renderItem = (item: WorkoutItem, num: number, locked: boolean, active = false) =>
+    editing?.itemId === item.id ? (
+      <WorkoutEditor key={item.id} workout={w} itemId={item.id} onClose={endEdit} />
+    ) : (
+      <ItemCard key={item.id} item={item} num={num} locked={locked} active={active}
+        initialOpen={openedItemsRef.current[item.id] ?? false}
+        exercise={item.exerciseId ? exerciseById(item.exerciseId) : undefined}
+        last={item.exerciseId ? lastResultBefore(item.exerciseId, w.date, w.id) : null}
+        onChange={(patch) => saveItem(item.id, patch)} onRest={requestRest}
+        onEdit={editing ? undefined : () => beginEdit(item.id)}
+        onMove={editing ? undefined : () => beginOrder(item.id)}
+        onRemove={editing ? undefined : () => removeItem(item)} />
+    );
+
   const workLists = (
     <>
       {hasWarmup && !w.warmupDone && warmupSection}
@@ -586,19 +410,7 @@ export default function TrainingScreen() {
               {t.train.noItems}
             </p>
           )}
-          {todoMains.map((it) => (
-            <ItemCard
-              key={it.id}
-              item={it}
-              num={numOf(it)}
-              locked={false}
-              active
-              exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
-              last={it.exerciseId ? lastResultBefore(it.exerciseId, w.date, w.id) : null}
-              onChange={(patch) => saveItem(it.id, patch)}
-              onRest={requestRest}
-            />
-          ))}
+          {todoMains.map((it) => renderItem(it, numOf(it), false, true))}
         </section>
       )}
 
@@ -607,19 +419,7 @@ export default function TrainingScreen() {
           <h2 className="px-1 text-sm font-semibold uppercase tracking-wide text-muted">
             {t.train.cardio}
           </h2>
-          {todoCardio.map((it) => (
-            <ItemCard
-              key={it.id}
-              item={it}
-              num={0}
-              locked={false}
-              active
-              exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
-              last={it.exerciseId ? lastResultBefore(it.exerciseId, w.date, w.id) : null}
-              onChange={(patch) => saveItem(it.id, patch)}
-              onRest={requestRest}
-            />
-          ))}
+          {todoCardio.map((it) => renderItem(it, 0, false, true))}
         </section>
       )}
 
@@ -670,24 +470,29 @@ export default function TrainingScreen() {
   );
 
   return (
-    <div ref={rootRef} className="touch-pan-y space-y-4">
-      {/* Шапка со стрелками стоит на месте при свайпе — едет только контент,
-          а дата с бейджами меняется своей мягкой анимацией */}
+    <div style={{ overflowAnchor: 'none' }} className="touch-pan-y space-y-4">
+      {/* Дата и явная навигация между тренировками. */}
       <TopBlock
         w={w}
-        prev={prev}
-        next={next}
-        centerRef={headCenterRef}
+        prev={editing ? null : prev}
+        next={editing ? null : next}
         onOpen={(id) => navigate('train', id)}
       />
-      <div key={w.id} ref={slideRef} className="space-y-4">
+      <div key={w.id} className="space-y-4">
 
-      {editMode ? (
-        <>
-          {/* Тренеру не нужно ходить в «Историю», чтобы добавить тренировку */}
-          <NewWorkoutForm />
-          <WorkoutEditor workout={w} />
-        </>
+      {!editing && (
+        <div className="flex items-center justify-end gap-2">
+          <button type="button" onClick={() => beginOrder()}
+            className="min-h-11 rounded-xl px-3 py-2 text-sm font-medium text-muted">{t.actions.reorder}</button>
+          <button type="button" onClick={() => beginEdit()}
+            className="min-h-11 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-accent">
+            {w.status === 'done' ? t.actions.editRecord : t.actions.editWorkout}
+          </button>
+        </div>
+      )}
+
+      {editing && !editing.itemId ? (
+        <WorkoutEditor key={w.id} workout={w} onClose={endEdit} />
       ) : wState === 'active' ? (
         <>
           {/* Шапка режима «идёт»: минуты с начала и прогресс по упражнениям */}
@@ -725,6 +530,7 @@ export default function TrainingScreen() {
             />
             <div className="mt-4">
               <button
+                disabled={!!editing}
                 onClick={finishActive}
                 className="w-full rounded-xl bg-accent px-4 py-2.5 text-lg font-bold text-accent-fg"
               >
@@ -736,6 +542,7 @@ export default function TrainingScreen() {
           {/* Случайно нажала «Начать» — можно вернуть карточку-план */}
           <button
             type="button"
+            disabled={!!editing}
             onClick={cancelStart}
             className="mx-auto block text-sm text-muted underline decoration-dotted underline-offset-2"
           >
@@ -749,6 +556,9 @@ export default function TrainingScreen() {
           w={w}
           celebrate={celebrate}
           onStart={startWorkout}
+          onEdit={(item) => beginEdit(item.id, true)}
+          onMove={(item) => beginOrder(item.id)}
+          onRemove={removeItem}
           onExpand={() => switchView(() => setExpandedMap((m) => ({ ...m, [w.id]: true })))}
         />
       ) : (
@@ -756,6 +566,7 @@ export default function TrainingScreen() {
           {/* Подробный вид: всё как раньше, сверху — путь назад к карточке */}
           <button
             type="button"
+            disabled={!!editing}
             onClick={() => switchView(() => setExpandedMap((m) => ({ ...m, [w.id]: false })))}
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted"
           >
@@ -781,18 +592,7 @@ export default function TrainingScreen() {
                     {t.train.noItems}
                   </p>
                 )}
-                {mainItems.map((it, i) => (
-                  <ItemCard
-                    key={it.id}
-                    item={it}
-                    num={i + 1}
-                    locked={workoutLocked}
-                    exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
-                    last={it.exerciseId ? lastResultBefore(it.exerciseId, w.date, w.id) : null}
-                    onChange={(patch) => saveItem(it.id, patch)}
-                    onRest={requestRest}
-                  />
-                ))}
+                {mainItems.map((it, i) => renderItem(it, i + 1, workoutLocked))}
               </section>
 
               {/* Кардио — свой блок с сердечком, упражнением не считается */}
@@ -801,18 +601,7 @@ export default function TrainingScreen() {
                   <h2 className="px-1 text-sm font-semibold uppercase tracking-wide text-muted">
                     {t.train.cardio}
                   </h2>
-                  {cardioItems.map((it) => (
-                    <ItemCard
-                      key={it.id}
-                      item={it}
-                      num={0}
-                      locked={workoutLocked}
-                      exercise={it.exerciseId ? exerciseById(it.exerciseId) : undefined}
-                      last={it.exerciseId ? lastResultBefore(it.exerciseId, w.date, w.id) : null}
-                      onChange={(patch) => saveItem(it.id, patch)}
-                      onRest={requestRest}
-                    />
-                  ))}
+                  {cardioItems.map((it) => renderItem(it, 0, workoutLocked))}
                 </section>
               )}
             </>
@@ -829,6 +618,7 @@ export default function TrainingScreen() {
             <div className="mt-4">
               {w.status === 'planned' ? (
                 <button
+                  disabled={!!editing}
                   onClick={() => {
                     saveWorkout({ ...w, status: 'done' });
                     // завершение всегда закрывает замок заново
@@ -844,6 +634,7 @@ export default function TrainingScreen() {
                 /* Общий замок: «Завершить» закрывает отметки всей тренировки;
                    открытие/закрытие меняет вид на рабочие списки — с кроссфейдом */
                 <button
+                  disabled={!!editing}
                   onClick={() =>
                     switchView(() => setUnlockedMap((m) => ({ ...m, [w.id]: workoutLocked })))
                   }
@@ -865,6 +656,7 @@ export default function TrainingScreen() {
           {/* «Вернуть в запланированные» — отдельно, появляется после разблокировки */}
           {w.status === 'done' && !workoutLocked && (
             <button
+              disabled={!!editing}
               onClick={() => saveWorkout({ ...w, status: 'planned' })}
               className="anim-rise w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted"
             >
@@ -878,8 +670,13 @@ export default function TrainingScreen() {
       )}
       </div>
 
-      {/* Таймер вне «листаемого» блока: смена тренировки не сбрасывает отсчёт */}
-      {!editMode && <RestTimer request={restRequest} />}
+      {/* Таймер остаётся на месте при редактировании и перестановке */}
+      {reordering !== null && <WorkoutOrderDialog workout={w} selectedId={reordering || undefined}
+        onClose={endOrder} onSave={(ids) => {
+          const current = wRef.current ?? w;
+          saveWorkout({ ...current, items: applyWorkoutOrder(current.items, ids) });
+          endOrder();
+        }} />}
     </div>
   );
 }
@@ -890,14 +687,11 @@ function TopBlock({
   w,
   prev,
   next,
-  centerRef,
   onOpen,
 }: {
   w: Workout;
   prev: Workout | null;
   next: Workout | null;
-  /** Центр шапки: свайп-анимация двигает только дату и бейджи, не стрелки */
-  centerRef?: React.Ref<HTMLDivElement>;
   onOpen: (id: string | null) => void;
 }) {
   const { t } = useT();
@@ -908,7 +702,7 @@ function TopBlock({
         disabled={!prev}
         onClick={() => prev && onOpen(prev.id)}
       />
-      <div ref={centerRef} className="min-w-0 flex-1 text-center">
+      <div className="min-w-0 flex-1 text-center">
         <h2 className="text-xl font-extrabold leading-snug tracking-tight">
           {fmtDate(w.date)}, {fmtWeekday(w.date)}
         </h2>
@@ -1030,156 +824,60 @@ function compactSummary(it: WorkoutItem, kind: ExerciseKind, dict: Dict): string
   return [sr, wt].filter(Boolean).join(' · ');
 }
 
-function CompactWorkoutCard({
-  w,
-  celebrate,
-  onStart,
-  onExpand,
-}: {
+function CompactWorkoutCard({ w, celebrate, onStart, onExpand, onEdit, onMove, onRemove }: {
   w: Workout;
-  /** Конфетти после «Завершить» из режима «идёт» — прямо на карточке-итоге */
   celebrate: boolean;
   onStart: () => void;
   onExpand: () => void;
+  onEdit: (item: WorkoutItem) => void;
+  onMove: (item: WorkoutItem) => void;
+  onRemove: (item: WorkoutItem) => void;
 }) {
   const { exerciseById, itemKind } = useApp();
   const { t } = useT();
-  const sorted = [...w.items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  const warmupCount =
-    w.warmup.length + sorted.filter((it) => itemKind(it) === 'warmup').length;
-  const mains = sorted.filter((it) => itemKind(it) === 'main');
-  const cardio = sorted.filter((it) => itemKind(it) === 'cardio');
-
-  return (
-    <>
-      <section className="relative rounded-2xl border border-border bg-card p-4">
-        {celebrate && <ConfettiBurst />}
-        {warmupCount > 0 && (
-          <div className="mb-1 flex items-center gap-2.5 border-b border-border/60 pb-2.5">
-            <span
-              aria-hidden="true"
-              className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-lg bg-chip px-1 text-muted"
-            >
-              <FlameIcon size={13} />
+  const sorted = [...w.items].sort((a, b) => a.order - b.order);
+  const warmupCount = w.warmup.length + sorted.filter((item) => itemKind(item) === 'warmup').length;
+  const items = [...sorted.filter((item) => itemKind(item) === 'main'), ...sorted.filter((item) => itemKind(item) === 'cardio')];
+  return <>
+    <section className="relative rounded-2xl border border-border bg-card p-4">
+      {celebrate && <ConfettiBurst />}
+      {warmupCount > 0 && <div className="mb-1 flex items-center gap-2.5 border-b border-border/60 pb-2.5">
+        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-chip text-muted" aria-hidden="true"><FlameIcon size={13} /></span>
+        <span className="text-[15px] font-semibold text-muted">{t.train.warmup}</span>
+        <span className="ml-auto text-xs font-semibold text-muted">{warmupCount}</span>
+      </div>}
+      {!items.length && <p className="text-muted">{t.train.noItems}</p>}
+      <ul className="divide-y divide-border/60">
+        {items.map((item, index) => {
+          const kind = itemKind(item);
+          const name = t.catalog.exercise(exerciseById(item.exerciseId)?.name ?? stripNumbering(item.nameRaw)) || t.item.fallbackName;
+          const skipped = !!item.skipped && !item.done;
+          const summary = compactSummary(item, kind, t);
+          return <li key={item.id} data-workout-item={item.id} className="flex min-h-14 items-center gap-2.5 py-2">
+            <span aria-hidden="true" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-chip text-[13px] font-bold text-muted">
+              {kind === 'cardio' ? <HeartPulseIcon size={13} /> : index + 1}
             </span>
-            <span className="text-[15px] font-semibold text-muted">{t.train.warmup}</span>
-            <span className="ml-auto shrink-0 text-xs font-semibold tabular-nums text-muted">
-              {warmupCount}
-            </span>
-          </div>
-        )}
-        {mains.length === 0 && cardio.length === 0 && (
-          <p className="text-muted">{t.train.noItems}</p>
-        )}
-        <ul className="divide-y divide-border/60">
-          {mains.map((it, i) => {
-            const ex = it.exerciseId ? exerciseById(it.exerciseId) : undefined;
-            const name =
-              t.catalog.exercise(ex?.name ?? stripNumbering(it.nameRaw ?? '')) ||
-              t.item.fallbackName;
-            const skipped = !!it.skipped && !it.done;
-            const summary = compactSummary(it, itemKind(it), t);
-            return (
-              <li key={it.id} className="flex items-center gap-2.5 py-2 last:pb-0">
-                <span
-                  aria-hidden="true"
-                  className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-lg bg-chip px-1 text-[13px] font-bold tabular-nums text-muted"
-                >
-                  {i + 1}
-                </span>
-                {skipped && <span className="sr-only">{t.train.skippedLabel}: </span>}
-                <span
-                  className={
-                    'min-w-0 flex-1 truncate text-[15px] ' +
-                    (skipped ? 'font-medium text-muted line-through opacity-60' : 'font-bold')
-                  }
-                >
-                  <span className="sr-only">{i + 1}. </span>
-                  {name}
-                </span>
-                {summary && (
-                  <span
-                    className={
-                      // длинные пояснения веса («36 кг (тренажёр 1)…») обрезаются,
-                      // не выталкивая название упражнения
-                      'ml-auto max-w-[45%] shrink-0 truncate text-xs font-semibold tabular-nums text-muted' +
-                      (skipped ? ' line-through opacity-60' : '')
-                    }
-                  >
-                    {summary}
-                  </span>
-                )}
-              </li>
-            );
-          })}
-          {/* Кардио — с сердечком вместо номера, упражнением не считается */}
-          {cardio.map((it) => {
-            const ex = it.exerciseId ? exerciseById(it.exerciseId) : undefined;
-            const name =
-              t.catalog.exercise(ex?.name ?? stripNumbering(it.nameRaw ?? '')) ||
-              t.item.fallbackName;
-            const skipped = !!it.skipped && !it.done;
-            const summary = compactSummary(it, 'cardio', t);
-            return (
-              <li key={it.id} className="flex items-center gap-2.5 py-2 last:pb-0">
-                <span
-                  aria-hidden="true"
-                  className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-lg bg-chip px-1 text-muted"
-                >
-                  <HeartPulseIcon size={13} />
-                </span>
-                {skipped && <span className="sr-only">{t.train.skippedLabel}: </span>}
-                <span
-                  className={
-                    'min-w-0 flex-1 truncate text-[15px] ' +
-                    (skipped ? 'font-medium text-muted line-through opacity-60' : 'font-bold')
-                  }
-                >
-                  {name}
-                </span>
-                {summary && (
-                  <span
-                    className={
-                      'ml-auto max-w-[45%] shrink-0 truncate text-xs font-semibold tabular-nums text-muted' +
-                      (skipped ? ' line-through opacity-60' : '')
-                    }
-                  >
-                    {summary}
-                  </span>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-        {w.fatigue != null && (
-          <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-border/60 pt-2.5">
-            <span className="rounded-lg bg-chip px-2 py-1 text-xs font-semibold text-muted">
-              {t.fatigueN10(w.fatigue)}
-            </span>
-          </div>
-        )}
-      </section>
-
-      {w.status === 'planned' && (
-        <button
-          onClick={onStart}
-          className="w-full rounded-xl bg-accent px-4 py-2.5 text-lg font-bold text-accent-fg"
-        >
-          {t.train.start}
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={onExpand}
-        className="w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted"
-      >
-        {t.train.expandView}
-      </button>
-    </>
-  );
+            <div className={'min-w-0 flex-1 ' + (skipped ? 'text-muted line-through opacity-60' : '')}>
+              {skipped && <span className="sr-only">{t.train.skippedLabel}: </span>}
+              <span title={name} className="block truncate text-[15px] font-semibold">{name}</span>
+              {summary && <span className="mt-0.5 block truncate text-xs font-medium tabular-nums text-muted">{summary}</span>}
+            </div>
+            <ActionMenu label={`${t.actions.exerciseActions}: ${name}`} actions={[
+              { label: t.actions.editWorkout, run: () => onEdit(item) },
+              { label: t.actions.moveExercise, run: () => onMove(item) },
+              { label: t.actions.removeFromWorkout, run: () => onRemove(item), danger: true },
+            ]} />
+          </li>;
+        })}
+      </ul>
+      {w.fatigue != null && <p className="mt-3 border-t border-border/60 pt-3 text-sm text-muted">{t.fatigueN10(w.fatigue)}</p>}
+    </section>
+    {w.status === 'planned' && <button type="button" onClick={onStart}
+      className="min-h-11 w-full rounded-xl bg-accent px-4 py-2.5 text-lg font-bold text-accent-fg">{t.train.start}</button>}
+    <button type="button" onClick={onExpand}
+      className="min-h-11 w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted">{t.train.expandView}</button>
+  </>;
 }
-
-/* --- Строка сделанного/пропущенного в блоке «Выполнено» -------------------- */
 
 function DoneRow({
   name,
@@ -1199,7 +897,7 @@ function DoneRow({
       onClick={onRestore}
       title={t.train.returnToList}
       aria-label={`${name} — ${t.train.returnToList}`}
-      className="anim-rise flex w-full items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-2.5 text-left"
+      className="anim-rise flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left"
     >
       <span
         aria-hidden="true"

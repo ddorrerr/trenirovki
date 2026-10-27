@@ -61,11 +61,12 @@ export const en: typeof ru = {
   nav: {
     home: 'Home',
     train: 'Workout',
-    history: 'History',
+    history: 'Workouts',
     library: 'Library',
     progress: 'Progress',
     menu: 'Settings',
     comments: 'Comments',
+    create: 'New workout',
   },
 
   status: { done: 'done', planned: 'planned', active: 'in progress' },
@@ -101,11 +102,43 @@ export const en: typeof ru = {
     tapRetry: (s) => `${s} — tap to retry saving`,
   },
 
-  editMode: {
-    turnOn: 'Turn on editing mode',
-    turnOff: 'Turn off editing mode',
-    titleOn: 'Edit',
-    titleOff: 'Turn off editing',
+  actions: {
+    skipExercise: 'Skip today',
+    exerciseActions: 'Exercise actions',
+    moveExercise: 'Move',
+    removeFromWorkout: 'Remove from workout',
+    reorder: 'Exercise order',
+    reorderHint: 'Drag a handle or use the arrows. Results and completion marks stay attached.',
+    planSection: 'Plan',
+    resultSection: 'Result',
+    resultHint: 'Record what you performed. The plan stays unchanged.',
+    resultAsPlanned: 'As planned',
+    clearResult: 'Clear result',
+    unfinished: 'unfinished',
+    currentWorkout: 'In progress',
+    plannedWorkouts: 'Planned',
+    pastWorkouts: 'Completed',
+    workoutView: 'Workout collection view',
+    listView: 'List',
+    calendarView: 'Calendar',
+    allWorkouts: 'All workouts',
+    dragExercise: (name) => `Drag: ${name}`,
+    moveUp: (name) => `Move up: ${name}`,
+    moveDown: (name) => `Move down: ${name}`,
+
+    addWorkout: 'Workout',
+    fromScratch: 'From scratch',
+    repeatWorkout: 'Repeat a workout',
+    usePlan: 'Use this plan',
+    createWorkout: 'Create workout',
+    newWorkoutHint: 'Start from scratch or reuse a previous workout plan.',
+    repeatHint: 'Choose a workout. Only the plan is copied, without results or completion marks.',
+    editWorkout: 'Edit',
+    editRecord: 'Edit record',
+    editPlan: 'Edit plan',
+    editExercise: 'Edit exercise',
+    doneEditing: 'Done',
+    moreDetails: 'More details',
   },
 
   key: {
@@ -124,13 +157,10 @@ export const en: typeof ru = {
   },
 
   menu: {
-    sectionMode: 'Mode',
     sectionSettings: 'Settings',
     sectionData: 'Data',
     sectionSync: 'Sync',
     sectionAbout: 'About',
-    editing: 'Editing',
-    editingSub: 'Add and edit workouts — for you and your trainer',
     keepAwake: 'Keep screen awake',
     keepAwakeSub: "The screen won't sleep while the app is open",
     unsupported: 'Not supported in this browser',
@@ -164,7 +194,6 @@ export const en: typeof ru = {
 
   home: {
     greetUser: 'Hi, Liza!',
-    greetTrainer: 'Hi, Tanya!',
     heroStart: 'Shall we start?',
     heroToday: 'Today',
     heroTodaySub: 'you trained',
@@ -190,7 +219,7 @@ export const en: typeof ru = {
     feedback: (date) => `Liza's feedback · ${date}`,
     allComments: 'All comments →',
     oftenMonth: 'Often in comments · month',
-    empty: 'No workouts yet — turn on editing mode (the pencil up top) and add your first one.',
+    empty: 'No workouts yet. Add your first one.',
   },
 
   train: {
@@ -217,9 +246,8 @@ export const en: typeof ru = {
     fatigueClear: 'remove mark',
     emptyTitle: 'No workouts yet',
     emptyBody:
-      'Turn on editing mode — the pencil button up top — and add your first workout. ' +
-      'Settings live behind the gear.',
-    emptyEnable: 'Turn on editing',
+      'Add a workout from scratch or repeat a previous plan.',
+    emptyEnable: 'Add workout',
     emptyMenu: 'Open menu',
     cardio: 'Cardio',
     start: 'Start workout',
@@ -269,6 +297,7 @@ export const en: typeof ru = {
     logFact: 'log the actual',
     quickFactAria: 'Log the actual: weight, sets, reps',
     doneEditing: 'Done',
+    moreDetails: 'More details',
     perSetOn: 'vary per set',
     perSetOff: 'same for all sets',
     addSet: 'set',
@@ -282,6 +311,12 @@ export const en: typeof ru = {
   },
 
   timer: {
+    finished: 'Rest finished',
+    dismiss: 'Done',
+    testSound: 'Test sound',
+    foregroundHint: 'Keep the app open for a reliable alert.',
+    soundUnavailable: 'Could not enable sound. Check the volume and try again.',
+
     title: 'Rest',
     openAria: 'Open rest timer',
     closeAria: 'Close timer',
@@ -294,7 +329,7 @@ export const en: typeof ru = {
   hist: {
     emptyTitle: 'No workouts yet.',
     emptyEdit: 'Create the first one with the button above.',
-    emptyNoEdit: 'Turn on editing mode (the pencil up top) to add the first one.',
+    emptyNoEdit: 'Tap + Workout to add your first one.',
     doneTitle: 'Done',
     hasComments: 'Has your comments',
     deleteWorkout: 'Delete workout',

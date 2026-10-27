@@ -3,6 +3,20 @@
 
 import type { Actual } from '../types';
 
+export function actualFromSets(sets: NonNullable<Actual['perSet']>, text = ''): Actual | null {
+  const clean = sets.filter((set) => set.weight != null || set.reps != null);
+  if (!clean.length) return text ? { weight: null, sets: null, reps: null, text } : null;
+  const weights = clean.flatMap((set) => set.weight == null ? [] : [set.weight]);
+  const reps = clean.map((set) => set.reps);
+  return {
+    weight: weights.length ? Math.max(...weights) : null,
+    sets: clean.length,
+    reps: reps.every((count) => count != null && count === reps[0]) ? reps[0] : null,
+    text,
+    perSet: clean,
+  };
+}
+
 /** «12-10-8» из чисел; одинаковые схлопываются в одно; null при пропусках */
 function joinNums(xs: (number | null)[]): string | null {
   if (xs.some((x) => x == null)) return null;

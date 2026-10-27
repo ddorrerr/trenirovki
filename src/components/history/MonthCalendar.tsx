@@ -2,7 +2,7 @@
 // (вольт — выполнена, петроль — запланирована), тап по дню открывает её.
 // Листается стрелками по месяцам; сегодняшний день обведён.
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useApp } from '../../store';
 import type { Workout } from '../../types';
 import { locale, useT } from '../../i18n';
@@ -38,11 +38,15 @@ function daysInMonth(ym: string): number {
   return new Date(Date.UTC(y, m, 0)).getUTCDate();
 }
 
-export default function MonthCalendar() {
-  const { workouts, navigate } = useApp();
+export default function MonthCalendar({ month: ym, onMonthChange, selectedDate, onSelectDate }: {
+  month: string;
+  onMonthChange: (month: string) => void;
+  selectedDate: string | null;
+  onSelectDate: (date: string) => void;
+}) {
+  const { workouts } = useApp();
   const { t } = useT();
   const today = todayISO();
-  const [ym, setYm] = useState(() => ymOf(today));
 
   const byDate = useMemo(() => {
     const map = new Map<string, Workout>();
@@ -71,7 +75,7 @@ export default function MonthCalendar() {
         <div className="-my-1 flex gap-1">
           <button
             type="button"
-            onClick={() => setYm((v) => ymAdd(v, -1))}
+            onClick={() => onMonthChange(ymAdd(ym, -1))}
             aria-label={t.cal.prevMonth}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-bg text-muted"
           >
@@ -81,7 +85,7 @@ export default function MonthCalendar() {
           </button>
           <button
             type="button"
-            onClick={() => setYm((v) => ymAdd(v, 1))}
+            onClick={() => onMonthChange(ymAdd(ym, 1))}
             aria-label={t.cal.nextMonth}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-bg text-muted"
           >
@@ -122,8 +126,9 @@ export default function MonthCalendar() {
             <button
               key={i}
               type="button"
-              onClick={() => navigate('train', w.id)}
+              onClick={() => onSelectDate(iso)}
               aria-label={t.cal.openWorkout(iso)}
+              aria-pressed={selectedDate === iso}
               className="flex h-10 items-center justify-center"
             >
               <span
@@ -132,7 +137,7 @@ export default function MonthCalendar() {
                   (w.status === 'done'
                     ? 'bg-ok text-ok-fg'
                     : 'border-2 border-accent text-accent') +
-                  (isToday ? ' ring-2 ring-fg/25 ring-offset-1 ring-offset-card' : '')
+                  (selectedDate === iso ? ' ring-2 ring-accent ring-offset-2 ring-offset-card' : isToday ? ' ring-2 ring-fg/25 ring-offset-1 ring-offset-card' : '')
                 }
               >
                 {day}
