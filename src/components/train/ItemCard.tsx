@@ -7,6 +7,9 @@ import type { Occurrence } from '../../store';
 import { useT, type Dict } from '../../i18n';
 import { fmtDateShort } from '../../lib/dates';
 import { perSetSummary } from '../../lib/actual';
+import { timedSetPlan } from '../../lib/timed-sets';
+import { parseRestSeconds } from '../../lib/rest-timer';
+import { TimerIcon, fmtClock } from './RestTimer';
 import ActionMenu from '../edit/ActionMenu';
 import VideoLink from './VideoLink';
 import {
@@ -45,6 +48,7 @@ interface ItemCardProps {
   onChange: (patch: Partial<WorkoutItem>) => void;
   /** autostart — тихий запуск отсчёта после отмеченного подхода */
   onRest: (item: WorkoutItem, autostart?: boolean) => void;
+  onTime?: (item: WorkoutItem) => void;
 }
 
 /** «1. Румынская» / «1.Румынская» / «2) Присед» → без нумерации */
@@ -67,7 +71,7 @@ export function weightLabel(weight: string, dict: Dict): string {
 
 /** Сколько кружков подходов рисовать: план «разными подходами» или «3х…» */
 export function plannedSetsCount(item: WorkoutItem): number {
-  const n = item.perSetPlan?.length ?? item.setsReps?.sets ?? 0;
+  const n = timedSetPlan(item)?.length ?? item.perSetPlan?.length ?? item.setsReps?.sets ?? 0;
   return Math.max(0, Math.min(8, n));
 }
 
@@ -117,6 +121,7 @@ export default function ItemCard({
   onRemove,
   onChange,
   onRest,
+  onTime,
 }: ItemCardProps) {
   const { t } = useT();
   const [open, setOpen] = useState(initialOpen);
@@ -141,6 +146,8 @@ export default function ItemCard({
 
   const plannedSets = active && exerciseKind(exercise) !== 'cardio' ? plannedSetsCount(item) : 0;
   const setsDone = Math.min(item.setsDone ?? 0, plannedSets);
+  const timedPlan = timedSetPlan(item);
+  const nextSeconds = timedPlan?.[item.setsDone ?? 0];
 
   const tapBubble = (idx: number) => {
     if (idx < setsDone) {
@@ -150,7 +157,7 @@ export default function ItemCard({
     }
     const next = idx + 1;
     setPopIdx(idx);
-    if (item.rest) onRest(item, true); // отдых стартует сам после отмеченного подхода
+    if (item.rest || timedPlan) onRest(item, true);
     if (next >= plannedSets) {
       setPendingFill(next);
       completeTimerRef.current = window.setTimeout(() => {
@@ -349,15 +356,22 @@ export default function ItemCard({
                 <span className="min-w-0 break-words">{c.text}</span>
               </span>
             ))}
-            {item.rest && (
+            {active && !locked && !item.done && nextSeconds != null && onTime && (
+              <button type="button" onClick={() => onTime(item)} aria-label={t.timer.startSet}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-sm font-bold text-accent-fg">
+                <TimerIcon name="play" /><span>{fmtClock(nextSeconds)}</span>
+              </button>
+            )}
+            {(item.rest || timedPlan) && (
               <button
                 onClick={() => onRest(item)}
                 aria-label={t.item.startRest}
                 title={t.item.rest}
-                className="relative inline-flex max-w-full items-center gap-1 rounded-lg bg-accent-soft px-2 py-1 text-left text-sm font-bold text-accent underline decoration-dotted underline-offset-2 after:absolute after:-inset-1.5 after:content-['']"
+                className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-xl bg-accent-soft px-3 py-2 text-left text-sm font-bold text-accent"
               >
-                <span className="sr-only">{t.item.rest}: </span>
-                <span className="min-w-0 break-words">{restLabel(item.rest, t)}</span>
+                <ClockIcon size={16} />
+                <span className={timedPlan ? '' : 'sr-only'}>{t.timer.title}{timedPlan ? '' : ':'}</span>
+                <span className="min-w-0 break-words">{timedPlan ? fmtClock(parseRestSeconds(item.rest)) : restLabel(item.rest!, t)}</span>
               </button>
             )}
             <span className="ml-auto flex items-center gap-1 text-muted">

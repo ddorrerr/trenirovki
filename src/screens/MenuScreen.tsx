@@ -10,6 +10,7 @@ import { version } from '../../package.json';
 
 export default function MenuScreen() {
   const {
+    cycle,
     exercises,
     workouts,
     navigate,
@@ -43,6 +44,9 @@ export default function MenuScreen() {
       </button>
 
       <Section title={t.menu.sectionSettings}>
+        <button type="button" onClick={() => navigate('cycle')} className="flex min-h-14 w-full items-center justify-between px-4 py-3.5 text-left font-medium">
+          {t.cycle.title}<span aria-hidden="true">›</span>
+        </button>
         <ToggleRow
           title={t.menu.keepAwake}
           subtitle={t.menu.keepAwakeSub}
@@ -58,7 +62,7 @@ export default function MenuScreen() {
       <Section title={t.menu.sectionData}>
         <button
           type="button"
-          onClick={() => downloadBackup({ exercises, workouts })}
+          onClick={() => downloadBackup({ exercises, workouts, ...(cycle ? { cycle } : {}) })}
           className="flex min-h-14 w-full items-center gap-4 px-4 py-3.5 text-left transition-colors active:bg-bg"
         >
           <span className="min-w-0 flex-1">

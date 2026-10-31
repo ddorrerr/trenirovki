@@ -138,9 +138,23 @@ export interface Workout {
   items: WorkoutItem[];
 }
 
+export interface PeriodRecord {
+  start: string;
+  /** null means only the start is logged; never present estimated days as recorded. */
+  end: string | null;
+}
+
+export interface CycleData {
+  periods: PeriodRecord[];
+  cycleLength: number;
+  periodLength: number;
+  showOvulation: boolean;
+}
+
 export interface AppData {
   exercises: Exercise[];
   workouts: Workout[];
+  cycle?: CycleData | null;
 }
 
 // --- Хранилище ---------------------------------------------------------
@@ -153,4 +167,5 @@ export interface StorageAdapter {
   deleteWorkout(id: string): Promise<void>;
   saveExercise(e: Exercise): Promise<void>;
   deleteExercise(id: string): Promise<void>;
+  saveCycle(cycle: CycleData | null): Promise<void>;
 }

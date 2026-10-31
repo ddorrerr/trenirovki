@@ -2,11 +2,12 @@
 // Общая механика для локального адаптера (правки поверх seed) и GitHub-адаптера
 // (несинхронизированные правки поверх данных из репозитория).
 
-import type { AppData, Exercise, Workout } from '../types';
+import type { AppData, CycleData, Exercise, Workout } from '../types';
 
 export interface Overlay {
   workouts: Record<string, Workout | null>;
   exercises: Record<string, Exercise | null>;
+  cycle?: CycleData | null;
 }
 
 export function emptyOverlay(): Overlay {
@@ -14,7 +15,7 @@ export function emptyOverlay(): Overlay {
 }
 
 export function overlaySize(o: Overlay): number {
-  return Object.keys(o.workouts).length + Object.keys(o.exercises).length;
+  return Object.keys(o.workouts).length + Object.keys(o.exercises).length + (o.cycle !== undefined ? 1 : 0);
 }
 
 export function readOverlay(storageKey: string): Overlay {
@@ -22,7 +23,8 @@ export function readOverlay(storageKey: string): Overlay {
     const raw = localStorage.getItem(storageKey);
     if (!raw) return emptyOverlay();
     const parsed = JSON.parse(raw) as Partial<Overlay>;
-    return { workouts: parsed.workouts ?? {}, exercises: parsed.exercises ?? {} };
+    return { workouts: parsed.workouts ?? {}, exercises: parsed.exercises ?? {},
+      ...(parsed.cycle !== undefined ? { cycle: parsed.cycle } : {}) };
   } catch {
     return emptyOverlay();
   }
@@ -64,7 +66,9 @@ export function normalizeItems(w: Workout): Workout {
 /** База + оверлей -> итоговые данные (с нормализацией позиций) */
 export function applyOverlay(base: AppData, overlay: Overlay): AppData {
   return {
+    ...base,
     exercises: mergeCollection(base.exercises, overlay.exercises),
     workouts: mergeCollection(base.workouts, overlay.workouts).map(normalizeItems),
+    ...(overlay.cycle !== undefined ? { cycle: overlay.cycle } : {}),
   };
 }

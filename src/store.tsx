@@ -17,10 +17,10 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { exerciseKind, type AppData, type Exercise, type ExerciseKind, type StorageAdapter, type Workout, type WorkoutItem } from './types';
+import { exerciseKind, type AppData, type CycleData, type Exercise, type ExerciseKind, type StorageAdapter, type Workout, type WorkoutItem } from './types';
 import { setLang, tr, type Lang } from './i18n';
 import { DATA_REPO } from './config';
-import type { RestRequest } from './lib/rest-timer';
+import type { RestRequest, TimerContext } from './lib/rest-timer';
 import { timerAudio } from './lib/timer-audio';
 import { LocalAdapter } from './storage/local';
 import {
@@ -32,7 +32,7 @@ import {
   type SyncState,
 } from './storage/github';
 
-export type Tab = 'home' | 'train' | 'history' | 'library' | 'progress' | 'menu' | 'comments' | 'create';
+export type Tab = 'home' | 'train' | 'history' | 'library' | 'progress' | 'menu' | 'comments' | 'create' | 'cycle';
 
 /** Тема оформления: как в системе / всегда светлая / всегда тёмная */
 export type Theme = 'system' | 'light' | 'dark';
@@ -42,6 +42,7 @@ export interface Settings {
   theme: Theme;
   /** Язык интерфейса; хранится на устройстве, как и тема */
   lang: Lang;
+  equivalentOffset: number;
 }
 
 export interface Occurrence {
@@ -64,15 +65,16 @@ interface UiPersist {
   keepAwake: boolean;
   theme: Theme;
   lang: Lang;
+  equivalentOffset: number;
 }
 
 function readUi(): UiPersist {
-  const fallback: UiPersist = { keepAwake: false, theme: 'system', lang: 'ru' };
+  const fallback: UiPersist = { keepAwake: false, theme: 'system', lang: 'ru', equivalentOffset: 0 };
   try {
     const raw = localStorage.getItem(UI_KEY);
     const ui = raw ? { ...fallback, ...(JSON.parse(raw) as Partial<UiPersist>) } : fallback;
     if (ui.lang !== 'ru' && ui.lang !== 'en') ui.lang = 'ru';
-    return { keepAwake: ui.keepAwake, theme: ui.theme, lang: ui.lang };
+    return { keepAwake: ui.keepAwake, theme: ui.theme, lang: ui.lang, equivalentOffset: Number.isSafeInteger(ui.equivalentOffset) && ui.equivalentOffset >= 0 ? ui.equivalentOffset : 0 };
   } catch {
     return fallback;
   }
@@ -109,12 +111,14 @@ export interface AppContextValue {
   syncNow: () => Promise<void>;
 
   restRequest: RestRequest | null;
-  requestRestTimer: (itemId: string, seconds: number, autostart?: boolean) => void;
+  requestRestTimer: (itemId: string, seconds: number, autostart?: boolean, context?: TimerContext) => void;
 
   /** Все упражнения (библиотека), включая archived */
   exercises: Exercise[];
   /** Все тренировки, отсортированы по дате по возрастанию */
   workouts: Workout[];
+  cycle: CycleData | null;
+  saveCycle: (cycle: CycleData | null) => void;
 
   /** Навигация */
   tab: Tab;
@@ -179,9 +183,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
   const [data, setData] = useState<AppData>({ exercises: [], workouts: [] });
   const [restRequest, setRestRequest] = useState<RestRequest | null>(null);
-  const requestRestTimer = useCallback((itemId: string, seconds: number, autostart = false) => {
+  const requestRestTimer = useCallback((itemId: string, seconds: number, autostart = false, context?: TimerContext) => {
     void timerAudio.prepare();
-    setRestRequest((previous) => ({ itemId, seconds, autostart, nonce: (previous?.nonce ?? 0) + 1 }));
+    setRestRequest((previous) => ({ itemId, seconds, autostart, context, nonce: (previous?.nonce ?? 0) + 1 }));
   }, []);
   const [tab, setTab] = useState<Tab>('home');
   const [openWorkoutId, setOpenWorkoutId] = useState<string | null>(null);
@@ -204,7 +208,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const lastLoadAtRef = useRef(0);
 
   const adoptData = useCallback((d: AppData) => {
-    setData({ exercises: d.exercises, workouts: sortWorkouts(d.workouts) });
+    setData({ ...d, workouts: sortWorkouts(d.workouts) });
     lastLoadAtRef.current = Date.now();
   }, []);
 
@@ -434,6 +438,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (patch.lang) setLang(patch.lang);
   }, []);
 
+  const saveCycle = useCallback((cycle: CycleData | null) => {
+    setData((prev) => ({ ...prev, cycle }));
+    void adapterRef.current?.saveCycle(cycle).catch(() => console.error("Cycle save failed"));
+  }, []);
+
   const saveWorkout = useCallback((w: Workout) => {
     setData((prev) => {
       const rest = prev.workouts.filter((x) => x.id !== w.id);
@@ -535,6 +544,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     requestRestTimer,
     exercises: data.exercises,
     workouts: data.workouts,
+    cycle: data.cycle ?? null,
+    saveCycle,
     tab,
     openWorkoutId,
     navigate,
@@ -543,7 +554,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDirtyGuard,
     openExerciseId,
     showExerciseProgress,
-    settings: { keepAwake: ui.keepAwake, theme: ui.theme, lang: ui.lang },
+    settings: { keepAwake: ui.keepAwake, theme: ui.theme, lang: ui.lang, equivalentOffset: ui.equivalentOffset },
     setSettings,
     exerciseById,
     itemKind,

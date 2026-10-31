@@ -3,18 +3,21 @@
 // когда строка однозначна. Ошибиться в null безопаснее, чем в число.
 
 import type { PlanSet, SetsReps, SubNote, Weight } from '../../types';
+import { parseSetSeconds } from '../../lib/timed-sets';
 
 /**
  * «3х12» / «3 x 8» / «3х12. См примечания» -> sets/reps.
  * Берём префикс до первого разделителя (точка, запятая, «;», перенос)
  * и требуем полного совпадения с «N х M» (латинская или кириллическая х).
- * «3х12-10», «3х35 сек» и прочее неоднозначное -> нули.
+ * Для времени сохраняем число подходов, но не записываем секунды в повторы.
  */
 export function parseSetsReps(raw: string): SetsReps | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
   const prefix = trimmed.split(/[.,;\n]/, 1)[0].trim();
-  const m = /^(\d+)\s*[xхXХ]\s*(\d+)$/.exec(prefix);
+  const timed = /^(\d+)\s*[xх×]\s*(.+)$/i.exec(trimmed);
+  if (timed && parseSetSeconds(timed[2]) != null) return { raw, sets: Number(timed[1]), reps: null };
+  const m = /^(\d+)\s*[xхXХ×]\s*(\d+)$/.exec(prefix);
   return { raw, sets: m ? Number(m[1]) : null, reps: m ? Number(m[2]) : null };
 }
 

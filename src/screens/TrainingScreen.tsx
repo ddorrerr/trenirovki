@@ -1,3 +1,4 @@
+import CycleSummary from '../components/CycleSummary';
 // Экран «Тренировка»: текущая (или выбранная) тренировка целиком —
 // разминка, упражнения с чипами и быстрым логом, усталость, заметки тренера.
 
@@ -20,6 +21,7 @@ import ItemCard, {
   weightLabel,
 } from '../components/train/ItemCard';
 import { parseRestSeconds } from '../lib/rest-timer';
+import { timedSetPlan } from '../lib/timed-sets';
 import VideoLink from '../components/train/VideoLink';
 import {
   CheckIcon,
@@ -226,7 +228,17 @@ export default function TrainingScreen() {
   };
 
   const requestRest = (item: WorkoutItem, autostart = false) =>
-    requestRestTimer(item.id, parseRestSeconds(item.rest), autostart);
+    requestRestTimer(item.id, parseRestSeconds(item.rest), autostart, { kind: 'rest', itemId: item.id, workoutId: w.id });
+  const requestSet = (item: WorkoutItem) => {
+    const plan = timedSetPlan(item);
+    const setIndex = item.setsDone ?? 0;
+    if (!plan || plan[setIndex] == null) return;
+    requestRestTimer(item.id, plan[setIndex], false, {
+      kind: 'set', itemId: item.id, workoutId: w.id, setIndex, totalSets: plan.length,
+      exerciseName: exerciseById(item.exerciseId)?.name ?? item.nameRaw,
+      restSeconds: parseRestSeconds(item.rest),
+    });
+  };
 
   /* Разминка: шапка как у карточки упражнения — видео и «выполнено».
      Секция общая для режима «идёт» и подробного вида */
@@ -390,7 +402,7 @@ export default function TrainingScreen() {
         initialOpen={openedItemsRef.current[item.id] ?? false}
         exercise={item.exerciseId ? exerciseById(item.exerciseId) : undefined}
         last={item.exerciseId ? lastResultBefore(item.exerciseId, w.date, w.id) : null}
-        onChange={(patch) => saveItem(item.id, patch)} onRest={requestRest}
+        onChange={(patch) => saveItem(item.id, patch)} onRest={requestRest} onTime={requestSet}
         onEdit={editing ? undefined : () => beginEdit(item.id)}
         onMove={editing ? undefined : () => beginOrder(item.id)}
         onRemove={editing ? undefined : () => removeItem(item)} />
@@ -478,6 +490,7 @@ export default function TrainingScreen() {
         next={editing ? null : next}
         onOpen={(id) => navigate('train', id)}
       />
+      {!editing && <CycleSummary date={w.date} />}
       <div key={w.id} className="space-y-4">
 
       {!editing && (

@@ -10,6 +10,7 @@ export function downloadBackup(data: AppData): void {
     version: 1,
     exercises: data.exercises,
     workouts: data.workouts,
+    ...(data.cycle ? { cycle: data.cycle } : {}),
   };
   const blob = new Blob([JSON.stringify(payload, null, 1)], {
     type: 'application/json',

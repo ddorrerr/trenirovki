@@ -2,7 +2,7 @@
 // + оверлей правок в localStorage. Используется в разработке и до деплоя;
 // в продакшене его место занимает GitHub-адаптер с тем же интерфейсом.
 
-import type { AppData, Exercise, StorageAdapter, Workout } from '../types';
+import type { AppData, CycleData, Exercise, StorageAdapter, Workout } from '../types';
 import { applyOverlay, readOverlay, writeOverlay, type Overlay } from './overlay';
 
 const OVERLAY_KEY = 'trenirovki:overlay:v1';
@@ -29,6 +29,10 @@ export class LocalAdapter implements StorageAdapter {
     this.mutate((o) => {
       o.workouts[w.id] = w;
     });
+  }
+
+  async saveCycle(cycle: CycleData | null): Promise<void> {
+    this.mutate((o) => { o.cycle = cycle; });
   }
 
   async deleteWorkout(id: string): Promise<void> {

@@ -1,5 +1,76 @@
 @import "tailwindcss";
 
+@layer components {
+  .timer-dock-position { position: fixed; bottom: calc(5.5rem + env(safe-area-inset-bottom)); inset-inline: 0; z-index: 30; display: flex; justify-content: center; pointer-events: none; }
+  .timer-dock { position: relative; width: 108px; height: 108px; padding: 4px; border: 1px solid var(--border); border-radius: 50%; background: var(--card); box-shadow: 0 5px 18px rgb(8 38 31 / .14); pointer-events: auto; }
+  .timer-dial { position: relative; display: block; width: min(248px, 64vw, 37dvh); aspect-ratio: 1; flex-shrink: 0; color: var(--accent); }
+  .timer-dial__ring { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .timer-dial__track, .timer-dial__progress { fill: none; stroke-width: 7; }
+  .timer-dial__track { stroke: var(--accent-soft); }
+  .timer-dial__progress { stroke: currentColor; stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; }
+  .timer-dial__time { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--fg); font-size: 64px; font-weight: 800; letter-spacing: -.035em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .timer-dial--small { width: 98px; }
+  .timer-dial--small .timer-dial__time { font-size: 27px; }
+  .timer-dial--small .timer-dial__track, .timer-dial--small .timer-dial__progress { stroke-width: 10; }
+  .timer-dial--finished, .timer-dial--finished .timer-dial__time { color: var(--ok-text); }
+  .timer-dial--finished .timer-dial__track { stroke: var(--ok-soft); }
+  .timer-dial--preparing { color: var(--warn-text); }
+  .timer-dock__label { position: absolute; top: 23px; inset-inline: 0; font-size: 10px; line-height: 1; color: var(--muted); }
+  .timer-dock__expand { position: absolute; bottom: 18px; inset-inline: 0; display: flex; justify-content: center; color: var(--muted); }
+  .timer-dock__expand svg { width: 12px; height: 12px; }
+  .workout-timer-dialog { position: fixed; inset: 0; width: 100%; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: 0; border: 0; overflow-y: auto; background: var(--card); color: var(--fg); }
+  .workout-timer-dialog::backdrop { background: var(--card); }
+  .workout-timer-panel { display: flex; min-height: 100%; max-width: 480px; margin-inline: auto; flex-direction: column; }
+  .workout-timer-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 72px; padding: calc(12px + env(safe-area-inset-top)) 20px 12px; }
+  .workout-timer-body { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; padding: 20px 16px 0; }
+  .timer-phase { margin: 16px 0 24px; min-height: 24px; font-size: 16px; font-weight: 650; }
+  .timer-controls { display: flex; align-items: center; justify-content: center; gap: 22px; }
+  .timer-control { display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 14px; font-weight: 650; }
+  .timer-control--secondary { width: 48px; height: 48px; background: var(--chip); color: var(--muted); }
+  .timer-control--primary { width: 68px; height: 68px; background: var(--accent); color: var(--accent-fg); }
+  .timer-control--primary svg { width: 28px; height: 28px; }
+  .timer-control:disabled { opacity: .4; }
+  .timer-feedback { height: 80px; display: flex; align-items: center; justify-content: center; }
+  .workout-timer-footer { padding: 0 20px calc(8px + env(safe-area-inset-bottom)); }
+  .timer-dock:focus-visible, .workout-timer-dialog button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  body:has(.timer-dock-position) main { padding-bottom: calc(15rem + env(safe-area-inset-bottom)); }
+  @media (min-width: 768px) { .timer-dock-position { bottom: 24px; } }
+  @media (prefers-reduced-motion: no-preference) {
+    .timer-dial__progress { transition: stroke-dashoffset 100ms linear; }
+    .workout-timer-dialog[open] .workout-timer-panel { animation: timer-focus-in 180ms ease-out; }
+  }
+  @keyframes timer-focus-in { from { opacity: .5; transform: scale(.98); } to { opacity: 1; transform: scale(1); } }
+  /* 34px disc + 4px clear gap + 4px workout dot fit inside a 44px day cell.
+     Rings are inset, so focus/selection never pushes into the dot's space. */
+  .calendar-day { display: flex; height: 44px; width: 100%; flex-direction: column; align-items: center; gap: 4px; }
+  .calendar-day__disc { position: relative; display: flex; height: 34px; width: 34px; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 50%; }
+  .calendar-day__disc::before { content: ''; position: absolute; inset: 3px; border-radius: 50%; }
+  .calendar-day__disc[data-mark="period"]::before,
+  .calendar-day__disc[data-mark="periodEstimate"]::before,
+  .cycle-swatch[data-mark="period"], .cycle-swatch[data-mark="periodEstimate"] { background: var(--cycle-rose-tint); }
+  .calendar-day__disc[data-mark="ovulation"]::before,
+  .cycle-swatch[data-mark="ovulation"] { background: var(--cycle-lavender-tint); }
+  .calendar-day__disc[data-mark="periodEstimate"]::before,
+  .cycle-swatch[data-mark="periodEstimate"] { border: 1px dashed var(--cycle-rose); }
+  .calendar-day__disc[data-today] { box-shadow: inset 0 0 0 1px var(--muted); font-weight: 700; }
+  .calendar-day__disc[data-selected] { box-shadow: inset 0 0 0 2px var(--accent); font-weight: 800; }
+  .calendar-day__number { position: relative; font-size: 15px; line-height: 20px; font-variant-numeric: tabular-nums; }
+  .calendar-day__workout { display: block; width: 4px; height: 4px; flex-shrink: 0; border-radius: 50%; background: var(--ok); }
+  .calendar-day__workout[data-status="planned"] { border: 1px solid var(--accent); background: var(--card); }
+  .cycle-swatch { display: inline-block; flex-shrink: 0; width: 12px; height: 12px; border-radius: 50%; }
+  @media (hover: hover) { .calendar-date-button:hover .calendar-day__number { color: var(--accent); } }
+  .cycle-symbol--period { color: var(--cycle-rose); }
+  .cycle-symbol--ovulation { color: var(--cycle-lavender); }
+  .cycle-ring { position: relative; display: flex; flex-shrink: 0; width: 52px; height: 52px; align-items: center; justify-content: center; }
+  .cycle-ring__elapsed { stroke: var(--cycle-rose); }
+  .cycle-ring__remaining { stroke: var(--cycle-rose-soft); }
+  .cycle-ring--stale { color: var(--muted); }
+  .cycle-ring--stale .cycle-ring__remaining { stroke: var(--border); }
+  .equivalent-swap { animation: equivalent-change 220ms cubic-bezier(.22,1,.36,1); }
+  @keyframes equivalent-change { from { opacity: .25; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  @media (prefers-reduced-motion: reduce) { .equivalent-swap { animation: none; } }
+}
+
 /* Дизайн-токены. Тема следует за системной (светлая/тёмная).
    Роли: петроль (--accent) — только действия и интерактив;
    вольт-лайм (--ok) — только «сделано» и достижения;
@@ -23,6 +94,11 @@
   --warn: #f59e0b;
   --warn-soft: #fdf0d9;
   --warn-text: #96610b;
+  --cycle-rose: #c34660;
+  --cycle-rose-soft: #f2cbd3;
+  --cycle-lavender: #7154af;
+  --cycle-rose-tint: #fae3e9;
+  --cycle-lavender-tint: #e0def8;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -43,6 +119,11 @@
     --warn: #fbbf24;
     --warn-soft: #3a2f10;
     --warn-text: #fcd34d;
+    --cycle-rose: #f58da2;
+    --cycle-rose-soft: #653442;
+    --cycle-lavender: #bda7f5;
+    --cycle-rose-tint: #4b2c35;
+    --cycle-lavender-tint: #302b4b;
   }
 }
 
@@ -66,6 +147,11 @@
   --warn: #f59e0b;
   --warn-soft: #fdf0d9;
   --warn-text: #96610b;
+  --cycle-rose: #c34660;
+  --cycle-rose-soft: #f2cbd3;
+  --cycle-lavender: #7154af;
+  --cycle-rose-tint: #fae3e9;
+  --cycle-lavender-tint: #e0def8;
 }
 :root[data-theme="dark"] {
   --bg: #0d1110;
@@ -85,6 +171,11 @@
   --warn: #fbbf24;
   --warn-soft: #3a2f10;
   --warn-text: #fcd34d;
+  --cycle-rose: #f58da2;
+  --cycle-rose-soft: #653442;
+  --cycle-lavender: #bda7f5;
+  --cycle-rose-tint: #4b2c35;
+  --cycle-lavender-tint: #302b4b;
 }
 
 @theme inline {

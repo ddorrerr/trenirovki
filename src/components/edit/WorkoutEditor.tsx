@@ -17,6 +17,7 @@ import { tr, useT } from '../../i18n';
 import { fmtDate } from '../../lib/dates';
 import { nextExerciseId, nextItemId } from '../../lib/ids';
 import { mergeWorkoutDraft } from '../../lib/workout-draft';
+import { parseSetSeconds } from '../../lib/timed-sets';
 import ActualEditor from './ActualEditor';
 import { linesToSubNotes, parseSetsReps, parseWeight, serializePerSetPlan } from './parse';
 import ExerciseCombobox from './ExerciseCombobox';
@@ -488,7 +489,7 @@ function InsertSlot({ onClick }: { onClick: () => void }) {
 
 /** «3х12-10» → поля {sets: '3', reps: '12-10'}; свободный текст целиком в reps */
 function splitSetsReps(raw: string): { sets: string; reps: string } {
-  const m = /^\s*(\d+)\s*[xхXХ]\s*([\s\S]*)$/.exec(raw);
+  const m = /^\s*(\d+)\s*[xхXХ×]\s*([\s\S]*)$/.exec(raw);
   return m ? { sets: m[1], reps: m[2].trim() } : { sets: '', reps: raw.trim() };
 }
 
@@ -603,7 +604,7 @@ function ItemEditorCard({
                   }
                 />
                 <TextField
-                  label={t.item.reps}
+                  label={parseSetSeconds(sr.reps) != null ? t.timer.setDuration : t.editor.repsOrTime}
                   value={sr.reps}
                   placeholder={t.editor.repsPlaceholder}
                   onCommit={(v) =>
@@ -733,7 +734,7 @@ function PlanPerSetRows({
       <div className="grid grid-cols-[1.25rem_1fr_1fr_2.75rem] items-end gap-2 text-sm text-muted">
         <span aria-hidden="true" />
         <span>{t.item.weightKg}</span>
-        <span>{t.item.reps}</span>
+        <span>{t.editor.repsOrTime}</span>
         <span aria-hidden="true" />
       </div>
       <div className="mt-1 space-y-2">

@@ -10,6 +10,7 @@ import HistoryScreen from './screens/HistoryScreen';
 import LibraryScreen from './screens/LibraryScreen';
 import ProgressScreen from './screens/ProgressScreen';
 import MenuScreen from './screens/MenuScreen';
+import CycleScreen from './screens/CycleScreen';
 import KeyScreen from './screens/KeyScreen';
 import NewWorkoutForm from './components/edit/NewWorkoutForm';
 import RestTimer from './components/train/RestTimer';
@@ -172,6 +173,7 @@ export default function App() {
           {tab === 'library' && <LibraryScreen />}
           {tab === 'progress' && <ProgressScreen />}
           {tab === 'menu' && <MenuScreen />}
+          {tab === 'cycle' && <CycleScreen />}
           {tab === 'create' && <NewWorkoutForm />}
         </div>
       </main>

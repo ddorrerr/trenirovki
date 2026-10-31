@@ -18,7 +18,9 @@ import unitCablecar from '../assets/units/cablecar.png';
 import unitMinibus from '../assets/units/minibus.png';
 import unitBus from '../assets/units/bus.png';
 import unitTram from '../assets/units/tram.png';
-import { muscleIcon } from '../components/catalogIcons';
+import CycleSummary from '../components/CycleSummary';
+import CalendarDate from '../components/CalendarDate';
+import { cycleMarker } from '../lib/cycle';
 
 /** Понедельник недели данной даты (UTC), ISO-строкой */
 function mondayISO(iso: string): string {
@@ -145,7 +147,7 @@ const UNITS: ({ kg: number; emoji: string; img?: string } & EquivForms)[] = [
 ];
 
 export default function HomeScreen() {
-  const { workouts, navigate, exerciseById, showExerciseProgress } = useApp();
+  const { workouts, cycle, settings, setSettings, navigate, exerciseById, showExerciseProgress } = useApp();
   const { t } = useT();
   const today = todayISO();
 
@@ -282,46 +284,34 @@ export default function HomeScreen() {
   }, [lastDone, exerciseById]);
 
   /* Во что «переводится» поднятый объём — весёлый эквивалент; единица
-     выбирается из подходящих по величине и меняется от тренировки к
+     выбирается из читаемых по величине; нажатие перебирает список. Начальный вариант меняется от тренировки к
      тренировке (детерминированно по id, чтобы не мигало). Здесь только
      числа — текст собирается при рендере на текущем языке. */
   const equivalent = useMemo(() => {
     if (tonnage <= 0 || !lastDone) return null;
-    /* Красиво читается один знак: берём юниты, где выходит от 1 до ~10 штук;
+    /* Один десятичный знак: допускаем дробные эквиваленты и до ~100 штук;
        если вес огромный — самый крупный юнит, если крошечный — панды с дробью */
     const inRange = UNITS.filter((u) => {
       const c = tonnage / u.kg;
-      return c >= 0.95 && c <= 9.95;
+      return c >= 0.05 && c <= 99.95;
     });
     const fitting = inRange.length
       ? inRange
       : UNITS.filter((u) => tonnage / u.kg >= 0.95).slice(-1);
     let seed = 0;
     for (const ch of lastDone.id) seed = (seed + ch.charCodeAt(0)) % 997;
-    const unit = fitting.length ? fitting[seed % fitting.length] : UNITS[0];
+    const unit = fitting.length ? fitting[(seed + settings.equivalentOffset) % fitting.length] : UNITS[0];
     const count = tonnage / unit.kg;
     const rounded = Math.round(count);
     const isInt = Math.abs(count - rounded) < 0.05 && rounded >= 1;
     const iconCount = Math.min(5, Math.max(1, rounded));
     return { unit, count, rounded, isInt, iconCount };
-  }, [tonnage, lastDone]);
+  }, [tonnage, lastDone, settings.equivalentOffset]);
   const equivText = equivalent
     ? equivalent.isInt
       ? t.home.equivInt(equivalent.unit, equivalent.rounded)
       : t.home.equivFrac(equivalent.unit, equivalent.count)
     : null;
-
-  /* Какие группы мышц были в работе за последние 7 дней */
-  const groups7 = useMemo(() => {
-    const set = new Set<string>();
-    for (const w of past) {
-      if (daysBetween(w.date, today) > 6) continue;
-      for (const it of w.items) {
-        for (const m of exerciseById(it.exerciseId)?.muscles ?? []) set.add(m);
-      }
-    }
-    return [...set];
-  }, [past, today, exerciseById]);
 
   const addWorkout = <button type="button" onClick={() => navigate('create')}
     aria-label={t.actions.createWorkout}
@@ -331,7 +321,7 @@ export default function HomeScreen() {
 
   if (workouts.length === 0) {
     return <div className="space-y-4 text-center"><p className="py-8 text-muted">{t.home.empty}</p>
-      {addWorkout}
+      {addWorkout}<CycleSummary compact />
     </div>;
   }
 
@@ -380,6 +370,7 @@ export default function HomeScreen() {
             const w = byDate.get(iso);
             const isToday = iso === today;
             const day = Number(iso.slice(8));
+            const mark = cycleMarker(cycle, iso, today);
             return (
               <div key={iso} className="flex flex-col items-center gap-1">
                 <span className="text-[10px] font-semibold uppercase text-muted">
@@ -389,25 +380,20 @@ export default function HomeScreen() {
                   <button
                     type="button"
                     onClick={() => navigate('train', w.id)}
-                    aria-label={t.home.openWorkoutAria(iso)}
-                    className={
-                      'flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold tabular-nums ' +
-                      (w.status === 'done'
-                        ? 'bg-ok text-ok-fg'
-                        : 'border-2 border-accent text-accent') +
-                      (isToday ? ' ring-2 ring-fg/25 ring-offset-1 ring-offset-card' : '')
-                    }
+                    aria-label={`${t.home.openWorkoutAria(iso)}${mark ? `, ${t.cycle[mark]}` : ''}`}
+                    aria-current={isToday ? 'date' : undefined}
+                    className="calendar-date-button flex h-11 w-full justify-center rounded-lg focus-visible:outline-2 focus-visible:outline-accent"
                   >
-                    {day}
+                    <CalendarDate day={day} mark={mark} today={isToday} workout={w.status} />
                   </button>
                 ) : (
                   <span
-                    className={
-                      'flex h-8 w-8 items-center justify-center text-sm tabular-nums ' +
-                      (isToday ? 'font-bold' : 'text-muted')
-                    }
+                    aria-label={`${iso}${mark ? `, ${t.cycle[mark]}` : ''}`}
+                    aria-current={isToday ? 'date' : undefined}
+                    className="flex h-11 w-full justify-center"
                   >
-                    {day}
+                    <span className="sr-only">{day}{mark ? `, ${t.cycle[mark]}` : ''}</span>
+                    <CalendarDate day={day} mark={mark} today={isToday} />
                   </span>
                 )}
               </div>
@@ -416,7 +402,7 @@ export default function HomeScreen() {
         </div>
       </div>
 
-      {/* Плитки: неделя против ритма, объём, ритм, группы мышц.
+      {/* Плитки: неделя против ритма, объём, ритм, цикл.
           На широком экране — в один ряд, чтобы карточки не пустели */}
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <div className="rounded-2xl border border-border bg-card p-3.5">
@@ -432,28 +418,21 @@ export default function HomeScreen() {
           </div>
         </div>
         {tonnage > 0 && (
-          <div className="rounded-2xl border border-border bg-card p-3.5">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-muted">
-              {t.home.lifted}
-            </p>
-            <p className="mt-2 text-xl font-extrabold tabular-nums">{t.home.kgAmount(tonnage)}</p>
-            {equivalent && (
-              <p className="mt-1 text-xs font-medium text-muted">
-                {equivalent.unit.img ? (
-                  <span aria-hidden="true" className="mb-1 flex flex-wrap items-center gap-1">
-                    {Array.from({ length: equivalent.iconCount }, (_, i) => (
-                      <img key={i} src={equivalent.unit.img} alt="" className="h-6 w-auto" />
-                    ))}
-                  </span>
-                ) : (
-                  <span aria-hidden="true" className="mr-1 text-sm leading-none">
-                    {equivalent.unit.emoji.repeat(equivalent.iconCount)}
-                  </span>
-                )}
-                {equivText}
-              </p>
-            )}
-          </div>
+          <button type="button" onClick={() => setSettings({ equivalentOffset: (settings.equivalentOffset + 1) % 9970 })}
+            aria-label={`${t.home.lifted}: ${t.home.kgAmount(tonnage)}. ${equivText ?? ''}. ${t.home.changeEquivalent}`}
+            className="rounded-2xl border border-border bg-card p-3.5 text-left transition-colors active:bg-chip">
+            <span className="flex items-start justify-between gap-1 text-[11px] font-bold uppercase tracking-wider text-muted">
+              {t.home.lifted}<span aria-hidden="true" className="text-base leading-none text-accent">↻</span>
+            </span>
+            <span className="mt-2 block text-xl font-extrabold tabular-nums">{t.home.kgAmount(tonnage)}</span>
+            {equivalent && <span key={`${equivalent.unit.emoji}-${settings.equivalentOffset}`} className="equivalent-swap mt-1 block min-h-14 text-xs font-medium text-muted" aria-live="polite">
+              <span aria-hidden="true" className="mb-1 flex h-6 items-center gap-1 overflow-hidden">
+                {equivalent.unit.img ? Array.from({ length: equivalent.iconCount }, (_, i) => <img key={i} src={equivalent.unit.img} alt="" className="h-6 w-auto" />)
+                  : <span className="text-lg">{equivalent.unit.emoji.repeat(equivalent.iconCount)}</span>}
+              </span>
+              {equivText}
+            </span>}
+          </button>
         )}
         <div className="rounded-2xl border border-border bg-card p-3.5">
           <p className="text-[11px] font-bold uppercase tracking-wider text-muted">
@@ -464,32 +443,7 @@ export default function HomeScreen() {
           </div>
           <p className="mt-1.5 text-xs font-medium text-muted">{t.home.perWeek}</p>
         </div>
-        {groups7.length > 0 && (
-          <div className="rounded-2xl border border-border bg-card p-3.5">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-muted">
-              {t.home.last7}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-1">
-              {groups7.slice(0, 4).map((m) => {
-                const ic = muscleIcon(m, 12);
-                return (
-                  <span
-                    key={m}
-                    className="inline-flex items-center gap-1 rounded-lg bg-chip px-1.5 py-0.5 text-[11px] font-bold"
-                  >
-                    {ic && <span className="text-accent">{ic}</span>}
-                    {t.catalog.muscle(m)}
-                  </span>
-                );
-              })}
-              {groups7.length > 4 && (
-                <span className="rounded-lg bg-chip px-1.5 py-0.5 text-[11px] font-bold text-muted">
-                  +{groups7.length - 4}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
+        <CycleSummary compact />
       </div>
 
       {addWorkout}

@@ -8,7 +8,7 @@
 // же запись выигрывает последний пишущий (такие перезаписи считаем и
 // показываем в меню).
 
-import type { AppData, Exercise, StorageAdapter, Workout } from '../types';
+import type { AppData, CycleData, Exercise, StorageAdapter, Workout } from '../types';
 import type { DataRepoConfig } from '../config';
 import {
   applyOverlay,
@@ -237,6 +237,10 @@ export class GitHubAdapter implements StorageAdapter {
     });
   }
 
+  async saveCycle(cycle: CycleData | null): Promise<void> {
+    this.addPending((o) => { o.cycle = cycle; });
+  }
+
   async deleteWorkout(id: string): Promise<void> {
     this.addPending((o) => {
       o.workouts[id] = null;
@@ -264,6 +268,7 @@ export class GitHubAdapter implements StorageAdapter {
    */
   private addPending(fn: (o: Overlay) => void): void {
     const merged = readOverlay(PENDING_KEY);
+    if (this.pending.cycle !== undefined) merged.cycle = this.pending.cycle;
     for (const key of ['workouts', 'exercises'] as const) {
       for (const [id, value] of Object.entries(this.pending[key])) {
         merged[key][id] = value as never;
@@ -380,6 +385,7 @@ export class GitHubAdapter implements StorageAdapter {
       exercises: new Map(this.remote.exercises.map((e) => [e.id, e])),
     };
     let found = 0;
+    if (snapshot.cycle !== undefined && JSON.stringify(fresh.cycle) !== JSON.stringify(this.remote.cycle)) found++;
     for (const key of ['workouts', 'exercises'] as const) {
       for (const id of Object.keys(snapshot[key])) {
         const theirs = freshMaps[key].get(id);
@@ -401,6 +407,8 @@ export class GitHubAdapter implements StorageAdapter {
    */
   private dropFlushed(snapshot: Overlay): void {
     const disk = readOverlay(PENDING_KEY);
+    if (this.pending.cycle !== undefined) disk.cycle = this.pending.cycle;
+    if (snapshot.cycle !== undefined && JSON.stringify(disk.cycle) === JSON.stringify(snapshot.cycle)) delete disk.cycle;
     for (const key of ['workouts', 'exercises'] as const) {
       // наша память поверх диска (по нашим id), затем вычёркиваем отправленное
       for (const [id, value] of Object.entries(this.pending[key])) {

@@ -6,7 +6,9 @@ import { useMemo } from 'react';
 import { useApp } from '../../store';
 import type { Workout } from '../../types';
 import { locale, useT } from '../../i18n';
-import { todayISO } from '../../lib/dates';
+import { todayISO, fmtDateShort } from '../../lib/dates';
+import { cycleMarker } from '../../lib/cycle';
+import CalendarDate, { CycleSwatch } from '../CalendarDate';
 
 /** «2026-07» текущего дня */
 function ymOf(iso: string): string {
@@ -44,7 +46,7 @@ export default function MonthCalendar({ month: ym, onMonthChange, selectedDate, 
   selectedDate: string | null;
   onSelectDate: (date: string) => void;
 }) {
-  const { workouts } = useApp();
+  const { workouts, cycle } = useApp();
   const { t } = useT();
   const today = todayISO();
 
@@ -77,7 +79,7 @@ export default function MonthCalendar({ month: ym, onMonthChange, selectedDate, 
             type="button"
             onClick={() => onMonthChange(ymAdd(ym, -1))}
             aria-label={t.cal.prevMonth}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-bg text-muted"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:bg-chip focus-visible:outline-2 focus-visible:outline-accent"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M14.5 6l-6 6 6 6" />
@@ -87,7 +89,7 @@ export default function MonthCalendar({ month: ym, onMonthChange, selectedDate, 
             type="button"
             onClick={() => onMonthChange(ymAdd(ym, 1))}
             aria-label={t.cal.nextMonth}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-bg text-muted"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:bg-chip focus-visible:outline-2 focus-visible:outline-accent"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M9.5 6l6 6-6 6" />
@@ -96,7 +98,7 @@ export default function MonthCalendar({ month: ym, onMonthChange, selectedDate, 
         </div>
       </div>
 
-      <div className="mt-2 grid grid-cols-7 text-center text-[11px] font-semibold text-muted">
+      <div className="mt-1 grid grid-cols-7 text-center text-[11px] font-semibold text-muted">
         {t.weekdaysShort.map((d) => (
           <span key={d} className="py-1">
             {d}
@@ -105,47 +107,24 @@ export default function MonthCalendar({ month: ym, onMonthChange, selectedDate, 
       </div>
       <div className="grid grid-cols-7">
         {cells.map((iso, i) => {
-          if (!iso) return <span key={i} className="h-10" />;
+          if (!iso) return <span key={i} className="h-11" />;
           const w = byDate.get(iso);
-          const isToday = iso === today;
-          const day = Number(iso.slice(8));
-          if (!w) {
-            return (
-              <span
-                key={i}
-                className={
-                  'flex h-10 items-center justify-center text-sm tabular-nums ' +
-                  (isToday ? 'font-bold' : 'text-muted')
-                }
-              >
-                {day}
-              </span>
-            );
-          }
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => onSelectDate(iso)}
-              aria-label={t.cal.openWorkout(iso)}
-              aria-pressed={selectedDate === iso}
-              className="flex h-10 items-center justify-center"
-            >
-              <span
-                className={
-                  'flex h-8 w-8 flex-col items-center justify-center rounded-full text-sm font-bold tabular-nums ' +
-                  (w.status === 'done'
-                    ? 'bg-ok text-ok-fg'
-                    : 'border-2 border-accent text-accent') +
-                  (selectedDate === iso ? ' ring-2 ring-accent ring-offset-2 ring-offset-card' : isToday ? ' ring-2 ring-fg/25 ring-offset-1 ring-offset-card' : '')
-                }
-              >
-                {day}
-              </span>
-            </button>
-          );
+          const mark = cycleMarker(cycle, iso, today);
+          const label = [fmtDateShort(iso), w ? `${t.cycle.workout}: ${t.status[w.status]}` : '', mark ? t.cycle[mark] : ''].filter(Boolean).join(', ');
+          return <button key={iso} type="button" onClick={() => onSelectDate(iso)} aria-label={label}
+            aria-pressed={selectedDate === iso} aria-current={iso === today ? 'date' : undefined}
+            className="calendar-date-button flex h-11 items-start justify-center rounded-lg focus-visible:outline-2 focus-visible:outline-accent">
+            <CalendarDate day={Number(iso.slice(8))} mark={mark} today={iso === today} selected={selectedDate === iso} workout={w?.status} />
+          </button>;
         })}
       </div>
+      {cycle?.periods.length ? <div className="mt-2 border-t border-border pt-2.5">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
+          <span className="inline-flex items-center gap-1"><CycleSwatch mark="period" />{t.cycle.periodShort}</span>
+          <span className="inline-flex items-center gap-1"><CycleSwatch mark="periodEstimate" />{t.cycle.forecastShort}</span>
+          {cycle.showOvulation && <span className="inline-flex items-center gap-1"><CycleSwatch mark="ovulation" />{t.cycle.ovulationShort}</span>}
+        </div>
+      </div> : null}
     </section>
   );
 }

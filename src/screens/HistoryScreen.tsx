@@ -4,6 +4,7 @@ import { useApp } from '../store';
 import { useT } from '../i18n';
 import { fmtDateShort, fmtWeekday, todayISO } from '../lib/dates';
 import MonthCalendar from '../components/history/MonthCalendar';
+import CycleSummary from '../components/CycleSummary';
 import { Chip, IconCheck, IconComment, IconPlus } from '../components/edit/ui';
 
 const memory = { scroll: 0, view: 'list' as 'list' | 'calendar', month: todayISO().slice(0, 7), date: null as string | null };
@@ -56,6 +57,8 @@ export default function HistoryScreen() {
       {view === 'calendar' && <MonthCalendar month={month} selectedDate={date}
         onMonthChange={(value) => { memory.month = value; memory.date = null; setMonth(value); setDate(null); }}
         onSelectDate={(value) => { memory.date = value; setDate(value); }} />}
+      {view === 'calendar' && date && <CycleSummary date={date} />}
+      {view === 'calendar' && date && !workouts.some(w => w.date === date) && <p className="text-sm text-muted">{t.cycle.noWorkout}</p>}
       {view === 'calendar' && date && <button type="button" onClick={() => { memory.date = null; setDate(null); }}
         className="min-h-11 rounded-lg px-2 text-sm font-semibold text-accent">{t.actions.allWorkouts}</button>}
       {workouts.length === 0 && <p className="py-12 text-center text-muted">{t.hist.emptyNoEdit}</p>}
