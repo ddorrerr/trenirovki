@@ -369,6 +369,7 @@ export default function TrainingScreen() {
      «2 из 3 подх.», пропуск — «пропущено», иначе — обычная нотация) */
   const doneRowFor = (it: WorkoutItem, skippedRow: boolean) => {
     const ex = it.exerciseId ? exerciseById(it.exerciseId) : undefined;
+    const video = it.videoUrl ?? ex?.videoUrl;
     const nm =
       t.catalog.exercise(ex?.name ?? stripNumbering(it.nameRaw ?? '')) || t.item.fallbackName;
     const planned = plannedSetsCount(it);
@@ -384,6 +385,7 @@ export default function TrainingScreen() {
         <DoneRow name={nm} summary={summary} skippedRow={skippedRow}
           onRestore={() => saveItem(it.id, { done: false, skipped: false })} />
         {!editing && <ActionMenu label={`${t.actions.exerciseActions}: ${nm}`} actions={[
+          ...(video ? [{ label: t.item.techVideo, href: video }] : []),
           { label: t.actions.editWorkout, run: () => beginEdit(it.id) },
           { label: t.actions.moveExercise, run: () => beginOrder(it.id) },
           { label: t.actions.removeFromWorkout, run: () => removeItem(it), danger: true },
@@ -861,21 +863,21 @@ function CompactWorkoutCard({ w, celebrate, onStart, onExpand, onEdit, onMove, o
       </div>}
       {!items.length && <p className="text-muted">{t.train.noItems}</p>}
       <ul className="divide-y divide-border/60">
-        {items.map((item, index) => {
+        {items.map((item) => {
           const kind = itemKind(item);
-          const name = t.catalog.exercise(exerciseById(item.exerciseId)?.name ?? stripNumbering(item.nameRaw)) || t.item.fallbackName;
+          const exercise = exerciseById(item.exerciseId);
+          const name = t.catalog.exercise(exercise?.name ?? stripNumbering(item.nameRaw)) || t.item.fallbackName;
+          const video = item.videoUrl ?? exercise?.videoUrl;
           const skipped = !!item.skipped && !item.done;
           const summary = compactSummary(item, kind, t);
           return <li key={item.id} data-workout-item={item.id} className="flex min-h-14 items-center gap-2.5 py-2">
-            <span aria-hidden="true" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-chip text-[13px] font-bold text-muted">
-              {kind === 'cardio' ? <HeartPulseIcon size={13} /> : index + 1}
-            </span>
             <div className={'min-w-0 flex-1 ' + (skipped ? 'text-muted line-through opacity-60' : '')}>
               {skipped && <span className="sr-only">{t.train.skippedLabel}: </span>}
-              <span title={name} className="block truncate text-[15px] font-semibold">{name}</span>
-              {summary && <span className="mt-0.5 block truncate text-xs font-medium tabular-nums text-muted">{summary}</span>}
+              <span title={name} className="block break-words text-base font-semibold">{name}</span>
+              {summary && <span className="mt-0.5 block break-words text-sm tabular-nums text-muted">{summary}</span>}
             </div>
             <ActionMenu label={`${t.actions.exerciseActions}: ${name}`} actions={[
+              ...(video ? [{ label: t.item.techVideo, href: video }] : []),
               { label: t.actions.editWorkout, run: () => onEdit(item) },
               { label: t.actions.moveExercise, run: () => onMove(item) },
               { label: t.actions.removeFromWorkout, run: () => onRemove(item), danger: true },

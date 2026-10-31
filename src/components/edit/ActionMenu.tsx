@@ -1,12 +1,11 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useT } from '../../i18n';
 
-export interface MenuAction {
+export type MenuAction = {
   label: string;
-  run: () => void;
   danger?: boolean;
   disabled?: boolean;
-}
+} & ({ run: () => void; href?: never } | { href: string; run?: never });
 
 /** Native top-layer popover: the same visible entry on touch and desktop. */
 export default function ActionMenu({ actions, label }: { actions: MenuAction[]; label?: string }) {
@@ -35,7 +34,7 @@ export default function ActionMenu({ actions, label }: { actions: MenuAction[]; 
     element.style.left = `${Math.max(8, Math.min(bounds.right - 240, window.innerWidth - 248))}px`;
     element.style.top = `${Math.max(8, bounds.bottom + height < window.innerHeight ? bounds.bottom + 4 : bounds.top - height - 4)}px`;
     element.showPopover();
-    element.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true });
+    element.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled):not([aria-disabled="true"])')?.focus({ preventScroll: true });
   };
   return (
     <>
@@ -50,8 +49,8 @@ export default function ActionMenu({ actions, label }: { actions: MenuAction[]; 
         onToggle={(event) => setOpen(event.newState === 'open')}
         onClick={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
-          const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
-          const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+          const buttons = [...event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled):not([aria-disabled="true"])')];
+          const index = buttons.indexOf(document.activeElement as HTMLElement);
           if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
             event.preventDefault();
             const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
@@ -61,13 +60,15 @@ export default function ActionMenu({ actions, label }: { actions: MenuAction[]; 
           if (event.key === 'Escape') trigger.current?.focus({ preventScroll: true });
         }}
         className="fixed bottom-auto right-auto m-0 w-60 rounded-xl border border-border bg-card p-2 text-fg shadow-md">
-        {actions.map((action) => (
-          <button key={action.label} type="button" role="menuitem" disabled={action.disabled}
-            onClick={() => { menu.current?.hidePopover(); action.run(); }}
-            className={'block min-h-11 w-full rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-chip focus-visible:bg-chip disabled:opacity-40 ' + (action.danger ? 'text-danger' : '')}>
-            {action.label}
-          </button>
-        ))}
+        {actions.map((action) => {
+          const className = 'flex min-h-11 w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-chip focus-visible:bg-chip disabled:opacity-40 ' + (action.danger ? 'text-danger' : '');
+          return action.href !== undefined
+            ? <a key={action.label} role="menuitem" href={action.disabled ? undefined : action.href} target="_blank" rel="noopener noreferrer"
+                aria-disabled={action.disabled || undefined} tabIndex={action.disabled ? -1 : undefined}
+                onClick={() => menu.current?.hidePopover()} className={className}>{action.label}</a>
+            : <button key={action.label} type="button" role="menuitem" disabled={action.disabled}
+                onClick={() => { menu.current?.hidePopover(); action.run(); }} className={className}>{action.label}</button>;
+        })}
       </div>
     </>
   );

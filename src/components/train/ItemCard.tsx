@@ -17,8 +17,6 @@ import {
   CheckIcon,
   ChevronIcon,
   ClockIcon,
-  CommentIcon,
-  FlameIcon,
   HeartPulseIcon,
   HistoryIcon,
   PinIcon,
@@ -26,7 +24,6 @@ import {
   SidesIcon,
   SkullIcon,
   TempoIcon,
-  VideoIcon,
   XIcon,
 } from './icons';
 
@@ -249,6 +246,27 @@ export default function ItemCard({
     setOpen((v) => !v);
   };
 
+  const detailControls = (
+            <span className="ml-auto flex shrink-0 items-center text-muted">
+              {(onEdit || videoUrl) && <ActionMenu label={`${t.actions.exerciseActions}: ${name}`} actions={[
+                ...(videoUrl ? [{ label: t.item.techVideo, href: videoUrl }] : []),
+                ...(onEdit ? [{ label: t.actions.editWorkout, run: onEdit }] : []),
+                ...(onMove ? [{ label: t.actions.moveExercise, run: onMove }] : []),
+                ...(active && !item.done && !item.skipped ? [{ label: t.actions.skipExercise, run: () => onChange({ skipped: true, done: false }) }] : []),
+                ...(onRemove ? [{ label: t.actions.removeFromWorkout, run: onRemove, danger: true }] : []),
+              ]} />}
+              <button
+                onClick={() => setOpen((v) => !v)}
+                aria-expanded={open}
+                aria-label={[open ? t.item.collapse : t.item.expand, myComment ? t.item.hasMyComment : '', item.ptNote || item.ptRequest ? t.item.hasPtNote : ''].filter(Boolean).join('. ')}
+                className="relative flex h-11 w-11 items-center justify-center rounded-lg"
+              >
+                <ChevronIcon open={open} />
+                {(myComment || item.ptNote || item.ptRequest) && <span aria-hidden="true" className="absolute right-2 top-2 h-1 w-1 rounded-full bg-accent" />}
+              </button>
+            </span>
+  );
+
   return (
     <div
       data-workout-item={item.id}
@@ -256,21 +274,12 @@ export default function ItemCard({
       onClick={handleCardClick}
       className="cursor-pointer rounded-2xl border border-border bg-card p-4"
     >
-      {/* Номер + название + видео техники + отметка «выполнено» */}
+      {/* One left edge for the title, preparation and working values. */}
       <div className="flex items-start gap-3">
-        <span
-          aria-hidden="true"
-          className={
-            'mt-0.5 flex h-6 min-w-6 shrink-0 items-center justify-center rounded-lg px-1 text-[13px] font-bold tabular-nums ' +
-            (item.done ? 'bg-bg text-muted' : 'bg-chip text-muted')
-          }
-        >
-          {/* кардио — не упражнение: вместо номера сердечко */}
-          {kind === 'cardio' ? <HeartPulseIcon size={13} /> : num}
-        </span>
+        <div className="min-w-0 flex-1">
         <h3
           className={
-            'min-w-0 flex-1 break-words text-xl font-bold leading-snug ' +
+            'min-w-0 break-words pt-1.5 text-lg font-bold leading-snug ' +
             (item.done
               ? 'text-muted'
               : item.skipped
@@ -281,12 +290,14 @@ export default function ItemCard({
           {kind !== 'cardio' && <span className="sr-only">{num}. </span>}
           {name || t.item.fallbackName}
         </h3>
-        {onEdit && <ActionMenu label={`${t.actions.exerciseActions}: ${name}`} actions={[
-          { label: t.actions.editWorkout, run: onEdit },
-          ...(onMove ? [{ label: t.actions.moveExercise, run: onMove }] : []),
-          ...(active && !item.done && !item.skipped ? [{ label: t.actions.skipExercise, run: () => onChange({ skipped: true, done: false }) }] : []),
-          ...(onRemove ? [{ label: t.actions.removeFromWorkout, run: onRemove, danger: true }] : []),
-        ]} />}
+        {/* Разминка упражнения — первой: с неё начинают и её читают первой */}
+        {item.warmupSets && (
+          <p className="mt-2 flex flex-wrap gap-x-2 text-sm leading-relaxed">
+            <span className="text-muted">{t.item.warmupLabel}</span>
+            <span className="min-w-0 whitespace-pre-line break-words">{item.warmupSets}</span>
+          </p>
+        )}
+        </div>
         <button
           onClick={() => {
             // отметка «выполнено» заодно снимает пропуск
@@ -312,42 +323,18 @@ export default function ItemCard({
       </div>
 
       <div className={item.done ? 'opacity-70' : ''}>
-        {/* Разминка упражнения — первой: с неё начинают и её читают первой */}
-        {item.warmupSets && (
-          <p title={t.item.warmupSr} className="mt-2.5 flex items-start gap-1.5 text-xs">
-            <span className="mt-0.5 shrink-0 text-muted">
-              <FlameIcon size={14} />
-            </span>
-            <span className="sr-only">{t.item.warmupSr}: </span>
-            <span className="min-w-0 whitespace-pre-line break-words text-muted">
-              {item.warmupSets}
-            </span>
-          </p>
-        )}
+
 
         {/* Строка данных: повторы × вес + отдых; справа — значки
             «есть комментарий» / «есть заметка тренера» и шеврон раскрытия.
             Правка плана и результата доступна через меню действий. */}
-        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-        {videoUrl && (
-          <a
-            href={videoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            aria-label={t.item.techVideo}
-            title={t.item.techVideo}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"
-          >
-            <VideoIcon />
-          </a>
-        )}
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
             {mainChips.map((c, i) => (
               <span
                 key={i}
                 title={c.name ?? undefined}
                 className={
-                  'inline-flex max-w-full items-center gap-1 rounded-lg bg-chip px-2 py-1 text-sm tabular-nums ' +
+                  'inline-flex max-w-full items-center gap-1.5 text-sm tabular-nums ' +
                   (c.bold ? 'font-bold' : 'font-medium')
                 }
               >
@@ -356,6 +343,8 @@ export default function ItemCard({
                 <span className="min-w-0 break-words">{c.text}</span>
               </span>
             ))}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
             {active && !locked && !item.done && nextSeconds != null && onTime && (
               <button type="button" onClick={() => onTime(item)} aria-label={t.timer.startSet}
                 className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-sm font-bold text-accent-fg">
@@ -370,41 +359,22 @@ export default function ItemCard({
                 className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-xl bg-accent-soft px-3 py-2 text-left text-sm font-bold text-accent"
               >
                 <ClockIcon size={16} />
-                <span className={timedPlan ? '' : 'sr-only'}>{t.timer.title}{timedPlan ? '' : ':'}</span>
+                <span>{t.timer.title}</span>
                 <span className="min-w-0 break-words">{timedPlan ? fmtClock(parseRestSeconds(item.rest)) : restLabel(item.rest!, t)}</span>
               </button>
             )}
-            <span className="ml-auto flex items-center gap-1 text-muted">
-              {myComment && (
-                <span title={t.item.hasMyComment} className="flex h-8 w-6 items-center justify-center">
-                  <CommentIcon />
-                  <span className="sr-only">{t.item.hasMyComment}</span>
-                </span>
-              )}
-              {(item.ptNote || item.ptRequest) && (
-                <span title={t.item.hasPtNote} className="flex h-8 w-6 items-center justify-center">
-                  <PinIcon />
-                  <span className="sr-only">{t.item.hasPtNote}</span>
-                </span>
-              )}
-              <button
-                onClick={() => setOpen((v) => !v)}
-                aria-expanded={open}
-                aria-label={open ? t.item.collapse : t.item.expand}
-                className="relative -my-1 flex h-9 w-9 items-center justify-center rounded-lg after:absolute after:-inset-1 after:content-['']"
-              >
-                <ChevronIcon open={open} />
-              </button>
-            </span>
+            {plannedSets === 0 && detailControls}
           </div>
 
         {/* Кружки подходов (режим «идёт»): тап — подход сделан, повторный —
             снятие; последний кружок сам завершает упражнение */}
         {plannedSets > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-muted">
+          <div className="mt-3 flex items-end gap-2 border-t border-border pt-3">
+            <div className="min-w-0 flex-1">
+            <span className="mb-2 block text-sm text-muted">
               {t.item.setsRowLabel}
             </span>
+            <div className="flex flex-wrap gap-2">
             {Array.from({ length: plannedSets }, (_, i) => {
               const on = i < setsDone || (pendingFill != null && i < pendingFill);
               return (
@@ -415,7 +385,7 @@ export default function ItemCard({
                   aria-pressed={on}
                   aria-label={t.item.setBubbleAria(i + 1)}
                   className={
-                    'flex h-11 w-11 items-center justify-center rounded-full border text-[15px] font-extrabold tabular-nums transition-colors ' +
+                    'flex h-11 w-11 items-center justify-center rounded-full border text-sm font-bold tabular-nums transition-colors ' +
                     (on ? 'border-ok bg-ok text-ok-fg' : 'border-border bg-card text-muted') +
                     (popIdx === i ? ' anim-check' : '')
                   }
@@ -424,6 +394,9 @@ export default function ItemCard({
                 </button>
               );
             })}
+            </div>
+            </div>
+            {detailControls}
           </div>
         )}
 
@@ -442,7 +415,7 @@ export default function ItemCard({
                     key={i}
                     title={c.name ?? undefined}
                     className={
-                      'inline-flex max-w-full items-center gap-1 rounded-lg bg-chip px-2 py-1 text-sm tabular-nums ' +
+                      'inline-flex max-w-full items-center gap-1.5 text-sm tabular-nums ' +
                       (c.bold ? 'font-bold' : 'font-medium')
                     }
                   >
@@ -496,7 +469,7 @@ export default function ItemCard({
 
             {/* Прошлый раз — рядом с местом записи, чтобы сверяться */}
             {last && (
-              <p title={t.item.lastTime} className="mt-2.5 flex items-start gap-1.5 text-xs text-muted">
+              <p title={t.item.lastTime} className="mt-3 flex items-start gap-1.5 text-sm text-muted">
                 <span className="mt-0.5 shrink-0" aria-hidden="true">
                   <HistoryIcon />
                 </span>
@@ -558,7 +531,7 @@ function CommentEditor({
     <div className="anim-rise mt-4 border-t border-border pt-4" onClick={(e) => e.stopPropagation()}>
       <label className="block">
         <span className="flex items-baseline justify-between gap-2">
-          <span className="text-[12px] font-bold uppercase tracking-wider text-muted">
+          <span className="text-sm font-semibold text-muted">
             {t.item.yourComment}
           </span>
           <span
@@ -582,7 +555,7 @@ function CommentEditor({
       </label>
 
       {(item.actual?.text ?? '').trim() !== '' && (
-        <p className="mt-2 text-xs text-muted">{t.item.oldFactNote(item.actual?.text ?? '')}</p>
+        <p className="mt-2 text-sm text-muted">{t.item.oldFactNote(item.actual?.text ?? '')}</p>
       )}
     </div>
   );

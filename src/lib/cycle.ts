@@ -23,39 +23,65 @@ export function validCycle(cycle: CycleData): boolean {
     && Number.isInteger(cycle.periodLength) && cycle.periodLength >= 1 && cycle.periodLength <= 14;
 }
 export type CycleMark = 'period' | 'periodEstimate' | 'ovulation';
-export function cycleMarker(cycle: CycleData | null, date: string, today: string): CycleMark | null {
-  if (!cycle || !validCycle(cycle) || !validCycleDate(date)) return null;
-  const periods = sortedPeriods(cycle);
-  if (periods.some(p => date >= p.start && date <= (p.end ?? p.start))) return 'period';
-  let index = periods.length - 1;
-  while (index >= 0 && periods[index].start > date) index--;
-  if (index < 0) return null;
-  const p = periods[index];
-  const next = periods[index + 1];
-  const expected = next?.start ?? cycleAddDays(p.start, cycle.cycleLength);
-  // Once a forecast is stale, ask for a new record rather than roll it into fictitious cycles.
-  if (!next && distance(expected, today) > 7) return null;
-  if (!p.end && date > p.start && date < expected && date <= cycleAddDays(p.start, cycle.periodLength - 1)) return 'periodEstimate';
-  if (!next && date >= expected && date <= cycleAddDays(expected, cycle.periodLength - 1)) return 'periodEstimate';
-  if (cycle.showOvulation && date >= cycleAddDays(expected, -16) && date <= cycleAddDays(expected, -12)) return 'ovulation';
-  return null;
-}
-export function cycleSummary(cycle: CycleData | null, date: string, today: string) {
-  if (!cycle || !validCycle(cycle) || !validCycleDate(date)) return null;
+
+/** A bounded forecast is derived for display only; it never creates period records. */
+function cycleWindow(cycle: CycleData | null, date: string, today: string) {
+  if (!cycle || !validCycle(cycle) || !validCycleDate(date) || !validCycleDate(today)) return null;
   const periods = sortedPeriods(cycle);
   let index = periods.length - 1;
   while (index >= 0 && periods[index].start > date) index--;
   const period = periods[index];
   if (!period) return null;
   const next = periods[index + 1];
-  const expected = next?.start ?? cycleAddDays(period.start, cycle.cycleLength);
-  // A future workout may fall in the predicted next period, but not an invented later cycle.
-  if (!next && date > today && date > cycleAddDays(expected, cycle.periodLength - 1)) return null;
-  const forecast = !next && date > today && date >= expected;
-  return { day: distance(forecast ? expected : period.start, date) + 1, expected, forecast,
-    overdue: !next && date <= today && date > expected,
-    stale: !next && distance(expected, today) > 7,
-    mark: cycleMarker(cycle, date, today) };
+  const firstExpected = next?.start ?? cycleAddDays(period.start, cycle.cycleLength);
+  const stale = !next && distance(firstExpected, today) > 7;
+  if (!next && date > today && (stale || distance(today, date) > 90)) return null;
+  // Only future dates can advance into projected cycles. Today's missed start
+  // stays visible as a request to update, instead of silently resetting day one.
+  const cyclesAhead = !next && date > today ? Math.floor(distance(period.start, date) / cycle.cycleLength) : 0;
+  const start = cyclesAhead > 0 ? cycleAddDays(period.start, cyclesAhead * cycle.cycleLength) : period.start;
+  const expected = cyclesAhead > 0 ? cycleAddDays(start, cycle.cycleLength) : firstExpected;
+  return { period, start, expected, forecast: cyclesAhead > 0, stale,
+    overdue: !next && date <= today && date > firstExpected,
+    ovulationDate: cycleAddDays(expected, -14),
+    ovulationStart: cycleAddDays(expected, -16), ovulationEnd: cycleAddDays(expected, -12) };
+}
+
+function windowMarker(cycle: CycleData, date: string, window: NonNullable<ReturnType<typeof cycleWindow>>): CycleMark | null {
+  if (date >= window.period.start && date <= (window.period.end ?? window.period.start)) return 'period';
+  if (window.stale) return null;
+  if (window.forecast && date <= cycleAddDays(window.start, cycle.periodLength - 1)) return 'periodEstimate';
+  if (!window.period.end && date < window.expected && date <= cycleAddDays(window.period.start, cycle.periodLength - 1)) return 'periodEstimate';
+  if (date >= window.expected && date <= cycleAddDays(window.expected, cycle.periodLength - 1)) return 'periodEstimate';
+  if (cycle.showOvulation && date >= window.ovulationStart && date <= window.ovulationEnd) return 'ovulation';
+  return null;
+}
+export function cycleMarker(cycle: CycleData | null, date: string, today: string): CycleMark | null {
+  const window = cycleWindow(cycle, date, today);
+  return cycle && window ? windowMarker(cycle, date, window) : null;
+}
+export function cycleSummary(cycle: CycleData | null, date: string, today: string) {
+  const window = cycleWindow(cycle, date, today);
+  if (!cycle || !window) return null;
+  return { ...window, day: distance(window.start, date) + 1,
+    daysToPeriod: distance(date, window.expected), daysToOvulation: distance(date, window.ovulationDate),
+    mark: windowMarker(cycle, date, window) };
+}
+
+/** Select one useful message; estimates never imply measured ovulation or energy. */
+export function cycleMemo(cycle: CycleData | null, date: string, today: string) {
+  const summary = cycleSummary(cycle, date, today);
+  if (!summary) return null;
+  const mode = summary.overdue || summary.stale ? 'update'
+    : summary.mark === 'period' || summary.mark === 'periodEstimate' ? 'period'
+    : summary.mark === 'ovulation' ? 'ovulation'
+    : cycle?.showOvulation && summary.daysToOvulation > 0 && summary.daysToOvulation <= 7 ? 'ovulationSoon'
+    : summary.daysToPeriod <= 10 || (cycle?.showOvulation && date > summary.ovulationEnd) ? 'periodSoon' : 'day';
+  const value = mode === 'ovulationSoon' ? summary.daysToOvulation
+    : mode === 'periodSoon' ? summary.daysToPeriod
+    : mode === 'period' && date >= summary.expected ? distance(summary.expected, date) + 1 : summary.day;
+  const tone = mode === 'ovulation' || mode === 'ovulationSoon' ? 'lavender' : mode === 'update' ? 'neutral' : 'rose';
+  return { ...summary, mode, value, tone } as const;
 }
 
 /** Edits preserve all other historical records; ranges must not overlap. */

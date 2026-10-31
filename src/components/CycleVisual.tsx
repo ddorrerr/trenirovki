@@ -12,9 +12,12 @@ export function CycleSymbol({ mark, className = '' }: { mark: CycleMark; classNa
 }
 
 /** Position in the usual cycle, not a claim about hormone levels or readiness. */
-export function CycleRing({ day, label, length, forecast = false, stale = false }: { day: number | null; label: string; length: number; forecast?: boolean; stale?: boolean }) {
+export function CycleRing({ day, value = day, label, length, forecast = false, stale = false, tone = 'rose', symbol }: {
+  day: number | null; value?: number | null; label: string; length: number; forecast?: boolean; stale?: boolean;
+  tone?: 'rose' | 'lavender' | 'neutral'; symbol?: CycleMark;
+}) {
   const progress = day === null || stale ? 0 : Math.min(1, day / length);
-  return <span aria-hidden="true" className={`cycle-ring ${stale ? 'cycle-ring--stale' : ''}`}>
+  return <span aria-hidden="true" data-tone={tone} className={`cycle-ring ${stale ? 'cycle-ring--stale' : ''}`}>
     <svg viewBox="0 0 52 52" className="absolute inset-0 h-full w-full -rotate-90">
       {Array.from({ length: 12 }, (_, i) => {
         const start = (i * 30 + 7) * Math.PI / 180;
@@ -24,8 +27,10 @@ export function CycleRing({ day, label, length, forecast = false, stale = false 
       })}
     </svg>
     <span className="relative flex flex-col items-center">
-      <span className={`font-extrabold leading-none tabular-nums ${forecast ? 'text-base' : 'text-xl'}`}>{day === null ? '+' : `${forecast ? '≈' : ''}${day}`}</span>
-      {day !== null && <span className="mt-0.5 text-[9px] leading-none text-muted">{label}</span>}
+      {symbol ? <CycleSymbol mark={symbol} className="h-6 w-6" /> : <>
+        <span className={`font-extrabold leading-none tabular-nums ${forecast ? 'text-base' : 'text-xl'}`}>{stale ? '—' : value === null ? '+' : `${forecast ? '≈' : ''}${value}`}</span>
+        {value !== null && !stale && <span className="mt-0.5 text-[9px] leading-none text-muted">{label}</span>}
+      </>}
     </span>
   </span>;
 }
