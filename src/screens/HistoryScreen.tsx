@@ -7,12 +7,11 @@ import MonthCalendar from '../components/history/MonthCalendar';
 import CycleSummary from '../components/CycleSummary';
 import { Chip, IconCheck, IconComment, IconPlus } from '../components/edit/ui';
 
-const memory = { scroll: 0, view: 'list' as 'list' | 'calendar', month: todayISO().slice(0, 7), date: null as string | null };
+const memory = { scroll: 0, month: todayISO().slice(0, 7), date: null as string | null };
 
 export default function HistoryScreen() {
   const { workouts, navigate } = useApp();
   const { t } = useT();
-  const [view, setView] = useState(memory.view);
   const [month, setMonth] = useState(memory.month);
   const [date, setDate] = useState(memory.date);
   useEffect(() => {
@@ -26,7 +25,7 @@ export default function HistoryScreen() {
     navigate('train', workout.id);
   };
   const groups = useMemo(() => {
-    if (view === 'calendar' && date) return [{ title: fmtDateShort(date), workouts: workouts.filter((workout) => workout.date === date) }];
+    if (date) return [{ title: fmtDateShort(date), workouts: workouts.filter((workout) => workout.date === date) }];
     const active = workouts.filter((workout) => workout.status === 'planned' && workout.startedAt);
     const planned = workouts.filter((workout) => workout.status === 'planned' && !workout.startedAt);
     const done = [...workouts].reverse().filter((workout) => workout.status === 'done');
@@ -35,31 +34,22 @@ export default function HistoryScreen() {
       { title: t.actions.plannedWorkouts, workouts: planned },
       { title: t.actions.pastWorkouts, workouts: done },
     ].filter((group) => group.workouts.length > 0);
-  }, [workouts, view, date, t]);
+  }, [workouts, date, t]);
   return (
     <div className="space-y-4">
       <div className="sticky top-[calc(60px+env(safe-area-inset-top))] z-10 -mx-1 flex items-center gap-3 rounded-xl bg-bg p-1">
-        <div className="flex rounded-xl border border-border bg-card p-1" role="group" aria-label={t.actions.workoutView}>
-          {(['list', 'calendar'] as const).map((value) => (
-            <button key={value} type="button" aria-pressed={view === value}
-              onClick={() => { memory.view = value; setView(value); }}
-              className={'min-h-11 rounded-lg px-3 text-sm font-semibold ' + (view === value ? 'bg-accent-soft text-accent' : 'text-muted')}>
-              {value === 'list' ? t.actions.listView : t.actions.calendarView}
-            </button>
-          ))}
-        </div>
         <button type="button" aria-label={t.actions.createWorkout}
           onClick={() => { memory.scroll = window.scrollY; navigate('create'); }}
-          className="ml-auto flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl bg-accent px-3 py-2 font-semibold text-accent-fg">
-          <IconPlus size={20} /><span className="hidden min-[420px]:inline">{t.actions.addWorkout}</span>
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent px-3 py-2 font-semibold text-accent-fg">
+          <IconPlus size={20} /><span>{t.actions.addWorkout}</span>
         </button>
       </div>
-      {view === 'calendar' && <MonthCalendar month={month} selectedDate={date}
+      <MonthCalendar month={month} selectedDate={date}
         onMonthChange={(value) => { memory.month = value; memory.date = null; setMonth(value); setDate(null); }}
-        onSelectDate={(value) => { memory.date = value; setDate(value); }} />}
-      {view === 'calendar' && date && <CycleSummary date={date} />}
-      {view === 'calendar' && date && !workouts.some(w => w.date === date) && <p className="text-sm text-muted">{t.cycle.noWorkout}</p>}
-      {view === 'calendar' && date && <button type="button" onClick={() => { memory.date = null; setDate(null); }}
+        onSelectDate={(value) => { memory.date = date === value ? null : value; setDate(memory.date); }} />
+      {date && <CycleSummary date={date} />}
+      {date && !workouts.some(w => w.date === date) && <p className="text-sm text-muted">{t.cycle.noWorkout}</p>}
+      {date && <button type="button" onClick={() => { memory.date = null; setDate(null); }}
         className="min-h-11 rounded-lg px-2 text-sm font-semibold text-accent">{t.actions.allWorkouts}</button>}
       {workouts.length === 0 && <p className="py-12 text-center text-muted">{t.hist.emptyNoEdit}</p>}
       {groups.map((group) => <section key={group.title} className="space-y-2">

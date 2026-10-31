@@ -18,7 +18,9 @@ export default function CycleScreen() {
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [showAllHistory, setShowAllHistory] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
+  const history = cycle ? [...sortedPeriods(cycle)].reverse() : [];
   const today = todayISO();
   const input = 'mt-1 min-h-11 w-full min-w-0 rounded-xl border border-border bg-bg px-3 py-2 text-base text-fg';
   useEffect(() => {
@@ -48,6 +50,22 @@ export default function CycleScreen() {
   };
   return <div className="space-y-5">
     <p className="text-sm leading-relaxed text-muted">{t.cycle.sharedHint}</p>
+    {!!cycle && history.length > 0 && <section className="overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="flex items-center justify-between gap-3 px-4 py-2">
+        <h2 className="font-bold">{t.cycle.history} <span className="ml-1 text-sm font-medium text-muted">{history.length}</span></h2>
+        <button type="button" onClick={() => choose(null)} className="min-h-11 text-sm font-semibold text-accent">{t.cycle.newRecord}</button>
+      </div>
+      {(showAllHistory ? history : history.slice(0, 3)).map(record => <div key={record.start} className="flex items-center border-t border-border">
+        <button type="button" onClick={() => choose(record)} className="min-h-14 min-w-0 flex-1 px-4 py-3 text-left text-sm">
+          <span className="flex items-center justify-between gap-2 font-semibold"><span>{fmtDate(record.start)}{record.end ? ` — ${fmtDate(record.end)}` : ''}</span><span aria-hidden="true" className="text-muted">›</span></span>
+          {!record.end && <span className="text-xs text-muted">{t.cycle.startOnly}</span>}
+        </button>
+        <button type="button" disabled={dirty} aria-label={t.cycle.deleteRecord(fmtDate(record.start))}
+          onClick={() => { if (window.confirm(t.cycle.deleteConfirm)) { saveCycle({ ...cycle, periods: cycle.periods.filter(p => p.start !== record.start) }); if (editing === record.start) { setStart(''); setEnd(''); setEditing(null); } } }}
+          className="min-h-11 min-w-11 px-3 text-muted disabled:opacity-40">×</button>
+      </div>)}
+      {history.length > 3 && <button type="button" aria-expanded={showAllHistory} onClick={() => setShowAllHistory(value => !value)} className="min-h-11 w-full border-t border-border px-4 text-sm font-semibold text-accent">{showAllHistory ? t.cycle.hideHistory : t.cycle.showHistory(history.length)}</button>}
+    </section>}
     <form ref={formRef} onSubmit={(e) => { e.preventDefault(); save(); }} className="scroll-mt-20 space-y-5 rounded-2xl border border-border bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-bold">{editing ? t.cycle.editPeriod : t.cycle.addPeriod}</h2>
@@ -72,17 +90,5 @@ export default function CycleScreen() {
       {saved && <p role="status" className="text-sm text-accent">{t.cycle.updated}</p>}
       <button type="submit" disabled={!dirty} className="min-h-12 w-full rounded-xl bg-accent px-4 font-semibold text-accent-fg disabled:opacity-50">{t.save}</button>
     </form>
-    {!!cycle?.periods.length && <section className="overflow-hidden rounded-2xl border border-border bg-card">
-      <h2 className="px-4 pb-2 pt-4 font-bold">{t.cycle.history}</h2>
-      {[...sortedPeriods(cycle)].reverse().map(record => <div key={record.start} className="flex items-center border-t border-border">
-        <button type="button" onClick={() => choose(record)} className="min-h-14 min-w-0 flex-1 px-4 py-3 text-left text-sm">
-          <span className="flex items-center justify-between gap-2 font-semibold"><span>{fmtDate(record.start)}{record.end ? ` — ${fmtDate(record.end)}` : ''}</span><span aria-hidden="true" className="text-muted">›</span></span>
-          {!record.end && <span className="text-xs text-muted">{t.cycle.startOnly}</span>}
-        </button>
-        <button type="button" disabled={dirty} aria-label={t.cycle.deleteRecord(fmtDate(record.start))}
-          onClick={() => { if (window.confirm(t.cycle.deleteConfirm)) { saveCycle({ ...cycle, periods: cycle.periods.filter(p => p.start !== record.start) }); if (editing === record.start) { setStart(''); setEnd(''); setEditing(null); } } }}
-          className="min-h-11 min-w-11 px-3 text-muted disabled:opacity-40">×</button>
-      </div>)}
-    </section>}
   </div>;
 }

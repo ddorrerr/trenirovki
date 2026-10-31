@@ -20,6 +20,7 @@ import unitBus from '../assets/units/bus.png';
 import unitTram from '../assets/units/tram.png';
 import CycleSummary from '../components/CycleSummary';
 import CalendarDate from '../components/CalendarDate';
+import HoldToChange from '../components/HoldToChange';
 import { cycleMarker } from '../lib/cycle';
 
 /** Понедельник недели данной даты (UTC), ISO-строкой */
@@ -418,21 +419,21 @@ export default function HomeScreen() {
           </div>
         </div>
         {tonnage > 0 && (
-          <button type="button" onClick={() => setSettings({ equivalentOffset: (settings.equivalentOffset + 1) % 9970 })}
-            aria-label={`${t.home.lifted}: ${t.home.kgAmount(tonnage)}. ${equivText ?? ''}. ${t.home.changeEquivalent}`}
-            className="rounded-2xl border border-border bg-card p-3.5 text-left transition-colors active:bg-chip">
+          <HoldToChange onChange={() => setSettings({ equivalentOffset: (settings.equivalentOffset + 1) % 9970 })}
+            label={`${t.home.lifted}: ${t.home.kgAmount(tonnage)}. ${equivText ?? ''}. ${t.home.changeEquivalent}`}
+            hint={t.home.holdEquivalent} holdingHint={t.home.holdingEquivalent} doneHint={t.home.equivalentChanged}>
             <span className="flex items-start justify-between gap-1 text-[11px] font-bold uppercase tracking-wider text-muted">
               {t.home.lifted}<span aria-hidden="true" className="text-base leading-none text-accent">↻</span>
             </span>
             <span className="mt-2 block text-xl font-extrabold tabular-nums">{t.home.kgAmount(tonnage)}</span>
             {equivalent && <span key={`${equivalent.unit.emoji}-${settings.equivalentOffset}`} className="equivalent-swap mt-1 block min-h-14 text-xs font-medium text-muted" aria-live="polite">
               <span aria-hidden="true" className="mb-1 flex h-6 items-center gap-1 overflow-hidden">
-                {equivalent.unit.img ? Array.from({ length: equivalent.iconCount }, (_, i) => <img key={i} src={equivalent.unit.img} alt="" className="h-6 w-auto" />)
+                {equivalent.unit.img ? Array.from({ length: equivalent.iconCount }, (_, i) => <img key={i} src={equivalent.unit.img} alt="" draggable={false} className="h-6 w-auto" />)
                   : <span className="text-lg">{equivalent.unit.emoji.repeat(equivalent.iconCount)}</span>}
               </span>
               {equivText}
             </span>}
-          </button>
+          </HoldToChange>
         )}
         <div className="rounded-2xl border border-border bg-card p-3.5">
           <p className="text-[11px] font-bold uppercase tracking-wider text-muted">

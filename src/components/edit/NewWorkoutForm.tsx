@@ -14,12 +14,11 @@ export default function NewWorkoutForm() {
   const [draft, setDraft] = useState<Workout | null>(null);
   const [repeat, setRepeat] = useState(false);
   const sources = useMemo(() => [...workouts].reverse(), [workouts]);
-  const latestCompleted = sources.find((workout) => workout.status === 'done');
-  const [sourceId, setSourceId] = useState<string | null>(latestCompleted?.id ?? sources[0]?.id ?? null);
   const close = () => canGoBack ? goBack() : navigate('home');
   const begin = (source: Workout | null) => {
     const date = todayISO();
     setDraft(newWorkoutDraft(workoutIdForDate(date, workouts.map((workout) => workout.id)), date, source));
+    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'instant' }));
   };
 
   if (draft) {
@@ -44,13 +43,12 @@ export default function NewWorkoutForm() {
       {repeat && (
         <div className="space-y-3">
           <p className="text-sm text-muted">{t.actions.repeatHint}</p>
-          <ul className="max-h-[45dvh] space-y-2 overflow-y-auto">
+          <ul className="space-y-2">
             {sources.map((workout) => (
               <li key={workout.id}>
-                <button type="button" onClick={() => setSourceId(workout.id)} aria-pressed={sourceId === workout.id}
-                  className={'min-h-14 w-full rounded-xl border px-4 py-3 text-left ' +
-                    (sourceId === workout.id ? 'border-accent bg-accent-soft' : 'border-border bg-card')}>
-                  <span className="font-semibold">{fmtDateShort(workout.date)}, {fmtWeekday(workout.date)}</span>
+                <button type="button" onClick={() => begin(workout)} aria-label={t.actions.copyWorkoutAria(fmtDateShort(workout.date))}
+                  className="min-h-14 w-full rounded-xl border border-border bg-card px-4 py-3 text-left">
+                  <span className="flex items-center justify-between gap-3 font-semibold"><span>{fmtDateShort(workout.date)}, {fmtWeekday(workout.date)}</span><span aria-hidden="true" className="text-muted">›</span></span>
                   <span className="mt-1 block text-sm text-muted">
                     {t.counted.exercises(workout.items.filter((item) => itemKind(item) === 'main').length)}
                     {workout.type && ` · ${t.catalog.workoutType(workout.type)}`}
@@ -59,11 +57,6 @@ export default function NewWorkoutForm() {
               </li>
             ))}
           </ul>
-          <button type="button" disabled={!sourceId}
-            onClick={() => { const source = sources.find((workout) => workout.id === sourceId); if (source) begin(source); }}
-            className="min-h-11 w-full rounded-xl bg-accent px-4 py-2.5 font-semibold text-accent-fg disabled:opacity-40">
-            {t.actions.usePlan}
-          </button>
         </div>
       )}
       <button type="button" onClick={close} className="min-h-11 rounded-xl px-4 py-2.5 text-muted">{t.cancel}</button>
