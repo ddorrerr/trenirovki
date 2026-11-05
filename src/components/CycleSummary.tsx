@@ -5,7 +5,7 @@ import { cycleMemo } from '../lib/cycle';
 import { CycleRing } from './CycleVisual';
 
 export default function CycleSummary({ date = todayISO(), compact = false }: { date?: string; compact?: boolean }) {
-  const { cycle, navigate } = useApp();
+  const { cycle } = useApp();
   const { t } = useT();
   const memo = cycleMemo(cycle, date, todayISO());
   if (!memo && !compact) return null;
@@ -30,12 +30,12 @@ export default function CycleSummary({ date = todayISO(), compact = false }: { d
     label={countdown && memo ? t.cycle.daysLabel(memo.value) : t.cycle.dayLabel}
     length={cycle?.cycleLength ?? 28} forecast={!!countdown || memo?.forecast || memo?.mark === 'periodEstimate'}
     tone={memo?.tone} stale={memo?.mode === 'update'} symbol={memo?.mode === 'ovulation' ? 'ovulation' : undefined} />;
-  return <button type="button" onClick={() => navigate('cycle')} aria-label={`${t.cycle.title}. ${accessible}`}
-    className={`w-full rounded-2xl border border-border bg-card text-left transition-colors hover:bg-chip/40 active:bg-chip focus-visible:outline-2 focus-visible:outline-accent ${compact ? 'flex flex-col items-stretch justify-start p-3.5' : 'flex items-center gap-3 px-4 py-2.5'}`}>
+  return <div role="group" aria-label={`${t.cycle.title}. ${accessible}`}
+    className={`w-full rounded-2xl border border-border bg-card text-left ${compact ? 'flex flex-col items-stretch justify-start p-3.5' : 'flex items-center gap-3 px-4 py-2.5'}`}>
     {!compact && ring}
     <span className="block min-w-0 flex-1">
       <span className="flex items-center justify-between gap-1 text-[11px] font-bold uppercase tracking-wider text-muted">
-        {t.cycle.title}<span aria-hidden="true" className="text-base">›</span>
+        {t.cycle.title}
       </span>
       <span className={`${compact ? 'mt-2' : 'mt-1'} flex items-center gap-2.5`}>
         {compact && ring}
@@ -45,5 +45,5 @@ export default function CycleSummary({ date = todayISO(), compact = false }: { d
         </span>
       </span>
     </span>
-  </button>;
+  </div>;
 }

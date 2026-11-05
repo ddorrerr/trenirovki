@@ -47,8 +47,8 @@ function cycleWindow(cycle: CycleData | null, date: string, today: string) {
     ovulationStart: cycleAddDays(expected, -16), ovulationEnd: cycleAddDays(expected, -12) };
 }
 
-function windowMarker(cycle: CycleData, date: string, window: NonNullable<ReturnType<typeof cycleWindow>>): CycleMark | null {
-  if (date >= window.period.start && date <= (window.period.end ?? window.period.start)) return 'period';
+function windowMarker(cycle: CycleData, date: string, window: NonNullable<ReturnType<typeof cycleWindow>>, today: string): CycleMark | null {
+  if (date >= window.period.start && date <= (window.period.end ?? window.period.start)) return date > today ? 'periodEstimate' : 'period';
   if (window.stale) return null;
   if (window.forecast && date <= cycleAddDays(window.start, cycle.periodLength - 1)) return 'periodEstimate';
   if (!window.period.end && date < window.expected && date <= cycleAddDays(window.period.start, cycle.periodLength - 1)) return 'periodEstimate';
@@ -58,14 +58,20 @@ function windowMarker(cycle: CycleData, date: string, window: NonNullable<Return
 }
 export function cycleMarker(cycle: CycleData | null, date: string, today: string): CycleMark | null {
   const window = cycleWindow(cycle, date, today);
-  return cycle && window ? windowMarker(cycle, date, window) : null;
+  return cycle && window ? windowMarker(cycle, date, window, today) : null;
 }
 export function cycleSummary(cycle: CycleData | null, date: string, today: string) {
   const window = cycleWindow(cycle, date, today);
   if (!cycle || !window) return null;
   return { ...window, day: distance(window.start, date) + 1,
     daysToPeriod: distance(date, window.expected), daysToOvulation: distance(date, window.ovulationDate),
-    mark: windowMarker(cycle, date, window) };
+    mark: windowMarker(cycle, date, window, today) };
+}
+
+/** Inclusive end: a five-day period starting on the 4th ends on the 8th. */
+export function usualPeriodEnd(start: string, length: number): string {
+  return validCycleDate(start) && Number.isInteger(length) && length >= 1 && length <= 14
+    ? cycleAddDays(start, length - 1) : '';
 }
 
 /** Select one useful message; estimates never imply measured ovulation or energy. */

@@ -45,7 +45,7 @@ export default function MenuScreen() {
 
       <Section title={t.menu.sectionSettings}>
         <button type="button" onClick={() => navigate('cycle')} className="flex min-h-14 w-full items-center justify-between px-4 py-3.5 text-left font-medium">
-          {t.cycle.title}<span aria-hidden="true">›</span>
+          <span>{t.cycle.title}<span className="mt-1 block text-xs font-normal text-muted">{t.cycle.manageHint}</span></span><span aria-hidden="true">›</span>
         </button>
         <ToggleRow
           title={t.menu.keepAwake}

@@ -17,11 +17,11 @@ import { tr, useT } from '../../i18n';
 import { fmtDate } from '../../lib/dates';
 import { nextExerciseId, nextItemId } from '../../lib/ids';
 import { mergeWorkoutDraft } from '../../lib/workout-draft';
-import { parseSetSeconds } from '../../lib/timed-sets';
+import { timedSetPlan } from '../../lib/timed-sets';
 import ActualEditor from './ActualEditor';
 import { linesToSubNotes, parseSetsReps, parseWeight, serializePerSetPlan } from './parse';
 import ExerciseCombobox from './ExerciseCombobox';
-import { ChevronIcon, PinIcon } from '../train/icons';
+import { FlameIcon, PinIcon } from '../train/icons';
 import {
   IconBtn,
   IconDown,
@@ -124,8 +124,6 @@ export default function WorkoutEditor({ workout, onClose, onSaved, isNew = false
 
   /* --- Разминка --------------------------------------------------------- */
 
-  // Разминку правят редко — по умолчанию блок свёрнут, как в режиме чтения
-  const [warmupOpen, setWarmupOpen] = useState(false);
 
   /* Свободные текстовые пункты и «Видео разминки» — наследие: с v0.28.0
      разминка собирается из упражнений библиотеки. Старые данные (если
@@ -261,15 +259,17 @@ export default function WorkoutEditor({ workout, onClose, onSaved, isNew = false
   );
 
   if (itemId) {
-    const item = mainItems.find((entry) => entry.id === itemId);
+    const item = draft.items.find((entry) => entry.id === itemId);
     if (!item) return null;
     return (
       <div className="space-y-3">
         {actions}
         <h3 className="px-1 font-semibold">{t.actions.planSection}</h3>
-        <ItemEditorCard item={item} index={mainItems.indexOf(item)} total={mainItems.length}
-          exercises={exercises} patchItem={patchItem} move={() => {}} remove={removeItem}
-          createExercise={createExercise} compact />
+        {warmupItems.some(entry => entry.id === item.id)
+          ? <ul><WarmupItemEditorCard item={item} index={warmupItems.indexOf(item)} total={warmupItems.length}
+              exercises={exercises} patchItem={patchItem} move={() => {}} remove={removeItem} createExercise={createExercise} compact /></ul>
+          : <ItemEditorCard item={item} index={mainItems.indexOf(item)} total={mainItems.length}
+              exercises={exercises} patchItem={patchItem} move={() => {}} remove={removeItem} createExercise={createExercise} compact />}
         {exerciseKind(exercises.find((exercise) => exercise.id === item.exerciseId)) === 'main' &&
           <ActualEditor item={item} onChange={(actual) => patchItem(item.id, { actual })} />}
       </div>
@@ -322,26 +322,14 @@ export default function WorkoutEditor({ workout, onClose, onSaved, isNew = false
         </div>
       </section>
 
-      {/* --- Разминка (свёрнута, как в режиме чтения — правят её редко) ----- */}
+      {/* --- Разминка — отдельная видимая часть плана ----- */}
       <section className="rounded-2xl border border-border bg-card p-4">
-        <button
-          type="button"
-          onClick={() => setWarmupOpen((v) => !v)}
-          aria-expanded={warmupOpen}
-          className="flex min-h-11 w-full items-center gap-2 text-left"
-        >
-          <span className="text-sm font-semibold uppercase tracking-wide text-muted">
-            {t.train.warmup}
-          </span>
-          {draft.warmup.length + warmupItems.length > 0 && (
-            <span className="text-sm text-muted">{draft.warmup.length + warmupItems.length}</span>
-          )}
-          <span className="text-muted">
-            <ChevronIcon open={warmupOpen} size={18} />
-          </span>
-        </button>
-        {warmupOpen && (
-          <div className="anim-rise">
+        <h2 className="flex min-h-11 items-center gap-2 font-bold">
+          <FlameIcon size={20} /> {t.train.warmup}
+          {warmupItems.length > 0 && <span className="text-sm font-medium text-muted">{warmupItems.length}</span>}
+        </h2>
+        <p className="text-sm text-muted">{t.editor.warmupSectionHint}</p>
+        <div>
             {/* Поле «Видео разминки» — только если в данных ещё есть старая
                 ссылка; в новых тренировках видео живёт у «Суставной разминки» */}
             {draft.warmupVideoUrl && (
@@ -411,10 +399,9 @@ export default function WorkoutEditor({ workout, onClose, onSaved, isNew = false
               onClick={addWarmupItem}
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 font-medium"
             >
-              <IconPlus size={16} /> {t.editor.addExercise}
+              <IconPlus size={16} /> {t.editor.addWarmupExercise}
             </button>
           </div>
-        )}
       </section>
 
       {/* --- Упражнения ---------------------------------------------------- */}
@@ -526,6 +513,9 @@ function ItemEditorCard({
   const subNotes = item.subNotes ?? [];
   const sr = splitSetsReps(item.setsReps?.raw ?? '');
   const kind = exerciseKind(exercises.find((e) => e.id === item.exerciseId));
+  const seconds = timedSetPlan(item)?.[0] ?? null;
+  const [timeError, setTimeError] = useState(false);
+  const previousReps = useRef(seconds == null ? sr.reps : '');
   return (
     <article data-workout-item={item.id} className="rounded-2xl border border-border bg-card p-4">
       <div className="flex items-start gap-2">
@@ -594,23 +584,34 @@ function ItemEditorCard({
               «3х12»); «разные подходы» — прогрессия: вес×повторы на каждый */}
           {!item.perSetPlan?.length ? (
             <>
+              <div className="mt-3">
+                <SelectField label={t.timer.setMode} value={seconds != null ? 'time' : 'reps'}
+                  options={[{ value: 'reps', label: t.item.reps }, { value: 'time', label: t.timer.timeMode }]}
+                  onCommit={value => {
+                    setTimeError(false);
+                    if (value === 'time') previousReps.current = sr.reps;
+                    patchItem(item.id, { setsReps: parseSetsReps(`${sr.sets || '1'}х${value === 'time' ? '30 сек' : previousReps.current}`) });
+                  }} />
+              </div>
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <TextField
                   label={t.item.sets}
                   value={sr.sets}
                   placeholder={t.editor.setsPlaceholder}
-                  onCommit={(v) =>
-                    patchItem(item.id, { setsReps: parseSetsReps(joinSetsReps(v, sr.reps)) })
-                  }
+                  onCommit={(v) => patchItem(item.id, { setsReps: parseSetsReps(joinSetsReps(v, sr.reps)) })}
                 />
                 <TextField
-                  label={parseSetSeconds(sr.reps) != null ? t.timer.setDuration : t.editor.repsOrTime}
-                  value={sr.reps}
-                  placeholder={t.editor.repsPlaceholder}
-                  onCommit={(v) =>
-                    patchItem(item.id, { setsReps: parseSetsReps(joinSetsReps(sr.sets, v)) })
-                  }
+                  label={seconds != null ? t.timer.secondsLabel : t.editor.repsOrTime}
+                  value={seconds != null ? String(seconds) : sr.reps}
+                  inputMode={seconds != null ? 'numeric' : undefined}
+                  placeholder={seconds != null ? '30' : t.editor.repsPlaceholder}
+                  onCommit={value => {
+                    if (seconds != null && (!/^\d+$/.test(value.trim()) || Number(value) < 5 || Number(value) > 1200)) { setTimeError(true); return; }
+                    setTimeError(false);
+                    patchItem(item.id, { setsReps: parseSetsReps(joinSetsReps(sr.sets, seconds != null ? `${value.trim()} сек` : value)) });
+                  }}
                 />
+                {timeError && <p role="alert" className="col-span-2 text-sm text-danger">{t.timer.invalidDuration}</p>}
                 <TextField
                   label={t.item.weightKg}
                   value={item.weight?.raw ?? ''}

@@ -14,6 +14,7 @@ import ActionMenu from '../edit/ActionMenu';
 import VideoLink from './VideoLink';
 import {
   BarbellIcon,
+  FlameIcon,
   CheckIcon,
   ChevronIcon,
   ClockIcon,
@@ -293,7 +294,7 @@ export default function ItemCard({
         {/* Разминка упражнения — первой: с неё начинают и её читают первой */}
         {item.warmupSets && (
           <p className="mt-2 flex flex-wrap gap-x-2 text-sm leading-relaxed">
-            <span className="text-muted">{t.item.warmupLabel}</span>
+            <span className="mt-0.5 shrink-0 text-muted" title={t.item.warmupLabel}><FlameIcon size={18} /><span className="sr-only">{t.item.warmupLabel}</span></span>
             <span className="min-w-0 whitespace-pre-line break-words">{item.warmupSets}</span>
           </p>
         )}
@@ -345,10 +346,10 @@ export default function ItemCard({
             ))}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-            {active && !locked && !item.done && nextSeconds != null && onTime && (
+            {!locked && !item.done && !item.skipped && nextSeconds != null && onTime && (
               <button type="button" onClick={() => onTime(item)} aria-label={t.timer.startSet}
                 className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-sm font-bold text-accent-fg">
-                <TimerIcon name="play" /><span>{fmtClock(nextSeconds)}</span>
+                <TimerIcon name="play" /><span>{t.timer.startSetShort} · {fmtClock(nextSeconds)}</span>
               </button>
             )}
             {(item.rest || timedPlan) && (

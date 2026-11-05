@@ -4,7 +4,8 @@ import { useApp } from '../store';
 import { useT } from '../i18n';
 import { fmtDateShort, fmtWeekday, todayISO } from '../lib/dates';
 import MonthCalendar from '../components/history/MonthCalendar';
-import CycleSummary from '../components/CycleSummary';
+import { BarbellIcon } from '../components/train/icons';
+import { FatigueFace, fatigueColor } from '../components/FatigueIndicator';
 import { Chip, IconCheck, IconComment, IconPlus } from '../components/edit/ui';
 
 const memory = { scroll: 0, month: todayISO().slice(0, 7), date: null as string | null };
@@ -47,7 +48,6 @@ export default function HistoryScreen() {
       <MonthCalendar month={month} selectedDate={date}
         onMonthChange={(value) => { memory.month = value; memory.date = null; setMonth(value); setDate(null); }}
         onSelectDate={(value) => { memory.date = date === value ? null : value; setDate(memory.date); }} />
-      {date && <CycleSummary date={date} />}
       {date && !workouts.some(w => w.date === date) && <p className="text-sm text-muted">{t.cycle.noWorkout}</p>}
       {date && <button type="button" onClick={() => { memory.date = null; setDate(null); }}
         className="min-h-11 rounded-lg px-2 text-sm font-semibold text-accent">{t.actions.allWorkouts}</button>}
@@ -89,10 +89,10 @@ function WorkoutRow({ w, onOpen }: { w: Workout; onOpen: (workout: Workout) => v
             </span>
           )}
         </div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
           {w.type && <Chip>{t.catalog.workoutType(w.type)}</Chip>}
-          <Chip muted>{t.counted.exercises(exerciseCount)}</Chip>
-          {w.fatigue != null && <Chip muted>{t.fatigueN(w.fatigue)}</Chip>}
+          <span className="inline-flex items-center gap-1.5 text-sm font-semibold tabular-nums text-muted" title={t.counted.exercises(exerciseCount)}><BarbellIcon /><span aria-hidden="true">{exerciseCount}</span><span className="sr-only">{t.counted.exercises(exerciseCount)}</span></span>
+          {w.fatigue != null && <span className="inline-flex items-center gap-1.5 text-sm font-semibold tabular-nums" title={t.fatigueN10(w.fatigue)}><span style={{ color: `color-mix(in oklab, ${fatigueColor(w.fatigue)} 55%, var(--fg))` }}><FatigueFace level={w.fatigue} size={19} /></span><span aria-hidden="true">{w.fatigue}</span><span className="sr-only">{t.fatigueN10(w.fatigue)}</span></span>}
         </div>
       </button>
 

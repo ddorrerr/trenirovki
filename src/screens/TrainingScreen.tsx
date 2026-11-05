@@ -22,6 +22,8 @@ import ItemCard, {
 } from '../components/train/ItemCard';
 import { parseRestSeconds } from '../lib/rest-timer';
 import { timedSetPlan } from '../lib/timed-sets';
+import { TimerIcon, fmtClock } from '../components/train/RestTimer';
+import { FatigueFace, fatigueColor } from '../components/FatigueIndicator';
 import VideoLink from '../components/train/VideoLink';
 import {
   CheckIcon,
@@ -232,8 +234,9 @@ export default function TrainingScreen() {
   const requestSet = (item: WorkoutItem) => {
     const plan = timedSetPlan(item);
     const setIndex = item.setsDone ?? 0;
-    if (!plan || plan[setIndex] == null) return;
-    requestRestTimer(item.id, plan[setIndex], false, {
+    if (!plan || plan[setIndex] == null || w.status !== 'planned' || item.done || item.skipped) return;
+    if (!w.startedAt) saveWorkout({ ...w, startedAt: new Date().toISOString() });
+    requestRestTimer(item.id, plan[setIndex], true, {
       kind: 'set', itemId: item.id, workoutId: w.id, setIndex, totalSets: plan.length,
       exerciseName: exerciseById(item.exerciseId)?.name ?? item.nameRaw,
       restSeconds: parseRestSeconds(item.rest),
@@ -404,7 +407,7 @@ export default function TrainingScreen() {
         initialOpen={openedItemsRef.current[item.id] ?? false}
         exercise={item.exerciseId ? exerciseById(item.exerciseId) : undefined}
         last={item.exerciseId ? lastResultBefore(item.exerciseId, w.date, w.id) : null}
-        onChange={(patch) => saveItem(item.id, patch)} onRest={requestRest} onTime={requestSet}
+        onChange={(patch) => saveItem(item.id, patch)} onRest={requestRest} onTime={w.status === 'planned' ? requestSet : undefined}
         onEdit={editing ? undefined : () => beginEdit(item.id)}
         onMove={editing ? undefined : () => beginOrder(item.id)}
         onRemove={editing ? undefined : () => removeItem(item)} />
@@ -571,6 +574,7 @@ export default function TrainingScreen() {
           w={w}
           celebrate={celebrate}
           onStart={startWorkout}
+          onTime={requestSet}
           onEdit={(item) => beginEdit(item.id, true)}
           onMove={(item) => beginOrder(item.id)}
           onRemove={removeItem}
@@ -839,10 +843,11 @@ function compactSummary(it: WorkoutItem, kind: ExerciseKind, dict: Dict): string
   return [sr, wt].filter(Boolean).join(' · ');
 }
 
-function CompactWorkoutCard({ w, celebrate, onStart, onExpand, onEdit, onMove, onRemove }: {
+function CompactWorkoutCard({ w, celebrate, onStart, onExpand, onEdit, onMove, onRemove, onTime }: {
   w: Workout;
   celebrate: boolean;
   onStart: () => void;
+  onTime: (item: WorkoutItem) => void;
   onExpand: () => void;
   onEdit: (item: WorkoutItem) => void;
   onMove: (item: WorkoutItem) => void;
@@ -870,11 +875,14 @@ function CompactWorkoutCard({ w, celebrate, onStart, onExpand, onEdit, onMove, o
           const video = item.videoUrl ?? exercise?.videoUrl;
           const skipped = !!item.skipped && !item.done;
           const summary = compactSummary(item, kind, t);
+          const seconds = timedSetPlan(item)?.[item.setsDone ?? 0];
           return <li key={item.id} data-workout-item={item.id} className="flex min-h-14 items-center gap-2.5 py-2">
             <div className={'min-w-0 flex-1 ' + (skipped ? 'text-muted line-through opacity-60' : '')}>
               {skipped && <span className="sr-only">{t.train.skippedLabel}: </span>}
               <span title={name} className="block break-words text-base font-semibold">{name}</span>
               {summary && <span className="mt-0.5 block break-words text-sm tabular-nums text-muted">{summary}</span>}
+              {w.status === 'planned' && !item.done && !item.skipped && seconds != null && <button type="button" onClick={() => onTime(item)} aria-label={t.timer.startSet}
+                className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-3 text-sm font-bold text-accent-fg"><TimerIcon name="play" />{t.timer.startSetShort} · {fmtClock(seconds)}</button>}
             </div>
             <ActionMenu label={`${t.actions.exerciseActions}: ${name}`} actions={[
               ...(video ? [{ label: t.item.techVideo, href: video }] : []),
@@ -982,46 +990,6 @@ function ConfettiBurst() {
 }
 
 /* --- Усталость: ползунок со смайликом и замком от случайных сдвигов -------- */
-
-/** Каждой оценке — свой цвет по палитре: лайм → янтарь → коралл */
-function fatigueColor(level: number): string {
-  const hue = Math.round(85 - ((level - 1) / 9) * 85);
-  return `hsl(${hue} 78% 44%)`;
-}
-
-/** Лицо едет вместе с ползунком: улыбка → гримаса → крестики-глаза */
-function FatigueFace({ level, size = 26 }: { level: number; size?: number }) {
-  const dead = level >= 9;
-  // кривизна рта: +3.8 (улыбка, y вниз) → −3.8 (грусть)
-  const c = 3.8 - ((level - 1) / 9) * 7.6;
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="9" />
-      {dead ? (
-        <>
-          <path d="M7.4 7.9l2.8 2.8M10.2 7.9l-2.8 2.8" />
-          <path d="M13.8 7.9l2.8 2.8M16.6 7.9l-2.8 2.8" />
-        </>
-      ) : (
-        <>
-          <circle cx="9" cy="9.7" r="1.15" fill="currentColor" stroke="none" />
-          <circle cx="15" cy="9.7" r="1.15" fill="currentColor" stroke="none" />
-        </>
-      )}
-      <path d={`M8.3 15.4 Q12 ${(15.4 + c).toFixed(1)} 15.7 15.4`} />
-    </svg>
-  );
-}
 
 function LockIcon({ open }: { open: boolean }) {
   return (

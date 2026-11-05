@@ -140,7 +140,7 @@ export interface Workout {
 
 export interface PeriodRecord {
   start: string;
-  /** null means only the start is logged; never present estimated days as recorded. */
+  /** Chosen end may be in the future (shown as estimated). null means only the start is logged. */
   end: string | null;
 }
 

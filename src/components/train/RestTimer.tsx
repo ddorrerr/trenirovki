@@ -5,7 +5,8 @@ import { useWakeLock } from '../../hooks/useWakeLock';
 import { freshRestClock, parseRestSeconds, restClockReducer, restoreRestClock, type RestAction, type RestClock, type RestRequest } from '../../lib/rest-timer';
 import { confirmTimedSet } from '../../lib/timed-sets';
 import { timerAudio } from '../../lib/timer-audio';
-import { CheckIcon } from './icons';
+import { CheckIcon, XIcon } from './icons';
+import TimerDock from './TimerDock';
 
 const STORAGE_KEY = 'trenirovki:rest-clock:v1';
 const PRESETS = [60, 90, 120];
@@ -66,14 +67,14 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
     if (!request || request.nonce === lastNonce.current) return;
     lastNonce.current = request.nonce;
     confirming.current = false;
-    if (!request.autostart) setOpen(true);
+    if (!request.autostart || request.context?.kind === 'set') setOpen(true);
     const timestamp = Date.now();
     setNow(timestamp);
     setClock(previous => {
       const context = request.context ?? { kind: 'rest' as const, itemId: request.itemId };
       const same = previous.context?.itemId === request.itemId && previous.context?.kind === context.kind &&
         previous.context?.workoutId === context.workoutId && previous.context?.setIndex === context.setIndex && previous.duration === request.seconds;
-      if (!request.autostart && same && previous.status !== 'idle') return previous;
+      if (same && previous.status !== 'idle' && (!request.autostart || context.kind === 'set')) return previous;
       const next = freshRestClock(request.seconds, context);
       return request.autostart ? restClockReducer(next, { type: 'start', now: timestamp }) : next;
     });
@@ -127,6 +128,14 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
     };
   }, [running, finished]);
   useEffect(() => () => timerAudio.dispose(), []);
+  // A completed rest clears itself. Exercise results wait for explicit confirmation.
+  useEffect(() => {
+    if (!finished || isSet || clock.endAt == null) return;
+    const timeout = window.setTimeout(() => {
+      timerAudio.setDeadline(null); setClock(previous => freshRestClock(previous.duration)); setOpen(false);
+    }, Math.max(0, clock.endAt + 8000 - Date.now()));
+    return () => window.clearTimeout(timeout);
+  }, [finished, isSet, clock.endAt]);
 
   const start = () => {
     timerAudio.setDeadline(null);
@@ -154,20 +163,19 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
     : clock.status === 'paused' ? t.timer.pause : '';
 
   return <>
-    {!open && clock.status !== 'idle' && <div className="timer-dock-position">
-      <button type="button" className="timer-dock" onClick={() => setOpen(true)} aria-label={t.timer.openAria}>
+    {!open && clock.status !== 'idle' && <TimerDock onOpen={() => setOpen(true)} onDismiss={dismiss}>
         <Dial clock={clock} now={now} compact />
-        <span className="timer-dock__label">{clock.status === 'paused' ? t.timer.pause : isSet ? t.timer.setTitle : t.timer.title}</span>
+        <span className="timer-dock__label">{finished ? phase : clock.status === 'paused' ? t.timer.pause : isSet ? t.timer.setTitle : t.timer.title}</span>
         <span className="timer-dock__expand"><TimerIcon name="expand" /></span>
         {finished && <span className="sr-only" role="status">{phase}</span>}
-      </button>
-    </div>}
+    </TimerDock>}
     <dialog ref={dialog} className="workout-timer-dialog" aria-labelledby="timer-title"
       onCancel={event => { event.preventDefault(); minimise(); }} onClose={minimise}>
       <div className="workout-timer-panel">
         <header className="workout-timer-header">
           <h2 id="timer-title" className="min-w-0 break-words text-base font-bold">{isSet ? t.catalog.exercise(context?.exerciseName ?? t.timer.setTitle) : t.timer.title}</h2>
-          <button type="button" onClick={minimise} aria-label={t.timer.minimise} className="timer-control timer-control--secondary shrink-0"><TimerIcon name="minimize" /></button>
+          <div className="flex gap-2"><button type="button" onClick={minimise} aria-label={t.timer.minimise} className="timer-control timer-control--secondary shrink-0"><TimerIcon name="minimize" /></button>
+          <button type="button" onClick={dismiss} aria-label={t.timer.closeAria} className="timer-control timer-control--secondary shrink-0"><XIcon /></button></div>
         </header>
         <div className="workout-timer-body">
           <p className="mb-6 text-sm text-muted">{isSet ? t.timer.setNumber((context?.setIndex ?? 0) + 1, context?.totalSets ?? 1) : t.timer.betweenSets}</p>
@@ -185,6 +193,7 @@ export default function RestTimer({ request }: { request: RestRequest | null }) 
           </div>
         </div>
         <footer className="workout-timer-footer">
+          <p className="text-center text-xs text-muted">{t.timer.gestureHint}</p>
           <details className="text-center text-xs text-muted"><summary className="cursor-pointer py-3">{t.timer.sound}</summary>
             <button type="button" onClick={() => { void timerAudio.test().then(ok => setSoundFailed(!ok)); }} className="min-h-11 text-sm font-semibold text-accent">{t.timer.testSound}</button>
             <p>{soundFailed ? t.timer.soundUnavailable : t.timer.foregroundHint}</p>
